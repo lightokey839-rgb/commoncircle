@@ -1,6 +1,6 @@
 # Gate 0 diff inventory
 
-Generated from `git diff --name-status --no-renames HEAD` on 2026-11-10.
+Generated from `git diff --name-status --no-renames baseline-loanbook-port..HEAD` on 2026-11-10.
 
 | Status | Path |
 | --- | --- |
