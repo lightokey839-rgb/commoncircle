@@ -1,11 +1,12 @@
 # Gate 0 diff inventory
 
-Generated from `git diff --name-status --no-renames baseline-loanbook-port..HEAD` on 2026-11-10.
+Generated from `git diff --name-status --no-renames baseline-loanbook-port..HEAD` on 2026-11-11.
 
 | Status | Path |
 | --- | --- |
 | A | `.github/workflows/commoncircle-gate0.yml` |
 | M | `.gitignore` |
+| M | `.env.example` |
 | A | `.nvmrc` |
 | M | `AGENTS.md` |
 | A | `NEW_FILES.md` |
@@ -16,12 +17,14 @@ Generated from `git diff --name-status --no-renames baseline-loanbook-port..HEAD
 | A | `contracts/vault/README.md` |
 | A | `docs/VERIFICATION.md` |
 | A | `docs/COMMONCIRCLE_SPEC_v3.md` |
+| A | `docs/SPEC_DEVIATIONS.md` |
 | A | `evidence/evidence.json` |
 | A | `EVIDENCE.md` |
 | M | `package.json` |
 | A | `rust-toolchain.toml` |
 | A | `scripts/claims.mjs` |
 | A | `scripts/claims-self-test.mjs` |
+| A | `scripts/verify-usdc.mjs` |
 | A | `server/COMMONCIRCLE_GATE0.md` |
 | A | `web/README.md` |
 

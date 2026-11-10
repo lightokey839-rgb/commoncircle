@@ -1,6 +1,6 @@
 # CommonCircle status
 
-Updated: 2026-11-10 (Africa/Lagos)
+Updated: 2026-11-11 (Africa/Lagos)
 
 ## Gate 0
 
@@ -57,3 +57,19 @@ before any README claim is promoted.
    invites, passport mint/access checks, non-transferability, Trusted-tier
    qualification, and on-chain card-art views; record wasm hash and testnet
    evidence before moving to F2.
+
+## Gate 1 Phase 1A stop
+
+Status: BLOCKED — contract implementation intentionally not started.
+
+The attached Gate 1 request requires a compiler before contract code is written.
+This Windows environment has Node/npm but no Cargo, rustup, wasm32 target,
+cargo-near, WSL distribution, or Docker. The pre-existing package-lock and
+`scripts/test-db.mjs` are corrupt in the baseline and `origin/main`; registry
+access was also unavailable for lockfile regeneration. A read-only
+`scripts/verify-usdc.mjs` handoff was added, but no RPC output exists yet.
+
+Before Phase 1B, install/use a Linux Rust runner (WSL2, Docker, or CI), generate
+and commit `Cargo.lock`, repair/regenerate `package-lock.json`, and provide a
+reachable testnet RPC URL in a local gitignored `.env`. Do not add contract
+behavior until `cargo test --no-run` succeeds.

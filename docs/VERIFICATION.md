@@ -1,6 +1,6 @@
 # CommonCircle verification ledger
 
-Updated: 2026-11-10 (Africa/Lagos)
+Updated: 2026-11-11 (Africa/Lagos)
 
 This ledger is evidence-first. `UNVERIFIED` and `BLOCKED` entries are not README
 claims. No private keys, seed phrases, access tokens, or populated `.env` data
@@ -40,6 +40,34 @@ belong here.
 | Circle scaffold tests | BLOCKED | Rust/Cargo is not installed in the execution environment; tests are intentionally red placeholders for all 17 v3 README rows |
 | `npm ci` clean install | FAIL | `npm ci` rejected the committed `package-lock.json` because it is not valid JSON/lockfile data; npm cache-routed lockfile regeneration was attempted but could not complete due registry/cache host restrictions |
 | Existing LoanBook checks | FAIL | `npm test`/`npm run check`/`npm run test:contracts` could not run without dependencies; `npm run test:db` additionally fails because pre-existing `scripts/test-db.mjs` contains non-text bytes beginning `59 AA E7 8A 78 2D AE E9...` |
+
+## Gate 1 Phase 1A — toolchain and verification handoff
+
+| Check | Status | Evidence |
+| --- | --- | --- |
+| Cargo, rustc, rustup, cargo-near available on Windows | BLOCKED | `Get-Command cargo,rustc,rustup,cargo-near` returned no matches on 2026-11-11; WSL is not installed. The existing Ubuntu CI job is the test runner until a Linux toolchain is available. |
+| wasm32 target and cargo-near checked | BLOCKED | No local `rustup` or `cargo-near` command exists; no target query could run. |
+| Near SDK pin | PASS (manifest only) | `contracts/circle/Cargo.toml` pins `near-sdk = 5.17.2`; compilation has not run locally. |
+| Cargo.lock committed | BLOCKED | Cannot generate a trustworthy lockfile without Cargo; CI must generate/verify it in a Linux runner before contract code is pushed. |
+| package-lock baseline comparison | PASS (baseline corruption confirmed) | `git ls-tree 940099e` and `git ls-tree origin/main` both point to blob `9f6cce0fc5c0aee2455048ed490a38ba46ec120a`; JSON parse fails with `Unexpected token 'Y'`. |
+| test-db baseline comparison | PASS (baseline corruption confirmed) | `git ls-tree 940099e` and `git ls-tree origin/main` both point to blob `b6dda0986fbb4aae61f8b8e0a674f2b715a9a40d`; the file begins with non-text bytes and no alternate copy exists in Git. |
+| npm lockfile regeneration | BLOCKED | `npm install --package-lock-only --ignore-scripts --no-audit --no-fund` could not access the registry/cache from this environment; `npm ci` still fails before installation because the lockfile is not JSON. |
+| read-only USDC verification script | PASS (fail-closed behavior) | `node --check scripts/verify-usdc.mjs` passed. `npm run verify:usdc` with no RPC variables failed closed for both pinned IDs with `missing RPC URL for this network`; no metadata claim is made. |
+| baseline tag target | PASS | `git rev-parse baseline-loanbook-port^{}` resolves to `940099e49466accf9110769056b0e50891e5f096` in this writable clone. |
+
+### Required push handoff
+
+From the writable clone, after reviewing the commits and once the original
+checkout is writable, push the tag before any Gate 1 branch commits:
+
+```powershell
+git push origin baseline-loanbook-port
+git push origin codex/loanbook-release-candidate
+```
+
+The current `origin` is a local path to the LoanBook checkout, not a public
+remote. Do not run these commands until the intended public remote is configured
+and the original checkout accepts Git writes.
 
 ## Evidence format
 

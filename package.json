@@ -19,6 +19,7 @@
     "test:contracts": "node node_modules/@foundry-rs/forge/bin.mjs test",
     "claims": "node scripts/claims.mjs",
     "claims:test": "node scripts/claims-self-test.mjs",
+    "verify:usdc": "node scripts/verify-usdc.mjs",
     "preview": "vite preview --configLoader runner --host localhost --port 5173"
   },
   "dependencies": {
