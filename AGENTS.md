@@ -93,3 +93,57 @@ Do NOT run the older numbered migrations (001_loanbook_schema, 002_security_hard
 bun install
 bun run dev
 ```
+
+---
+
+# CommonCircle engineering instructions
+
+This repository is the CommonCircle NEAR hackathon entry. The disclosed LoanBook
+port is the baseline; everything after the annotated `baseline-loanbook-port`
+tag is NEW. The authoritative product spec is `docs/COMMONCIRCLE_SPEC_v3.md`.
+The attached `COMMONCIRCLE_SPEC.md` was supplied as v2 because v3 was not
+present in the checkout; this discrepancy is recorded in `docs/VERIFICATION.md`
+and must be resolved before any claim is made against v3-only requirements.
+
+## Rules that never bend
+
+1. Integer base units only; USDC has 6 decimals. Use U128 strings across APIs;
+   never use floating point.
+2. The circle contract holds zero USDC at rest. State changes commit in
+   callbacks after the forward succeeds, and callbacks are `#[private]`.
+   `ft_on_transfer` accepts only the pinned USDC contract as caller, only the
+   named lender (or vault, or circle treasury), and only the exact principal;
+   every other transfer is refunded.
+3. Every duration is a parameter. There is no admin and no upgrade path after
+   final deploy.
+4. The agent drafts and cranks. It never signs for a member and never executes
+   chat text.
+5. Never put keys, seed phrases, or tokens in the repo, logs, or chat. Use a
+   gitignored `.env` and a committed `.env.example`.
+6. Do not claim anything that has not been run. If it fails or cannot be
+   verified, say so and record it in `docs/VERIFICATION.md`.
+
+## Gate list
+
+- Gate 0: baseline tag, repository hygiene/toolchain pins/CI, testnet
+  verification evidence, circle data-model scaffold with failing README-check
+  tests, and the evidence claims stub.
+- Gate 1: F0 loan lifecycle with exact-unit/refund/callback invariants and
+  sandbox integration coverage.
+- Gate 2: F1 passport NFT, access gates, tiers, and on-chain card art.
+- Gate 3: F4 NEP-366 onboarding and the real pilot; start early because
+  repayments take real time.
+- Gate 4: F5 vault/agent flows, then F2 Sputnik treasury flow, then F3 Intents
+  only if their evidence gates are satisfied.
+- Submission gate: only tracks with evidence/evidence.json-backed claims may
+  appear in README; final deployment must have no full-access keys and must
+  show an empty access-key view.
+
+## Gate 0 operating rules
+
+- Keep commits small and run the relevant tests before reporting completion.
+- The baseline tag must point to the last commit containing only the ported
+  LoanBook code; ask for clarification if that commit cannot be determined.
+- Generate `NEW_FILES.md` from the diff after each Gate 0 change set.
+- Do not implement behavior in `contracts/circle` or `contracts/vault` during
+  the data-model scaffold step.
