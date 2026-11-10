@@ -4,7 +4,7 @@ Updated: 2026-11-10 (Africa/Lagos)
 
 ## Gate 0
 
-Status: IN PROGRESS / NOT CLAIMABLE
+Status: ARTIFACTS COMPLETE / BLOCKED ITEMS REMAIN / NOT CLAIMABLE
 
 The working clone is based on LoanBook commit `940099e`. The original checkout
 at `C:\Users\HomePC\Documents\GitHub\Loanbook` was read-only to Git's object
@@ -44,3 +44,16 @@ the gate.
 
 See `docs/VERIFICATION.md` for the evidence ledger. This file must be updated
 before any README claim is promoted.
+
+## Next three Gate 1 tasks
+
+1. Resolve environment/repository blockers: writable original checkout,
+   committed `Cargo.lock`, valid Node/Bun dependency installation, and a
+   reachable NEAR RPC path; then run the v3 USDC metadata/storage checks.
+2. Implement and sandbox-test F0 callbacks/refunds with pinned USDC, exact
+   principal, named lender/vault/treasury authorization, private callbacks, and
+   zero circle-token balance at rest.
+3. Implement F1 core gates in the contract freeze window: registered single-use
+   invites, passport mint/access checks, non-transferability, Trusted-tier
+   qualification, and on-chain card-art views; record wasm hash and testnet
+   evidence before moving to F2.
