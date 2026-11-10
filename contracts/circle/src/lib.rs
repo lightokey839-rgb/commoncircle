@@ -11,13 +11,20 @@ use near_sdk::{AccountId, BorshStorageKey};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::U128;
 use near_sdk::serde::{Deserialize, Serialize};
-use near_sdk::serde_json::Value;
 
 #[derive(BorshStorageKey, BorshSerialize)]
 pub enum StorageKey {
     Circles,
     Passports,
     Loans,
+    Invites,
+}
+
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(crate = "near_sdk::serde")]
+pub enum DeploymentMode {
+    TestnetDemo,
+    Mainnet,
 }
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -30,6 +37,15 @@ pub struct DurationConfig {
     pub recovery_timelock_ns: u64,
     pub access_recheck_ns: u64,
     pub invite_expiry_ns: u64,
+}
+
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(crate = "near_sdk::serde")]
+pub struct DurationFloorConfig {
+    pub funding_window_floor_ns: u64,
+    pub qualifying_duration_floor_ns: u64,
+    pub recovery_lock_floor_ns: u64,
+    pub dao_proposal_period_floor_ns: u64,
 }
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -51,10 +67,46 @@ pub struct NetworkConfig {
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(crate = "near_sdk::serde")]
+pub struct DaoConfig {
+    pub proposal_period_ns: u64,
+    pub proposal_bond: U128,
+    pub threshold_numerator: u32,
+    pub threshold_denominator: u32,
+    pub strict_majority: bool,
+}
+
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(crate = "near_sdk::serde")]
 pub struct CircleConfig {
+    pub deployment_mode: DeploymentMode,
     pub network: NetworkConfig,
     pub durations: DurationConfig,
+    pub duration_floors: DurationFloorConfig,
     pub amounts: AmountConfig,
+    pub dao: DaoConfig,
+}
+
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(crate = "near_sdk::serde")]
+pub struct Circle {
+    pub circle_id: u64,
+    pub founder_id: AccountId,
+    pub treasury_id: AccountId,
+    pub steward_ids: Vec<AccountId>,
+    pub trusted_repayment_threshold: u32,
+    pub minimum_qualifying_duration_ns: u64,
+    pub config: CircleConfig,
+}
+
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(crate = "near_sdk::serde")]
+pub struct Invite {
+    pub circle_id: u64,
+    pub invite_key_hash: Vec<u8>,
+    pub inviter_id: AccountId,
+    pub invitee_id: Option<AccountId>,
+    pub expires_at_ns: u64,
+    pub signature: Vec<u8>,
 }
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -75,7 +127,9 @@ pub struct Passport {
     pub late_repayments: u32,
     pub overdue_open_loans: u32,
     pub different_lenders: Vec<AccountId>,
-    pub metadata: Value,
+    /// JSON metadata is kept as text in the storage model; API view wrappers
+    /// will expose it without introducing non-integer financial types.
+    pub metadata_json: String,
 }
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -87,6 +141,7 @@ pub enum LoanState {
     Repaying,
     Repaid,
     Cancelled,
+    WrittenOff,
 }
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]

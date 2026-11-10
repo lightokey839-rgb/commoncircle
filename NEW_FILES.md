@@ -15,10 +15,13 @@ Generated from `git diff --name-status --no-renames HEAD` on 2026-11-10.
 | A | `contracts/circle/tests/readme_checks.rs` |
 | A | `contracts/vault/README.md` |
 | A | `docs/VERIFICATION.md` |
+| A | `docs/COMMONCIRCLE_SPEC_v3.md` |
 | A | `evidence/evidence.json` |
+| A | `EVIDENCE.md` |
 | M | `package.json` |
 | A | `rust-toolchain.toml` |
 | A | `scripts/claims.mjs` |
+| A | `scripts/claims-self-test.mjs` |
 | A | `server/COMMONCIRCLE_GATE0.md` |
 | A | `web/README.md` |
 

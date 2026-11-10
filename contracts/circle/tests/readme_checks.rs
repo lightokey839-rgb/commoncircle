@@ -42,13 +42,28 @@ fn fund_to_an_unregistered_borrower() {
 }
 
 #[test]
+fn redeem_an_invite_twice_or_with_the_wrong_account_for_a_named_invite() {
+    todo!("Gate 2: registered invites are single-use and account-bound")
+}
+
+#[test]
 fn join_with_an_account_that_never_bought_near() {
     todo!("Gate 3: NEP-366 onboarding and first repayment")
 }
 
 #[test]
+fn ask_the_relayer_to_sponsor_a_call_outside_the_allowlist() {
+    todo!("Gate 3: relayer allowlist and account/total caps")
+}
+
+#[test]
 fn dao_proposal_passes() {
     todo!("Gate 4: Sputnik proposal funds a real testnet loan")
+}
+
+#[test]
+fn treasury_loan_for_a_steward_or_with_fewer_than_two_stewards() {
+    todo!("Gate 4: treasury lender and quorum safeguards")
 }
 
 #[test]
@@ -64,4 +79,9 @@ fn call_execute_repay_before_the_set_date() {
 #[test]
 fn list_access_keys_on_the_contract_account() {
     todo!("Submission gate: final contract has no full-access keys")
+}
+
+#[test]
+fn put_a_wrong_hash_in_evidence_json_and_run_npm_run_claims() {
+    todo!("Gate 0: claims harness rejects a wrong evidence reference")
 }

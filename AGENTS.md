@@ -100,10 +100,8 @@ bun run dev
 
 This repository is the CommonCircle NEAR hackathon entry. The disclosed LoanBook
 port is the baseline; everything after the annotated `baseline-loanbook-port`
-tag is NEW. The authoritative product spec is `docs/COMMONCIRCLE_SPEC_v3.md`.
-The attached `COMMONCIRCLE_SPEC.md` was supplied as v2 because v3 was not
-present in the checkout; this discrepancy is recorded in `docs/VERIFICATION.md`
-and must be resolved before any claim is made against v3-only requirements.
+tag is NEW. The authoritative product spec is `docs/COMMONCIRCLE_SPEC_v3.md`,
+which supersedes v2.
 
 ## Rules that never bend
 
@@ -125,19 +123,19 @@ and must be resolved before any claim is made against v3-only requirements.
 
 ## Gate list
 
-- Gate 0: baseline tag, repository hygiene/toolchain pins/CI, testnet
-  verification evidence, circle data-model scaffold with failing README-check
-  tests, and the evidence claims stub.
-- Gate 1: F0 loan lifecycle with exact-unit/refund/callback invariants and
-  sandbox integration coverage.
-- Gate 2: F1 passport NFT, access gates, tiers, and on-chain card art.
-- Gate 3: F4 NEP-366 onboarding and the real pilot; start early because
-  repayments take real time.
-- Gate 4: F5 vault/agent flows, then F2 Sputnik treasury flow, then F3 Intents
-  only if their evidence gates are satisfied.
-- Submission gate: only tracks with evidence/evidence.json-backed claims may
-  appear in README; final deployment must have no full-access keys and must
-  show an empty access-key view.
+- Gate 0 — Tue 10 Nov 23:59 UTC: answer every v3 Open item in
+  `docs/VERIFICATION.md`, tag the baseline, and make the scaffold/CI green.
+- Gate 1 — Wed 11 Nov 23:59 UTC: freeze F0/F1 core, treasury/vault hooks,
+  testnet wasm hash, mainnet 50-USDC cap, relayer, pilot circle and invites.
+- Gate 2 — Thu 12 Nov 23:59 UTC: prove Tier A, run the F3 go/no-go, and fund
+  the first pilot loan.
+- Gate 3 — Fri 13 Nov 23:59 UTC: freeze features; prove F5 and have three
+  funded/one repaid pilot loans, with a testnet backup demo.
+- Gate 4 — Sat 14 Nov 17:59 UTC: README/claims green, secret scan clean,
+  public repo, mainnet key deletion, demo post and form submitted.
+- Cut order: F3, keeper tips, auto-lend, F2 write-off/badge, F1 recovery, then
+  F5. Never cut F0 refunds, F1 gates, non-transferability, claims, or truthful
+  README evidence.
 
 ## Gate 0 operating rules
 
@@ -145,5 +143,8 @@ and must be resolved before any claim is made against v3-only requirements.
 - The baseline tag must point to the last commit containing only the ported
   LoanBook code; ask for clarification if that commit cannot be determined.
 - Generate `NEW_FILES.md` from the diff after each Gate 0 change set.
-- Do not implement behavior in `contracts/circle` or `contracts/vault` during
-  the data-model scaffold step.
+- Do not implement loan, passport, invite, treasury, relayer, or vault behavior
+  during the data-model scaffold step; only model shape and red tests belong in
+  that step.
+- Do not add a README track claim unless `npm run claims` verifies its evidence
+  row. The claims harness owns the generated track table.

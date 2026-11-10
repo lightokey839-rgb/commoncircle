@@ -18,6 +18,7 @@
     "test:db": "node scripts/test-db.mjs",
     "test:contracts": "node node_modules/@foundry-rs/forge/bin.mjs test",
     "claims": "node scripts/claims.mjs",
+    "claims:test": "node scripts/claims-self-test.mjs",
     "preview": "vite preview --configLoader runner --host localhost --port 5173"
   },
   "dependencies": {
