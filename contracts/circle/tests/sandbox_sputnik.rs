@@ -13,7 +13,7 @@ use anyhow::Result;
 use common::*;
 use near_workspaces::result::ExecutionFinalResult;
 use near_workspaces::types::{Gas, NearToken};
-use near_workspaces::{Account, Contract};
+use near_workspaces::{Account, Contract, ContractState};
 use serde_json::{json, Value};
 
 const SPUTNIK_GLOBAL_HASH: &str = "Ea8tHXFSQVszVwGASyzAfLq65DjcRDhkfab4FcPaRpgD";
@@ -56,11 +56,11 @@ async fn setup() -> Result<(World, Contract)> {
     }
 
     let dao = w.worker.dev_deploy(&sputnik_wasm()?).await?;
-    assert_eq!(
-        dao.view_account().await?.code_hash.to_string(),
-        SPUTNIK_GLOBAL_HASH,
-        "fixture must be the testnet global Sputnik code"
-    );
+    let code_hash = match dao.view_account().await?.contract_state {
+        ContractState::LocalHash(h) | ContractState::GlobalHash(h) => h.to_string(),
+        other => format!("{:?}", other),
+    };
+    assert_eq!(code_hash, SPUTNIK_GLOBAL_HASH, "fixture must be the testnet global Sputnik code");
     dao.call("new")
         .args_json(json!({
             "config": { "name": "sandbox-treasury", "purpose": "CommonCircle sandbox", "metadata": "" },
