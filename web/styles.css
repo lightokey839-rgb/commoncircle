@@ -1,0 +1,18 @@
+:root { color: #e8efe9; background: #0c1713; font: 16px/1.5 system-ui, sans-serif; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+.shell { width: min(720px, calc(100% - 32px)); margin: 0 auto; padding: 48px 0 72px; }
+.eyebrow { color: #8ce3ae; font-size: .75rem; letter-spacing: .16em; }
+h1 { max-width: 11ch; margin: 10px 0 12px; font-size: clamp(2.4rem, 7vw, 4.8rem); line-height: .98; }
+.lede { color: #a9b8af; max-width: 52ch; }
+.card { display: grid; gap: 10px; margin-top: 20px; padding: 22px; border: 1px solid #284538; border-radius: 18px; background: #11221a; }
+h2 { margin: 0 0 4px; font-size: 1.05rem; }
+label { color: #a9b8af; font-size: .86rem; }
+input { width: 100%; padding: 12px 13px; border: 1px solid #345848; border-radius: 10px; color: #f7fff9; background: #09120f; }
+button { width: fit-content; padding: 11px 15px; border: 0; border-radius: 999px; color: #082014; background: #8ce3ae; font-weight: 700; cursor: pointer; }
+button.secondary { color: #dff7e7; background: #244936; }
+.muted, .risk { color: #91a69a; font-size: .88rem; }
+.status { min-height: 24px; margin-top: 22px; color: #8ce3ae; }
+.positions { display: grid; gap: 8px; margin: 10px 0 0; padding: 0; list-style: none; }
+.positions li { padding: 10px 12px; border-radius: 9px; background: #0a1711; color: #dce9df; }
+.risk { margin-top: 32px; }

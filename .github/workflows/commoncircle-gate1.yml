@@ -1,0 +1,129 @@
+name: CommonCircle Gate 1
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NEAR_MAINNET_RPC_URL: ${{ vars.NEAR_MAINNET_RPC_URL }}
+  NEAR_TESTNET_RPC_URL: ${{ vars.NEAR_TESTNET_RPC_URL }}
+
+jobs:
+  contracts:
+    name: Rust build, unit tests, and near-workspaces sandbox
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.86.0
+          target: wasm32-unknown-unknown
+          components: rustfmt, clippy
+      - name: Prepare log directory
+        run: mkdir -p artifacts
+      - name: Build circle contract
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo build --manifest-path contracts/circle/Cargo.toml --target wasm32-unknown-unknown 2>&1 | tee artifacts/cargo-build.log
+      - name: Test circle contract
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --manifest-path contracts/circle/Cargo.toml --no-fail-fast 2>&1 | tee artifacts/cargo-test.log
+      - name: Test near-workspaces sandbox
+        shell: bash
+        run: |
+          set -o pipefail
+          sandbox_manifest=""
+          for candidate in tests/near-workspaces/Cargo.toml near-workspaces/Cargo.toml; do
+            if [[ -f "$candidate" ]]; then
+              sandbox_manifest="$candidate"
+              break
+            fi
+          done
+          if [[ -z "$sandbox_manifest" ]]; then
+            echo "near-workspaces sandbox manifest is required but was not found" | tee artifacts/near-workspaces.log
+            exit 1
+          fi
+          cargo test --manifest-path "$sandbox_manifest" --no-fail-fast 2>&1 | tee artifacts/near-workspaces.log
+      - name: Upload Rust logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: commoncircle-rust-logs
+          path: artifacts/
+          if-no-files-found: warn
+
+  javascript:
+    name: npm tests, claims, and USDC verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Prepare log directory
+        run: mkdir -p artifacts
+      - name: Clean npm install
+        shell: bash
+        run: |
+          set -o pipefail
+          npm ci --ignore-scripts --no-audit --no-fund 2>&1 | tee artifacts/npm-ci.log
+      - name: Run npm tests
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee artifacts/npm-test.log
+      - name: Run claims self-test
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run claims:test 2>&1 | tee artifacts/claims-test.log
+      - name: Run claims harness
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run claims 2>&1 | tee artifacts/claims.log
+      - name: Verify pinned USDC contracts from A6 RPC variables
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run verify:usdc 2>&1 | tee artifacts/verify-usdc.log
+      - name: Upload JavaScript logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: commoncircle-javascript-logs
+          path: artifacts/
+          if-no-files-found: warn
+
+  secrets:
+    name: Full-history gitleaks scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Scan full Git history with gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: detect --source . --redact --verbose --log-format json --log-file gitleaks.json
+      - name: Upload gitleaks log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: commoncircle-gitleaks-log
+          path: gitleaks.json
+          if-no-files-found: warn

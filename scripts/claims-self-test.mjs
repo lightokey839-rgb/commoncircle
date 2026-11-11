@@ -20,11 +20,11 @@ const baseClaim = {
   expected: { hash: "tx-good", success: true },
 };
 const evidencePath = path.join(root, "evidence", "evidence.json");
-await writeFile(path.join(root, "evidence", "evidence.json"), JSON.stringify({ schema_version: "v3", claims: [baseClaim] }));
+await writeFile(path.join(root, "evidence", "evidence.json"), JSON.stringify({ schema_version: "A9", claims: [baseClaim] }));
 execFileSync(process.execPath, [script], { cwd: root, stdio: "pipe" });
 
 await writeFile(evidencePath, JSON.stringify({
-  schema_version: "v3",
+  schema_version: "A9",
   claims: [{ ...baseClaim, expected: { hash: "tx-wrong", success: true } }],
 }));
 let failed = false;

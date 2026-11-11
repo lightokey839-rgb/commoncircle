@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CommonCircle member pilot</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <p class="eyebrow">COMMONCIRCLE · MEMBER PILOT</p>
+      <h1>Your circle, your repayment record.</h1>
+      <p class="lede">A read-first member surface for NEP-413 sign-in, invite joining, and on-chain positions.</p>
+
+      <section class="card" aria-labelledby="sign-in-heading">
+        <h2 id="sign-in-heading">1. Sign in</h2>
+        <label for="account-id">NEAR account</label>
+        <input id="account-id" autocomplete="username" placeholder="alice.testnet" />
+        <button id="sign-in">Sign in with NEP-413</button>
+      </section>
+
+      <section class="card" aria-labelledby="invite-heading">
+        <h2 id="invite-heading">2. Join by invite</h2>
+        <p class="muted">The invite secret stays in this browser and is never sent to the server.</p>
+        <label for="circle-id">Circle id</label>
+        <input id="circle-id" inputmode="numeric" placeholder="1" />
+        <label for="invite-public-key">Registered invite public key</label>
+        <input id="invite-public-key" placeholder="ed25519:..." />
+        <label for="invite-secret">Invite secret</label>
+        <input id="invite-secret" type="password" autocomplete="off" placeholder="from the invite link" />
+        <button id="join-invite">Join circle</button>
+      </section>
+
+      <section class="card" aria-labelledby="positions-heading">
+        <h2 id="positions-heading">3. My positions</h2>
+        <button id="load-positions" class="secondary">Refresh positions</button>
+        <ul id="positions" class="positions" aria-live="polite"></ul>
+      </section>
+
+      <p id="status" class="status" role="status">Connect a wallet adapter to begin.</p>
+      <p class="risk">Loans are unsecured; repayment cannot be forced. Terms, account ids, and passport history are public on-chain.</p>
+    </main>
+    <script type="module" src="./app.ts"></script>
+  </body>
+</html>
