@@ -20,6 +20,11 @@ This directory is the ops/web handoff surface for the frozen
   code hash handoff is `3tF3gbHWdjhoSfMe2KDHrP7TSCEPAXNZh8dm9q97JrB8`; no
   circle currently exists, so an empty-circle response is expected rather than
   treated as a successful product claim.
+- `server/relayer.ts` is the F4 authorization core: it verifies a current
+  on-chain invite and its canonical signature, or an active passport, restricts
+  receivers/methods to the configured circle/vault/USDC allowlist, and reserves
+  configurable per-account and total UTC-day budgets. It does not contain a
+  private key or submit transactions.
 - `nep413.ts` performs the nonce → wallet `signMessage` → server verification
   flow. The server receives the signed challenge, never an invite secret.
 - `index.html`, `app.ts`, and `styles.css` are the join-by-invite and “my
