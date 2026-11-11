@@ -69,6 +69,48 @@ jobs:
             contracts/target/near-wasm/*.wasm
           if-no-files-found: warn
 
+  reproducible-wasm:
+    name: Reproducible circle wasm (Docker, cargo-near)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: contracts/circle
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install pinned Rust toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: Install cargo-near 0.23.0 (prebuilt release)
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/near/cargo-near/releases/download/cargo-near-v0.23.0/cargo-near-installer.sh | sh
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: Build reproducible wasm and record hashes
+        run: |
+          set -o pipefail
+          mkdir -p ../../artifacts
+          cargo near build reproducible-wasm --out-dir ../../artifacts/reproducible 2>&1 | tee ../../artifacts/reproducible-build.log
+          sha256sum ../../artifacts/reproducible/*.wasm | tee ../../artifacts/reproducible-sha256.txt
+          python3 - <<'PY' | tee ../../artifacts/reproducible-code-hash.txt
+          import hashlib, glob
+          A = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+          for p in glob.glob("../../artifacts/reproducible/*.wasm"):
+              n = int.from_bytes(hashlib.sha256(open(p, "rb").read()).digest(), "big")
+              s = ""
+              while n:
+                  n, r = divmod(n, 58)
+                  s = A[r] + s
+              print(p.split("/")[-1], "code_hash(base58) =", s)
+          PY
+      - name: Upload reproducible wasm
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: commoncircle-reproducible-wasm
+          path: artifacts/
+          if-no-files-found: warn
+
   javascript:
     name: npm tests, claims, and USDC verification
     runs-on: ubuntu-latest

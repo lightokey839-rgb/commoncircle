@@ -112,6 +112,41 @@ The Gate 0 pin of Rust 1.86 / near-sdk 5.17.2 is replaced: current near-sdk,
 near-workspaces and cargo-near all require Rust >= 1.95. Nothing has compiled
 yet; `Cargo.lock` will be committed from the first successful build.
 
+## Gate 1 phase 1B — F0 core loop (contracts lane)
+
+Runner: GitHub Actions `ubuntu-latest`, private repo
+`lightokey839-rgb/commoncircle`, workflow `CommonCircle Gate 1`, job
+"Rust build, unit tests, and near-workspaces sandbox".
+Run `42979826071` on commit `579575d` (branch `lane/contracts`), 2026-11-11.
+Toolchain: Rust 1.99.1, near-sdk 5.30.1, near-workspaces 0.24.0, cargo-near
+0.23.0 (prebuilt release). Re-run: `contracts/scripts/test.sh` on Linux/WSL.
+
+| Check | Status | Evidence |
+| --- | --- | --- |
+| Circle + mock-ft wasm build | PASS | `cargo near build non-reproducible-wasm --no-abi`; cargo-near: "near-sdk targets protocol version 85; rustc 1.99.1 accepted". sha256 `commoncircle_circle.wasm` = `d456c906661ba8d7302cd84827b0ee26feade8861e3a190e42d13b98281087af` (357775 bytes), `commoncircle_mock_ft.wasm` = `9cf8241a111fa701ec2368b2dd28112b69a0bdbdaa371161a04bd0ba2dc60148`. Non-reproducible build: NOT the freeze hash. |
+| Unit tests (`cargo test --workspace --lib`) | PASS 40/40 | Includes `gas_at_minimum_is_accepted` / `low_gas_fails_early` (boundary at `MIN_GAS_FT_ON_TRANSFER` = 70 Tgas), `failed_forward_reverts_to_open_and_returns_everything`, `failed_repay_forward_returns_everything_and_stays_funded`, `double_fund_while_in_flight_is_refunded`. Earlier run `42975019261` failed 39/40 at 55 Tgas (GasExceeded); fixed in `579575d`. |
+| Sandbox starts | PASS 1/1 | `sandbox_starts_and_creates_an_account` |
+| F0 sandbox scenarios, circle USDC balance asserted zero after each | PASS 10/10 | `tests/sandbox_f0.rs`: `f0_fund_then_full_repay_on_time`, `f0_partial_repay_then_overpay_returns_excess`, `f0_wrong_amount_is_refunded`, `f0_lapsed_window_cancels_and_refunds`, `f0_double_fund_is_refunded` (concurrent lender + vault race: exactly one funds), `f0_low_gas_fails_early_and_is_refunded` (60 Tgas attached), `f0_revoked_passport_mid_loan_stays_payable`, `f0_non_member_borrower_is_rejected`, `a3_repay_forward_fails_when_lender_unregistered`, `a3_repay_with_wrong_token_wrong_state_or_wrong_caller_is_refunded` (also: private callback rejects outside callers) |
+| README check rows (F0) | PASS 4/4 | `create_a_loan_naming_a_non_member`, `fund_a_loan_from_an_account_that_is_not_the_named_lender`, `send_a_different_token_to_the_contract`, `fund_to_an_unregistered_borrower` |
+| README check rows (later gates) | RED as expected | 13 rows still `todo!` in that run |
+| Full-history secret scan | PASS | gitleaks job green on runs `42972697704` and `42979826071` (pattern scan; manual review in this session found only variable names and instructions) |
+| Gate 1 stop rule (F0 refund proofs) | CLEARED in sandbox | Testnet refund proof is still required before the Open Innovation row is claimed (v3 F0: "Proven on testnet before it is claimed") |
+
+### Gate 1 phases 1C and 1D (run `42980986379`, commit `14b3b46`)
+
+| Check | Status | Evidence |
+| --- | --- | --- |
+| Unit tests | PASS 40/40 | same suite as above |
+| F0 sandbox + storage refund | PASS 11/11 | adds `storage_deposit_excess_is_refunded` (1 NEAR attached to `create_circle`, < 0.05 NEAR kept) |
+| README rows, contract side | PASS 9/9 | adds `repay_n_qualifying_loans_on_time` (pilot N=1: tier flips to Trusted, `tier_changed` event, card media changes), `let_a_loan_pass_its_due_date` (overdue, perks paused, card shows "PERKS PAUSED", late repayment restores perks, late count stays), `try_nft_transfer_on_a_passport` (`nft_transfer`, `nft_transfer_call`, `nft_approve` fail with E40; owner unchanged), `redeem_an_invite_twice_or_with_the_wrong_account_for_a_named_invite` (E32 then E30; open invite replay E30), `treasury_loan_for_a_steward_or_with_fewer_than_two_stewards` (1 steward E19, steward borrower E19, other passportless lender E11, 2 stewards + Trusted non-steward: DAO-stand-in account funds, `funded_via: Treasury`; founder loses admin after `attach_dao`) |
+| README rows, other lanes / later gates | RED (8) | relayer, NEP-366 join, chat gate (server), DAO proposal (Gate 2, real Sputnik), agent draft, vault `execute_repay`, access-key list, claims wrong-hash (covered by `npm run claims:test`, not cargo) |
+| Card art samples | PASS (generated) | `docs/card-art/token_uri_member.txt` and `token_uri_trusted.txt` (exact `nft_token().metadata.media` from the sandbox run), decoded as `passport_member.svg` / `passport_trusted.svg`. Rendering in two wallets or explorers is NOT verified yet (needs a testnet deploy). |
+| `contracts/Cargo.lock` | PASS | taken from the CI artifact of this run (near-sdk 5.30.1) |
+| Non-reproducible circle wasm sha256 | recorded | `e47d84e1bf86c96666745741c3e2ba1c2ce4afbb70bfad89194ca4bce01e273e` (changed from the 1B run because of `.detach()`). Freeze hash comes from the reproducible build. |
+
+Not yet evidenced: callback gas actually used (needed for the "cannot stay
+stuck" argument in `docs/EVENTS.md`), reproducible build hash, testnet deploy.
+
 ## Evidence format
 
 `evidence/evidence.json` uses the A9 schema. The document has

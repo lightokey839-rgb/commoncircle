@@ -4,6 +4,7 @@ version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
+repository = "https://github.com/lightokey839-rgb/commoncircle"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -19,3 +20,11 @@ anyhow = "1"
 serde_json = "1"
 ed25519-dalek = "2"
 bs58 = "0.5"
+
+# Reproducible build (cargo near build reproducible-wasm). Image pinned by digest
+# from Docker Hub sourcescan/cargo-near, tag 0.23.0-rust-1.99.1 (2026-11-06).
+[package.metadata.near.reproducible_build]
+image = "sourcescan/cargo-near:0.23.0-rust-1.99.1"
+image_digest = "sha256:8013f039e8005627f10ae66b5519d1a6eeeed7d7aef4b5067d5e9a86c4302fcc"
+passed_env = []
+container_build_command = ["cargo", "near", "build", "non-reproducible-wasm", "--locked"]
