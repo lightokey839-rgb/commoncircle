@@ -50,6 +50,22 @@ entry from `git show lane/contracts:HANDOFF.md` dated 2026-11-11 01:30 UTC.
 These are web-lane follow-ups. No contract file or `contracts` job in
 `.github/workflows/commoncircle-gate1.yml` was changed.
 
+## 2026-11-11 — ops/web → lead (review fix and F4 relayer)
+
+- `3e40483` fixes `signInviteWithSecret`: contract signatures are now standard
+  padded base64 (`^[A-Za-z0-9+/]{86}==$`, 64 decoded bytes); only the invite
+  secret remains base64url in the URL fragment. `tests/invite.test.ts` covers
+  the exact format and round-trip length.
+- `8bdabef` adds `server/relayer.ts` and `tests/relayer.test.ts`. The policy
+  verifies current on-chain invite/passport state, checks the canonical invite
+  signature, enforces configured circle/vault/USDC receiver-method allowlists,
+  and reserves configurable per-account and total UTC-day budgets using BigInt
+  U128 strings. No relayer key or transaction submission is included.
+- Source TypeScript and claims self-test pass. The project Vitest runner could
+  not start in this checkout because dependencies are still unavailable; the
+  invite format and relayer valid-invite path were exercised directly with
+  Node 24 WebCrypto/Ed25519. No contract file or contracts CI job changed.
+
 ## 2026-11-11 — ops/web → lead (ordered web build)
 
 - `faa500c` — browser invite lifecycle: WebCrypto Ed25519 key generation,
