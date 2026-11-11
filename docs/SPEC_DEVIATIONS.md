@@ -28,3 +28,52 @@ corresponding behavior is shipped.
 - Covering test: qualification succeeds at the pilot parameters and fails when
   either the repayment count or distinct-lender requirement is below the circle
   setting.
+
+## D-003 — loan length uses a per-circle day length
+
+- Status: planned in `docs/CIRCLE_INTERFACE.md` 1.0.0, not implemented.
+- Spec surface: v3 and Gate 1 name `create_loan(..., duration_days)`, while v3
+  says testnet demo circles use minutes and amendment A4 says test time
+  parameters are seconds-scale. Whole days cannot express either.
+- Safe reading: keep `duration_days` in the signature and add an immutable
+  per-circle `day_length_sec`, bounded below by an init floor (mainnet
+  `86400`, so a mainnet "day" can never be shorter than 24 h; testnet floor 0,
+  contract still enforces at least 1 second). Testnet DEMO circles may use, for
+  example, 60-second days and must be labelled DEMO in the UI.
+- Covering test: a circle below the floor is rejected; `due_at` equals
+  `funded_at + duration_days * day_length_sec`.
+
+## D-004 — Steward is a badge beside the earned tier
+
+- Status: planned in `docs/CIRCLE_INTERFACE.md` 1.0.0, not implemented.
+- Spec surface: v3 lists Member, Trusted and Steward as tiers, but treasury
+  loans need a "Trusted, non-steward" borrower, so Steward cannot simply be a
+  higher rung of the same ladder.
+- Safe reading: the passport stores an earned `tier` (Member or Trusted, never
+  downgraded) and a separate `steward` flag set only by the circle admin.
+  `display_tier` shows Steward when the flag is set. Perks (cap, open-loan
+  limit, inviting) follow the earned tier only; a steward who is not Trusted
+  cannot invite.
+- Covering test: steward borrower rejected for a treasury loan; steward without
+  Trusted cannot register an invite.
+
+## D-005 — founder invite power ends at `attach_dao`
+
+- Status: planned in `docs/CIRCLE_INTERFACE.md` 1.0.0, not implemented.
+- Spec surface: Gate 1 says `attach_dao` "removes founder powers", and v3 says
+  the inviter is "a founder or a Trusted member".
+- Safe reading: the founder may invite only while still the circle admin. After
+  `attach_dao` the founder invites only if their passport is effectively
+  Trusted, like any member.
+- Covering test: founder invite succeeds before `attach_dao` and fails after it
+  while the founder is still Member tier.
+
+## D-006 — qualifying minimum amount is its own parameter
+
+- Status: planned in `docs/CIRCLE_INTERFACE.md` 1.0.0, not implemented.
+- Spec surface: v3 anti-farming counts a repayment only if "the loan met the
+  circle's minimum amount", which every loan does by construction.
+- Safe reading: add an immutable `qualifying_min_amount >= min_amount`, so a
+  circle can allow small loans that do not count toward Trusted.
+- Covering test: an on-time repayment below `qualifying_min_amount` does not
+  increase `qualifying_count`.
