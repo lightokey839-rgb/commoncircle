@@ -172,6 +172,30 @@ Testnet and mainnet deploy this file (sha256 `2ad7e094…0e37`). The on-chain co
 hash must equal `3tF3gbHWdjhoSfMe2KDHrP7TSCEPAXNZh8dm9q97JrB8`. The `913998e`
 hash recorded above is superseded as the deploy artifact (same source).
 
+### Gate 1 phase 1E — testnet deploy (2026-11-11, run by the builder)
+
+Command: `contracts/scripts/deploy-testnet.sh` with
+`CIRCLE_ACCOUNT_ID=commoncircle-light.testnet`, the deploy artifact above,
+`EXPECTED_SHA256=2ad7e094…0e37`, `EXPECTED_CODE_HASH=3tF3gb…JrB8`. Script output
+ended `VERIFY OK`. Each row was re-checked independently by the contracts lane
+over FastNEAR testnet RPC (`tx` with `wait_until: FINAL`, `view_account`,
+`view_access_key_list`).
+
+| Step | Status | Transaction / view |
+| --- | --- | --- |
+| Create `commoncircle-light.testnet` (faucet) | PASS, SuccessValue | `7AdiA1LQfgiWe3nrdYDvCRrvtBKeZrZkV1bxfVwWTNb2` (block `ATdWfFau96M3WRJT222ujSsXmkXK9BEAuaCy4Ad8jc7X`) |
+| Create and reserve vault `vault.commoncircle-light.testnet` (0.1 NEAR) | PASS, SuccessValue | `3v854pjEVxukAs6mHxntooqSnf8zfdQmiXZGhqpCRySm` (block `ENEwkbvonuiVUEMbgSsQwUTssexX7diPMye9yhZxAdrT`) |
+| Deploy code `3tF3gb…JrB8` + `new` (testnet floors 0, cap 50 USDC, pinned USDC and vault) | PASS, SuccessValue | `9mj8gUg4GHTETjR8b6Wuoe3BffbDJK41rkAmT9bT8dQJ` (block `C8DWJU4EFuka7dFUnn8HeDRa8vDfnTDhWcuvsZZJM2DK`), 28.3 Tgas |
+| Register circle with testnet USDC (0.00125 NEAR) | PASS, SuccessValue | `7hArgw6tYgp9fhzfd4dDGJhcqD9MrdB8QGsarP97tAcY` (block `BBxc5SjBjtuXaCN8iSKQmGjrf4mVmdBBQpRNjPTSTR9g`) |
+| On-chain code hash = tested artifact | PASS | `view_account` at block 277213578: `code_hash 3tF3gbHWdjhoSfMe2KDHrP7TSCEPAXNZh8dm9q97JrB8`, storage_usage 362583 |
+| `get_config` matches init | PASS | interface 1.0.0, usdc `3e2210e1…b8af`, vault `vault.commoncircle-light.testnet`, cap `50000000`, floors 0, min gas 70, recommended 150, recovery false |
+| Circle USDC balance at rest | PASS | `ft_balance_of(commoncircle-light.testnet)` = `"0"` |
+| Access keys on the contract account | 1 FullAccess key (expected on testnet) | Key deletion is a mainnet / Gate 4 step, not done here |
+
+Still to do on testnet: a real fund → repay loan and a failed-forward refund
+proof with transaction hashes (v3 F0: "Proven on testnet before it is
+claimed"), and the card art viewed in two wallets or explorers.
+
 Not yet evidenced: callback gas actually used (needed for the "cannot stay
 stuck" argument in `docs/EVENTS.md`), reproducible build hash, testnet deploy.
 

@@ -2,7 +2,7 @@
 
 ## Gate 1 — contracts (lead), updated 2026-11-11 ~09:15 UTC
 
-Status: CONTRACT FROZEN IN SANDBOX / TESTNET DEPLOY NOT RUN / NOT CLAIMABLE
+Status: CONTRACT FROZEN / DEPLOYED ON TESTNET (commoncircle-light.testnet) / NOT CLAIMABLE
 
 - Branch `lane/contracts` (integration; includes `lane/web` up to `b6449bb`),
   pushed only to the PRIVATE repo `lightokey839-rgb/commoncircle` (A10).
@@ -19,11 +19,15 @@ Status: CONTRACT FROZEN IN SANDBOX / TESTNET DEPLOY NOT RUN / NOT CLAIMABLE
 - Recovery (F1) is cut for Gate 1: methods exist and always fail
   (`features.recovery = false`).
 
+- Testnet: `commoncircle-light.testnet`, code hash `3tF3gb…JrB8` on chain
+  (= tested artifact), vault pinned to `vault.commoncircle-light.testnet`,
+  registered with testnet USDC, holds 0 USDC. Tx hashes in `docs/VERIFICATION.md`.
+
 Builder actions needed:
-1. Pick the testnet circle account name; confirm the vault id
-   `vault.<circle account>` (proposed for both networks).
-2. Run `contracts/scripts/deploy-testnet.sh` (Git Bash + near-cli-rs) and paste
-   the output; then the testnet refund proof and card-art wallet check.
+1. Testnet refund proof: get testnet USDC (Circle faucet, NEAR Testnet) for
+   two test accounts, then run the fund/repay and failed-forward script the
+   lead provides.
+2. Open the passport card in two NEAR wallets or explorers once one exists.
 3. Mainnet deploy kit (1G) is the ops/web lane; if mainnet is not deployed by
    Thu 12 Nov 11:59 UTC, the pilot becomes a labelled testnet user test.
 

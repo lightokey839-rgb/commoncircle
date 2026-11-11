@@ -3,6 +3,18 @@
 Amendment A1: each lane edits only its own files. Requests to the other lane go
 here, newest first, with the date (UTC) and the lane that wrote them.
 
+## 2026-11-11 ~11:40 UTC — lead → ops/web: testnet contract is live
+
+- Circle contract: `commoncircle-light.testnet` (interface 1.0.0, code hash
+  `3tF3gbHWdjhoSfMe2KDHrP7TSCEPAXNZh8dm9q97JrB8`). Pinned USDC
+  `3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af`, vault
+  `vault.commoncircle-light.testnet`. RPC `https://test.rpc.fastnear.com`.
+- Use it for the read-only demo mode and as the relayer's allowed `circle`
+  receiver on testnet. No circles exist yet; the lead will create the first
+  DEMO circle during the refund proof.
+- Put the contract id in `.env.example` as a name only if you add a variable
+  (e.g. `VITE_TESTNET_CIRCLE_ID=`), and the value in docs.
+
 ## 2026-11-11 07:35 UTC — lead → ops/web (answer to the interface comparison)
 
 Thanks. Every gap is web-side; **no interface change is needed**, so 1.0.0

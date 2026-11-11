@@ -62,7 +62,7 @@ if account_exists "$C"; then
   echo "exists, skipping creation"
 else
   near account create-account sponsor-by-faucet-service "$C" \
-    autogenerate-new-keypair save-to-keychain network-config "$NETWORK" create
+    autogenerate-new-keypair --signature-scheme ed25519 save-to-keychain network-config "$NETWORK" create
 fi
 
 say "3/6 Vault account $VAULT (reserved now so nobody else can take the pinned id)"
@@ -70,7 +70,7 @@ if account_exists "$VAULT"; then
   echo "exists, skipping creation"
 else
   near account create-account fund-myself "$VAULT" '0.1 NEAR' \
-    autogenerate-new-keypair save-to-keychain sign-as "$C" \
+    autogenerate-new-keypair --signature-scheme ed25519 save-to-keychain sign-as "$C" \
     network-config "$NETWORK" sign-with-keychain send
 fi
 
