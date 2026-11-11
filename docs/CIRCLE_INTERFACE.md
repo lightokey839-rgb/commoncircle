@@ -1,6 +1,6 @@
 # CommonCircle `circle` contract interface
 
-Interface version: **1.1.0** (2026-11-11, contracts lane). 1.1.0 adds per-circle passport themes and a square card; every 1.0.0 call still works unchanged.
+Interface version: **1.1.1** (2026-11-11, contracts lane; 1.1.1 = D-009 fixes: storage deposits are now really charged, the DAO account cannot hold a passport, invisible characters in names are rejected). 1.1.0 adds per-circle passport themes and a square card; every 1.0.0 call still works unchanged.
 Authority: `docs/COMMONCIRCLE_SPEC_v3.md` and the Gate 1 prompt with amendments A1 to A11.
 Owner: contracts lane (`lane/contracts`). The web lane builds against this file.
 
@@ -119,6 +119,8 @@ theme: {
 ```
 
 - The **name tag** on every card is the circle's `name` (set at creation).
+- Names and taglines must be plain text: no control characters, zero-width
+  characters or direction overrides (`E04_BAD_PARAMS`).
 - SVG emblems are rejected (they can carry script); text is XML-escaped.
 - The web app should resize uploads in the browser (canvas) to about 128x128
   and encode WebP or PNG so they fit under 12 KiB.
@@ -405,6 +407,7 @@ The server indexes these events and nothing else.
 | `E34_NOT_INVITER` | Only the founder or a Trusted member can invite. |
 | `E35_ALREADY_MEMBER` | You already have (or had) a passport in this circle. |
 | `E36_INVITE_EXISTS` | That invite key is already registered. |
+| `E37_TREASURY_NO_PASSPORT` | The circle's DAO account cannot hold a passport. |
 | `E40_NON_TRANSFERABLE` | Passports cannot be transferred or approved. |
 | `E50_RECOVERY_DISABLED` | Recovery is not available in this deployment. |
 | `E51_RECOVERY_LOCKED` | Recovery is still time-locked. |

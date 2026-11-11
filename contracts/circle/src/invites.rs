@@ -98,6 +98,7 @@ impl Contract {
                 "expires_at": expires_at,
             }),
         );
+        self.flush_all();
         charge_storage(initial, 0);
     }
 
@@ -139,6 +140,7 @@ impl Contract {
         let tid = self.mint_passport(cid, &caller, Some(invite.inviter_id.clone()));
         // Measure before deleting the invite so the redeemer pays the full
         // passport cost; the freed invite bytes stay with the contract.
+        self.flush_all();
         let after_mint = env::storage_usage();
         self.invites.remove(&key);
         events::emit(

@@ -116,6 +116,44 @@ corresponding behavior is shipped.
   `default_theme_is_reported_when_none_is_set`, sandbox
   `themed_circle_passport_art_in_sandbox`.
 
+## D-009 — post-freeze fixes from the Gate 1 red team (interface 1.1.1)
+
+Found by `docs/REDTEAM_GATE1.md` after the Gate 1 freeze. Confirmed bugs, so
+the freeze rule allows the change; it needs a full CI run, a new reproducible
+hash and an in-place testnet redeploy approved by the builder.
+
+1. **Storage was not charged (Critical).** near-sdk `store` collections flush
+   their writes when the contract struct is dropped, after the method body, so
+   `env::storage_usage()` inside the method saw no growth and the full deposit
+   was refunded. Proven on testnet: `create_circle` tx `6PwNu7df…` attached
+   0.029 NEAR and was refunded 0.029; `register_invite` `GkWBK471…` refunded in
+   full; `create_loan` `2ihs24Ue…` kept only the 256-byte reserve. Anyone could
+   grow the contract's state for gas alone until its NEAR balance could no
+   longer cover storage, after which state-growing calls and callbacks fail.
+   Fix: `flush_all()` before every storage measurement (`create_circle`,
+   `register_invite`, `redeem_invite`, `create_loan`, `set_circle_theme`).
+   Tests: `rt_contract_never_subsidises_storage`, `rt_underpaid_storage_is_rejected`.
+2. **The DAO could take a passport (Medium).** After `attach_dao` the treasury
+   account could redeem an invite, make itself a steward and satisfy the
+   2-steward rule with one human steward. Fix: `mint_passport` rejects the
+   circle's treasury account (`E37_TREASURY_NO_PASSPORT`). Test:
+   `rt_dao_cannot_take_a_passport_or_count_as_steward`. This does not stop one
+   person controlling two steward accounts; that limit is stated in the trust
+   assumptions (see `docs/REDTEAM_GATE1.md`).
+3. **Invisible and direction-changing characters in names (Low).** Circle
+   names and taglines accepted bidi overrides, zero-width characters and
+   newlines, which reach the card and the token title and can imitate another
+   circle's name. Fix: both are rejected with `E04_BAD_PARAMS`; names may not
+   start or end with a space. Test: `rt_bidi_and_control_characters_in_circle_name`.
+
+Not changed (accepted, documented): emblem image dimensions are not checked
+(`rt_png_with_huge_declared_dimensions_is_accepted_known_issue`); a lender who
+leaves the token can make an honest borrower late until the circle admin clears
+the flag (`rt_lender_unregistering_makes_an_honest_borrower_late_known_issue`);
+admin methods that take 1 yoctoNEAR (`set_steward`, `attach_dao`,
+`set_passport_expiry`) can add a few dozen bytes without charging them; the
+event `version` string is still `1.0.0`.
+
 ## Contract freeze notice (Gate 1 phase 1E)
 
 **Current (interface 1.1.0, recorded 2026-11-11 ~16:00 UTC):** frozen source

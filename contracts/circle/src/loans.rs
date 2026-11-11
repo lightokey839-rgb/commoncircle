@@ -127,6 +127,7 @@ impl Contract {
                 "funding_deadline": funding_deadline.to_string(),
             }),
         );
+        self.flush_all();
         charge_storage(initial, LOAN_GROWTH_RESERVE_BYTES);
         U64(loan_id)
     }

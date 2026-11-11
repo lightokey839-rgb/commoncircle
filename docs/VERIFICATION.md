@@ -6,6 +6,29 @@ This ledger is evidence-first. `UNVERIFIED` and `BLOCKED` entries are not README
 claims. No private keys, seed phrases, access tokens, or populated `.env` data
 belong here.
 
+## Current state at a glance (read this first)
+
+Rows further down are a dated log, oldest first. Several early rows say
+BLOCKED or NOT RUN and were **superseded** later the same day; they are kept so
+the history is honest. The current state is:
+
+| Item | Current status | Where in this file |
+| --- | --- | --- |
+| Rust toolchain, Cargo.lock, clean `npm ci` | PASS (GitHub Actions, Ubuntu) | "Toolchain pins", phases 1B to 1E |
+| Contract tests | PASS: unit 49/49, sandbox 13/13, contract README rows 9/9 | "Interface 1.1.0" |
+| Testnet contract | `commoncircle-light.testnet`, interface 1.1.0, code hash `CCYR2EZ87by5MX65Ci1V49EVqhF93p8ymwFa6LeH9whm` | "Interface 1.1.0" |
+| F0 refund proof on testnet | PASS twice (1.0.0 and 1.1.0) | "F0 refund proof on testnet", "Interface 1.1.0" |
+| Card art in wallets | PASS: MyNearWallet and Meteor | "Interface 1.1.0" |
+| Both USDC ids | PASS (USDC, 6 decimals) | "USDC verification output" |
+| Red-team findings | see `docs/REDTEAM_GATE1.md` | — |
+| Still UNVERIFIED | NEP-366 relayer onboarding, Sputnik DAO proposal funding, event indexer, NEP-413 phone sign-in, any mainnet transaction | Gate 2 and later |
+
+Superseded rows below: "Annotated baseline tag in original checkout" (the tag
+is pushed to the private remote), "Toolchain pins and lockfiles", "Circle
+scaffold tests", "`npm ci` clean install", "Existing LoanBook checks", every row
+of "Gate 1 Phase 1A" marked BLOCKED, and "Testnet deploy … NOT RUN" under
+phase 1E (the deploy ran later; see "testnet deploy").
+
 ## Spec and repository gates
 
 | Check | Status | Evidence |

@@ -81,9 +81,18 @@ row is dropped, unless mainnet funding appears before Thu 12 Nov 11:59 UTC.
 Open items: card art in two wallets/explorers. Callback gas: measured in the
 sandbox and on testnet, well inside budget.
 
+---
+
+# History (superseded; kept for the record)
+
+Everything below this line describes Gate 0 and the start of Gate 1, before the
+Rust toolchain existed. It is **not** the current state. Every "BLOCKED" below
+was cleared later on 2026-11-11 (see the sections above and
+`docs/VERIFICATION.md`).
+
 Updated: 2026-11-11 (Africa/Lagos)
 
-## Gate 0
+## (history) Gate 0
 
 Status: ARTIFACTS COMPLETE / BLOCKED ITEMS REMAIN / NOT CLAIMABLE
 
@@ -98,7 +107,7 @@ Gate 0 is late relative to its Tue 10 Nov 23:59 UTC deadline, so the v3 rule is
 to run its checks alongside Gate 1 and cut from the bottom rather than extend
 the gate.
 
-## Completed in this clone
+## (history) Completed in this clone
 
 - Gate 0 instructions appended to `AGENTS.md`.
 - Contract/server/web/evidence layout created.
@@ -113,7 +122,7 @@ the gate.
   expected transaction hash.
 - Node and Rust toolchain metadata plus clean-clone CI added.
 
-## Not verified yet
+## (history) Not verified yet
 
 - NEAR testnet token metadata/storage bounds (the v3 IDs are now known, but RPC
   access failed in this environment).
@@ -126,7 +135,7 @@ the gate.
 See `docs/VERIFICATION.md` for the evidence ledger. This file must be updated
 before any README claim is promoted.
 
-## Next three Gate 1 tasks
+## (history) Next three Gate 1 tasks
 
 1. Resolve environment/repository blockers: writable original checkout,
    committed `Cargo.lock`, valid Node/Bun dependency installation, and a
@@ -139,7 +148,7 @@ before any README claim is promoted.
    qualification, and on-chain card-art views; record wasm hash and testnet
    evidence before moving to F2.
 
-## Gate 1 Phase 1A stop
+## (history) Gate 1 Phase 1A stop
 
 Status: BLOCKED — contract implementation intentionally not started.
 

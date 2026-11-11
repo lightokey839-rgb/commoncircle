@@ -64,7 +64,7 @@ pub(crate) fn validate_theme(input: CircleThemeInput) -> StoredTheme {
     let d = StoredTheme::default();
     let tagline = input.tagline.map(|t| t.trim().to_string()).filter(|t| !t.is_empty());
     if let Some(t) = &tagline {
-        if t.chars().count() > MAX_TAGLINE_LEN || t.chars().any(|c| c.is_control()) {
+        if t.chars().count() > MAX_TAGLINE_LEN || !crate::is_plain_text(t) {
             bad("tagline must be 1..32 printable characters");
         }
     }
@@ -142,6 +142,7 @@ impl Contract {
         let cid = circle_id.0;
         self.assert_admin(cid);
         self.apply_theme(cid, theme);
+        self.flush_all();
         charge_storage(initial, 0);
     }
 }

@@ -30,7 +30,7 @@ mod tests;
 
 pub use types::*;
 
-pub const INTERFACE_VERSION: &str = "1.1.0";
+pub const INTERFACE_VERSION: &str = "1.1.1";
 pub const MAX_PAGE: u32 = 50;
 pub const NS_PER_SEC: u64 = 1_000_000_000;
 pub const ONE_YOCTO: NearToken = NearToken::from_yoctonear(1);
@@ -168,6 +168,16 @@ pub(crate) fn secs_to_ns(sec: u64) -> u64 {
         .unwrap_or_else(|| env::panic_str("E04_BAD_PARAMS: duration overflows"))
 }
 
+/// Text shown on cards and in wallets must be plain: no control characters and
+/// no invisible or direction-changing format characters (zero-width, bidi
+/// overrides and isolates, BOM), which could be used to spoof another name.
+pub(crate) fn is_plain_text(s: &str) -> bool {
+    !s.chars().any(|c| {
+        c.is_control()
+            || matches!(c, '؜' | '​'..='‏' | '‪'..='‮' | '⁠'..='⁩' | '﻿')
+    })
+}
+
 pub(crate) fn token_id(circle_id: u64, owner: &AccountId) -> String {
     format!("{}:{}", circle_id, owner)
 }
@@ -211,6 +221,26 @@ pub(crate) fn charge_storage(initial_usage: u64, reserve_bytes: u64) {
 }
 
 impl Contract {
+    /// near-sdk `store` collections cache writes and only flush them when the
+    /// contract struct is dropped, AFTER the method body. Storage must
+    /// therefore be flushed before `env::storage_usage()` is read, or the
+    /// growth is invisible and the caller is charged nothing (D-009).
+    pub(crate) fn flush_all(&mut self) {
+        self.circles.flush();
+        self.loans.flush();
+        self.passports.flush();
+        self.circle_members.flush();
+        self.circle_loans.flush();
+        self.borrower_loan_count.flush();
+        self.borrower_loans.flush();
+        self.lender_loan_count.flush();
+        self.lender_loans.flush();
+        self.owner_token_count.flush();
+        self.owner_tokens.flush();
+        self.all_tokens.flush();
+        self.invites.flush();
+    }
+
     pub(crate) fn circle_index(&self, circle_id: u64) -> u32 {
         if circle_id == 0 || circle_id > self.circles.len() as u64 {
             env::panic_str("E01_NOT_FOUND: circle");
@@ -335,6 +365,10 @@ impl Contract {
         owner: &AccountId,
         invited_by: Option<AccountId>,
     ) -> String {
+        require!(
+            self.circle(circle_id).treasury_id.as_ref() != Some(owner),
+            "E37_TREASURY_NO_PASSPORT: the circle treasury (DAO) account cannot hold a passport"
+        );
         let key = (circle_id, owner.clone());
         require!(
             !self.passports.contains_key(&key),

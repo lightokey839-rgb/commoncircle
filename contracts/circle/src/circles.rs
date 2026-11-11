@@ -50,6 +50,7 @@ impl Contract {
                 "invite_public_key": null,
             }),
         );
+        self.flush_all();
         charge_storage(initial, 0);
         U64(circle_id)
     }
@@ -239,6 +240,9 @@ impl Contract {
 
         if name.is_empty() || name.chars().count() > MAX_NAME_LEN {
             bad("name must be 1..64 characters");
+        }
+        if !is_plain_text(name) || name.trim() != name {
+            bad("name must not contain control or invisible characters, or leading/trailing spaces");
         }
         if p.min_amount.0 == 0 {
             bad("min_amount must be > 0");

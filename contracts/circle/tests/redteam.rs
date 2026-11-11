@@ -1,6 +1,7 @@
 //! Gate 1 red-team tests. Each test is named after the attack it tries.
-//! Tests named `..._known_issue` assert the CURRENT (unwanted) behaviour, so a
-//! later fix must flip them. Results are also written to $ARTIFACT_DIR.
+//! Tests named `..._known_issue` assert a CURRENT, accepted limitation, so a
+//! later fix must flip them. D-009 fixed and flipped: storage charging, the
+//! DAO passport, and invisible characters in names. Results are also written to $ARTIFACT_DIR.
 
 mod common;
 
@@ -57,10 +58,11 @@ async fn rt_nft_enumeration_with_50_max_size_emblems() -> Result<()> {
     Ok(())
 }
 
-/// B3 (lead 2): after attach_dao the DAO account can take a passport through
-/// an invite, make itself a steward, and count toward the 2-steward rule.
+/// B3 (lead 2, fixed in D-009): after attach_dao the DAO account must not be
+/// able to take a passport, make itself a steward, or count toward the
+/// 2-steward rule.
 #[tokio::test]
-async fn rt_dao_can_take_a_passport_and_count_as_steward_known_issue() -> Result<()> {
+async fn rt_dao_cannot_take_a_passport_or_count_as_steward() -> Result<()> {
     let w = world().await?;
     members(&w).await?;
     register(&w.bob, &w.usdc, w.bob.id()).await?;
@@ -73,7 +75,9 @@ async fn rt_dao_can_take_a_passport_and_count_as_steward_known_issue() -> Result
 
     let (sk, pk) = invite_key(21);
     let registered = register_invite(&w, &w.bob, &pk, Some(dao.id())).await?.is_success();
-    let redeemed = registered && redeem(&w, &dao, &sk, &pk).await?.is_success();
+    let redeem_result = redeem(&w, &dao, &sk, &pk).await?;
+    let redeemed = redeem_result.is_success();
+    assert!(failed_with(redeem_result, "E37_TREASURY_NO_PASSPORT"));
     let self_steward = redeemed
         && call1(&w, &dao, "set_steward", json!({ "circle_id": "1", "account_id": dao.id(), "steward": true }))
             .await?
@@ -87,8 +91,10 @@ async fn rt_dao_can_take_a_passport_and_count_as_steward_known_issue() -> Result
             registered, redeemed, self_steward, c["steward_count"], c["treasury_lending_enabled"], treasury_loan
         ),
     );
-    assert!(redeemed, "expected the known issue: the DAO account can redeem an invite");
-    assert!(treasury_loan, "expected the known issue: one human steward + the DAO passes the 2-steward rule");
+    assert!(registered, "an invite naming the DAO can be registered, but not redeemed");
+    assert!(!redeemed && !self_steward, "the DAO must not hold a passport");
+    assert_eq!(c["steward_count"], 1);
+    assert!(!treasury_loan, "one human steward must not unlock treasury lending");
     Ok(())
 }
 
@@ -131,8 +137,8 @@ async fn rt_lender_unregistering_makes_an_honest_borrower_late_known_issue() -> 
     assert_circle_holds_zero(&w).await
 }
 
-/// C1/C2 (lead 3): bidi override, zero-width and newline characters in a
-/// circle name. They must not break the SVG; do they reach the card?
+/// C1/C2 (lead 3, fixed in D-009): bidi override, zero-width and newline
+/// characters in a circle name or tagline are rejected.
 #[tokio::test]
 async fn rt_bidi_and_control_characters_in_circle_name() -> Result<()> {
     let w = world().await?;
@@ -147,6 +153,16 @@ async fn rt_bidi_and_control_characters_in_circle_name() -> Result<()> {
         .transact()
         .await?;
     let accepted = r.is_success();
+    assert!(!accepted, "names with invisible or direction-changing characters must be rejected");
+    let t = w
+        .bob
+        .call(w.circle.id(), "create_circle")
+        .args_json(json!({ "name": "Plain", "params": params(), "theme": { "tagline": "evil‮txet" } }))
+        .deposit(NearToken::from_yoctonear(deposit))
+        .max_gas()
+        .transact()
+        .await?;
+    assert!(failed_with(t, "E04_BAD_PARAMS"), "tagline with a bidi override must be rejected");
     let mut bidi_in_svg = false;
     let mut newline_in_svg = false;
     let mut title = String::new();
@@ -247,4 +263,43 @@ async fn rt_contract_never_subsidises_storage() -> Result<()> {
     );
     assert!(free(&after) >= free(&before), "contract paid for someone's storage: {} -> {}", free(&before), free(&after));
     assert_circle_holds_zero(&w).await
+}
+
+/// A4 (fixed in D-009): a deposit below the real storage cost is rejected, so
+/// nobody can make the contract pay for their circles, invites or loans.
+#[tokio::test]
+async fn rt_underpaid_storage_is_rejected() -> Result<()> {
+    let w = world().await?;
+    members(&w).await?;
+    let r = w
+        .bob
+        .call(w.circle.id(), "create_circle")
+        .args_json(json!({ "name": "Free rider", "params": params() }))
+        .deposit(NearToken::from_yoctonear(1))
+        .max_gas()
+        .transact()
+        .await?;
+    assert!(failed_with(r, "E02_DEPOSIT"), "create_circle with 1 yocto must fail");
+    let (_sk, pk) = invite_key(41);
+    let r = w
+        .founder
+        .call(w.circle.id(), "register_invite")
+        .args_json(json!({ "circle_id": "1", "invite_public_key": pk, "expires_at": (u64::MAX / 2).to_string(), "invitee_id": null }))
+        .deposit(NearToken::from_yoctonear(1))
+        .max_gas()
+        .transact()
+        .await?;
+    assert!(failed_with(r, "E02_DEPOSIT"), "register_invite with 1 yocto must fail");
+    // Only the 256-byte reserve attached: not enough for the loan record itself.
+    let r = w
+        .bob
+        .call(w.circle.id(), "create_loan")
+        .args_json(json!({ "circle_id": "1", "lender_id": w.carol.id(), "amount": (10 * USDC).to_string(), "duration_days": 2 }))
+        .deposit(NearToken::from_yoctonear(2_560_000_000_000_000_000_000))
+        .max_gas()
+        .transact()
+        .await?;
+    assert!(failed_with(r, "E02_DEPOSIT"), "create_loan paying only the reserve must fail");
+    assert_eq!(loan(&w, 1).await?, serde_json::Value::Null, "no loan was created");
+    Ok(())
 }
