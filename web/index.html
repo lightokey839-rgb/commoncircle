@@ -31,6 +31,19 @@
         <button id="join-invite">Join circle</button>
       </section>
 
+      <section class="card" aria-labelledby="create-invite-heading">
+        <h2 id="create-invite-heading">Invite someone</h2>
+        <p class="muted">The generated Ed25519 secret is placed in the link fragment and never sent to the server.</p>
+        <label for="invite-circle-id">Circle id</label>
+        <input id="invite-circle-id" inputmode="numeric" placeholder="1" />
+        <label for="invitee-account-id">Named invitee account (optional)</label>
+        <input id="invitee-account-id" autocomplete="off" placeholder="bob.testnet" />
+        <label for="invite-expiry-hours">Expires in hours</label>
+        <input id="invite-expiry-hours" inputmode="numeric" value="72" />
+        <button id="create-invite">Register invite</button>
+        <textarea id="invite-link" rows="3" readonly placeholder="The share link appears here"></textarea>
+      </section>
+
       <section class="card" aria-labelledby="positions-heading">
         <h2 id="positions-heading">3. My positions</h2>
         <button id="load-positions" class="secondary">Refresh positions</button>

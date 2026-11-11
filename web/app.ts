@@ -1,5 +1,6 @@
 import { CircleClient, plainContractError, type NearWallet } from './circle-client'
 import { signInWithNep413, type Nep413Wallet } from './nep413'
+import { buildInviteLink, generateInviteKeyPair, parseInviteLink, signInviteWithSecret } from './invite'
 
 type BrowserWallet = Nep413Wallet & NearWallet
 
@@ -12,12 +13,13 @@ declare global {
 }
 
 const config = window.COMMONCIRCLE_CONFIG ?? {
-  rpcUrl: 'https://rpc.testnet.near.org',
-  contractId: 'circle.testnet',
+  rpcUrl: 'https://test.rpc.fastnear.com',
+  contractId: 'commoncircle-light.testnet',
   authUrl: 'http://localhost:3001',
   recipient: window.location.host,
 }
-const client = new CircleClient(config.rpcUrl, config.contractId, window.commonCircleWallet)
+const readClient = new CircleClient(config.rpcUrl, config.contractId)
+const client = () => new CircleClient(config.rpcUrl, config.contractId, window.commonCircleWallet)
 let accountId = ''
 
 const $ = <T extends HTMLElement>(selector: string): T => document.querySelector(selector) as T
@@ -48,19 +50,35 @@ async function joinInvite(): Promise<void> {
   const inviteSecret = $<HTMLInputElement>('#invite-secret').value.trim()
   const invitePublicKey = $<HTMLInputElement>('#invite-public-key').value.trim()
   const circleId = $<HTMLInputElement>('#circle-id').value.trim()
-  const signer = window.commonCircleInviteSigner
-  if (!signer) throw new Error('Invite signing adapter is not installed; the secret stays in this browser.')
+  const signer = window.commonCircleInviteSigner ?? signInviteWithSecret
   if (!inviteSecret || !invitePublicKey || !circleId) throw new Error('Circle id, public key, and invite secret are required.')
-  const invite = await client.getInvite(invitePublicKey)
+  const invite = await readClient.getInvite(invitePublicKey)
   if (!invite || invite.expired || (invite.invitee_id && invite.invitee_id !== accountId)) throw new Error('Invite is missing, expired, or named for another account.')
-  const storage = await client.storageCosts()
-  await client.joinByInvite({ circleId, callerId: accountId, invitePublicKey, inviteSecret, signInvite: signer, deposit: storage.redeem_invite })
+  const storage = await readClient.storageCosts()
+  await client().joinByInvite({ circleId, callerId: accountId, invitePublicKey, inviteSecret, signInvite: signer, deposit: storage.redeem_invite })
   show('Join transaction submitted. Refresh after finality to see the passport.')
+}
+
+async function createInvite(): Promise<void> {
+  const wallet = window.commonCircleWallet
+  if (!wallet) throw new Error('Connect a NEAR wallet adapter before registering an invite.')
+  if (!accountId) throw new Error('Sign in before creating an invite.')
+  const circleId = $<HTMLInputElement>('#invite-circle-id').value.trim()
+  const inviteeId = $<HTMLInputElement>('#invitee-account-id').value.trim() || null
+  const hours = BigInt($<HTMLInputElement>('#invite-expiry-hours').value || '72')
+  if (!/^\d+$/.test(circleId) || hours <= 0n) throw new Error('Enter a valid circle id and positive expiry.')
+  const pair = await generateInviteKeyPair()
+  const expiresAt = (BigInt(Date.now()) * 1_000_000n + hours * 3_600_000_000_000n).toString()
+  const storage = await readClient.storageCosts()
+  await client().registerInvite({ circleId, invitePublicKey: pair.publicKey, expiresAt, inviteeId, deposit: storage.register_invite })
+  const link = buildInviteLink({ circleId, invitePublicKey: pair.publicKey, inviteSecret: pair.secret })
+  $<HTMLTextAreaElement>('#invite-link').value = link
+  show('Invite registered. Share the link; its secret exists only in the URL fragment.')
 }
 
 async function loadPositions(): Promise<void> {
   if (!accountId) throw new Error('Sign in before loading positions.')
-  const positions = await client.myPositions(accountId)
+  const positions = await readClient.myPositions(accountId)
   const list = $('#positions')
   list.replaceChildren(
     ...positions.borrowed.map((loan) => row(`Borrowed #${loan.loan_id}`, `${loan.principal} USDC · ${loan.state}`)),
@@ -72,8 +90,16 @@ async function loadPositions(): Promise<void> {
 function wire(): void {
   $('#sign-in').addEventListener('click', () => void signIn().catch((error) => show(error instanceof Error ? error.message : String(error))))
   $('#join-invite').addEventListener('click', () => void joinInvite().catch((error) => show(plainContractError(error))))
+  $('#create-invite').addEventListener('click', () => void createInvite().catch((error) => show(plainContractError(error))))
   $('#load-positions').addEventListener('click', () => void loadPositions().catch((error) => show(error instanceof Error ? error.message : String(error))))
 }
 
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire)
-else wire()
+function hydrateInviteFields(): void {
+  const invite = parseInviteLink()
+  if (invite.circleId) $<HTMLInputElement>('#circle-id').value = invite.circleId
+  if (invite.invitePublicKey) $<HTMLInputElement>('#invite-public-key').value = invite.invitePublicKey
+  if (invite.inviteSecret) $<HTMLInputElement>('#invite-secret').value = invite.inviteSecret
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { hydrateInviteFields(); wire() })
+else { hydrateInviteFields(); wire() }

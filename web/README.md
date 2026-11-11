@@ -6,6 +6,8 @@ This directory is the ops/web handoff surface for the frozen
 - `circle-client.ts` contains typed JSON-RPC views and the invite transaction
   wrapper. U64/U128 values remain decimal strings; no money is converted to a
   JavaScript number.
+- `invite.ts` generates an Ed25519 key pair in WebCrypto, registers the public
+  key, and puts only the private secret in the URL fragment of a share link.
 - `nep413.ts` performs the nonce → wallet `signMessage` → server verification
   flow. The server receives the signed challenge, never an invite secret.
 - `index.html`, `app.ts`, and `styles.css` are the join-by-invite and “my

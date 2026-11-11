@@ -193,6 +193,15 @@ export class CircleClient {
   loansByLender(accountId: string): Promise<LoanView[]> { return this.view('loans_by_lender', { account_id: accountId, from_index: null, limit: 50 }) }
   storageCosts(): Promise<StorageCosts> { return this.view('storage_costs') }
 
+  async registerInvite(input: { circleId: U64; invitePublicKey: string; expiresAt: U64; inviteeId?: string | null; deposit: U128 }): Promise<unknown> {
+    return this.call('register_invite', {
+      circle_id: input.circleId,
+      invite_public_key: input.invitePublicKey,
+      expires_at: input.expiresAt,
+      invitee_id: input.inviteeId ?? null,
+    }, input.deposit, '30000000000000')
+  }
+
   async myPositions(accountId: string): Promise<{ borrowed: LoanView[]; lent: LoanView[] }> {
     const [borrowed, lent] = await Promise.all([this.loansByBorrower(accountId), this.loansByLender(accountId)])
     return { borrowed, lent }
