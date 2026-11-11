@@ -69,6 +69,12 @@ jobs:
         run: |
           set -o pipefail
           cargo test -p commoncircle-circle --test readme_checks --no-fail-fast -- --test-threads=4 2>&1 | tee ../artifacts/readme-checks.log
+      - name: Sputnik DAO treasury loans (Gate 2; testnet global-hash Sputnik code)
+        env:
+          ARTIFACT_DIR: ${{ github.workspace }}/artifacts
+        run: |
+          set -o pipefail
+          cargo test -p commoncircle-circle --test sandbox_sputnik --no-fail-fast -- --test-threads=2 --nocapture 2>&1 | tee ../artifacts/sandbox-sputnik.log
       - name: Upload Rust logs and wasm
         if: always()
         uses: actions/upload-artifact@v4
