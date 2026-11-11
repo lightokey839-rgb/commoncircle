@@ -1,5 +1,34 @@
 # CommonCircle status
 
+## Gate 1 — contracts (lead), updated 2026-11-11 ~09:15 UTC
+
+Status: CONTRACT FROZEN IN SANDBOX / TESTNET DEPLOY NOT RUN / NOT CLAIMABLE
+
+- Branch `lane/contracts` (integration; includes `lane/web` up to `b6449bb`),
+  pushed only to the PRIVATE repo `lightokey839-rgb/commoncircle` (A10).
+  Baseline tag `baseline-loanbook-port` (`940099e`) pushed first.
+- CI (GitHub Actions, Ubuntu) is the Rust runner: Rust 1.99.1, near-sdk 5.30.1,
+  near-workspaces 0.24.0, cargo-near 0.23.0. Local WSL is optional.
+- Green in CI: unit 40/40, F0 sandbox 11/11 (refund proofs; circle holds zero
+  USDC after every scenario), all 9 contract README rows, gitleaks full
+  history, npm/claims, USDC metadata on both networks.
+- Frozen source `913998e`; reproducible wasm sha256 `6f1f054a…a858`, code hash
+  `8Umgymq4CW3h9HWYehaCh1LKvFk3254FRjDAFBetm7Sf` (full values in
+  `docs/VERIFICATION.md` and `docs/SPEC_DEVIATIONS.md`).
+- Recovery (F1) is cut for Gate 1: methods exist and always fail
+  (`features.recovery = false`).
+
+Builder actions needed:
+1. Pick the testnet circle account name; confirm the vault id
+   `vault.<circle account>` (proposed for both networks).
+2. Run `contracts/scripts/deploy-testnet.sh` (Git Bash + near-cli-rs) and paste
+   the output; then the testnet refund proof and card-art wallet check.
+3. Mainnet deploy kit (1G) is the ops/web lane; if mainnet is not deployed by
+   Thu 12 Nov 11:59 UTC, the pilot becomes a labelled testnet user test.
+
+Open items: callback gas measurement for the no-stuck-state argument
+(`docs/EVENTS.md`), F0 refund proof on testnet, card art in two wallets.
+
 Updated: 2026-11-11 (Africa/Lagos)
 
 ## Gate 0

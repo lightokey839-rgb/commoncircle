@@ -77,3 +77,14 @@ corresponding behavior is shipped.
   circle can allow small loans that do not count toward Trusted.
 - Covering test: an on-time repayment below `qualifying_min_amount` does not
   increase `qualifying_count`.
+
+## Contract freeze notice (Gate 1 phase 1E)
+
+- Frozen source: commit `913998e` on `lane/contracts`.
+- Reproducible wasm (cargo-near 0.23.0, image
+  `sourcescan/cargo-near:0.23.0-rust-1.99.1@sha256:8013f039e8005627f10ae66b5519d1a6eeeed7d7aef4b5067d5e9a86c4302fcc`):
+  sha256 `6f1f054ab5e20317a6875a34748d3de3b6177434d86b885a4fc2f70042e4a858`,
+  code hash `8Umgymq4CW3h9HWYehaCh1LKvFk3254FRjDAFBetm7Sf`.
+- From here on, any change under `contracts/circle/src` needs a new entry in
+  this file (what, why, covering test), a full sandbox re-run, and a new
+  reproducible hash recorded in `docs/VERIFICATION.md`.

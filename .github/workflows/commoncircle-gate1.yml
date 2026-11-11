@@ -103,6 +103,18 @@ jobs:
                   s = A[r] + s
               print(p.split("/")[-1], "code_hash(base58) =", s)
           PY
+      - name: F0 refund proofs against the reproducible wasm (the deploy artifact)
+        working-directory: contracts
+        run: |
+          set -o pipefail
+          ./scripts/build-wasm.sh > /dev/null   # mock-ft for the sandbox
+          CIRCLE_WASM="$GITHUB_WORKSPACE/artifacts/reproducible/commoncircle_circle.wasm"             cargo test -p commoncircle-circle --test sandbox_f0 --no-fail-fast -- --test-threads=4 2>&1 | tee ../artifacts/reproducible-sandbox-f0.log
+      - name: README rows against the reproducible wasm (later-gate rows stay red)
+        continue-on-error: true
+        working-directory: contracts
+        run: |
+          set -o pipefail
+          CIRCLE_WASM="$GITHUB_WORKSPACE/artifacts/reproducible/commoncircle_circle.wasm"             cargo test -p commoncircle-circle --test readme_checks --no-fail-fast -- --test-threads=4 2>&1 | tee ../artifacts/reproducible-readme-checks.log
       - name: Upload reproducible wasm
         if: always()
         uses: actions/upload-artifact@v4

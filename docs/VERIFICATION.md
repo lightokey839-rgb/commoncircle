@@ -144,6 +144,16 @@ Toolchain: Rust 1.99.1, near-sdk 5.30.1, near-workspaces 0.24.0, cargo-near
 | `contracts/Cargo.lock` | PASS | taken from the CI artifact of this run (near-sdk 5.30.1) |
 | Non-reproducible circle wasm sha256 | recorded | `e47d84e1bf86c96666745741c3e2ba1c2ce4afbb70bfad89194ca4bce01e273e` (changed from the 1B run because of `.detach()`). Freeze hash comes from the reproducible build. |
 
+### Gate 1 phase 1E — freeze build (run `42983781151`, commit `913998e`)
+
+| Check | Status | Evidence |
+| --- | --- | --- |
+| Reproducible circle wasm (Docker) | PASS | `cargo near build reproducible-wasm`, image `sourcescan/cargo-near:0.23.0-rust-1.99.1@sha256:8013f039e8005627f10ae66b5519d1a6eeeed7d7aef4b5067d5e9a86c4302fcc`, git clean at HEAD `913998e`. sha256 `6f1f054ab5e20317a6875a34748d3de3b6177434d86b885a4fc2f70042e4a858` (362127 bytes); NEAR code hash (base58 of sha256) `8Umgymq4CW3h9HWYehaCh1LKvFk3254FRjDAFBetm7Sf`. Artifact `commoncircle-reproducible-wasm`. |
+| Same commit: unit, F0 sandbox, contract README rows | PASS | all jobs green on run `42983781151` (tests built from the same source with the non-reproducible build) |
+| F0 sandbox against the reproducible wasm itself | PENDING | CI step added after this run; recorded on the next run |
+| Testnet deploy, code hash on chain = `8Umgymq4...` | NOT RUN | no testnet account on this machine; `contracts/scripts/deploy-testnet.sh` is ready for the builder to run |
+| evidence.json rows | none added | Gate 1: no track claims; Tier A rows are added in Gate 2 from testnet hashes |
+
 Not yet evidenced: callback gas actually used (needed for the "cannot stay
 stuck" argument in `docs/EVENTS.md`), reproducible build hash, testnet deploy.
 
