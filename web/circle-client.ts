@@ -1,7 +1,33 @@
-/** Typed, read-first client for docs/CIRCLE_INTERFACE.md 1.0.0. */
+/** Typed, read-first client for docs/CIRCLE_INTERFACE.md 1.1.0. */
 
 export type U64 = string
 export type U128 = string
+export type CircleThemePattern = 'None' | 'Dots' | 'Grid' | 'Waves' | 'Rays'
+
+export type CircleTheme = {
+  tagline?: string | null
+  background?: string | null
+  accent?: string | null
+  text?: string | null
+  pattern?: CircleThemePattern | null
+  /** Raw base64 image bytes; never an SVG or data URI. */
+  emblem?: string | null
+}
+
+export type CircleThemeView = {
+  tagline: string | null
+  background: string
+  accent: string
+  text: string
+  pattern: CircleThemePattern
+  emblem_mime: string | null
+  emblem_bytes: number
+  custom: boolean
+}
+
+export function passportTokenTitle(circleName: string): string {
+  return `${circleName} Passport`
+}
 
 export type CircleParams = {
   min_amount: U128
@@ -19,7 +45,7 @@ export type CircleParams = {
 }
 
 export type ConfigView = {
-  interface_version: '1.0.0'
+  interface_version: '1.1.0'
   usdc_id: string
   vault_id: string
   hard_loan_cap: U128
@@ -41,6 +67,7 @@ export type CircleView = {
   steward_count: number
   loan_count: number
   treasury_lending_enabled: boolean
+  theme: CircleThemeView
 }
 
 export type LoanView = {
@@ -108,6 +135,7 @@ export type InviteView = {
 
 export type StorageCosts = {
   create_circle: U128
+  set_circle_theme: U128
   register_invite: U128
   redeem_invite: U128
   create_loan: U128
@@ -187,6 +215,8 @@ const PLAIN_ERRORS: Record<string, string> = {
   E01_NOT_FOUND: 'That circle, loan, or passport does not exist.',
   E02_DEPOSIT: 'Attach more NEAR for storage.',
   E03_ONE_YOCTO: 'Attach exactly 1 yoctoNEAR for this action.',
+  E04_BAD_PARAMS: 'That design setting is not allowed (colour, image type or size).',
+  E05_NOT_ADMIN: 'Only the circle admin can edit this design.',
   E10_NO_PASSPORT: 'You need an active passport in this circle.',
   E12_NOT_NAMED_LENDER: 'Only the named lender can fund this loan.',
   E18_WINDOW_LAPSED: 'The funding window has closed.',
@@ -287,7 +317,15 @@ export function parseFtTransferCallOutcome(outcome: unknown): FtTransferCallOutc
 }
 
 export class CircleClient {
-  constructor(readonly rpcUrl: string, readonly contractId: string, readonly wallet?: NearWallet) {}
+  readonly rpcUrl: string
+  readonly contractId: string
+  readonly wallet?: NearWallet
+
+  constructor(rpcUrl: string, contractId: string, wallet?: NearWallet) {
+    this.rpcUrl = rpcUrl
+    this.contractId = contractId
+    this.wallet = wallet
+  }
 
   async view<T>(methodName: string, args: Record<string, unknown> = {}): Promise<T> {
     const encoded = encodeBase64(new TextEncoder().encode(JSON.stringify(args)))
@@ -337,8 +375,14 @@ export class CircleClient {
     }, input.deposit, '30000000000000')
   }
 
-  async createCircle(input: { name: string; params: CircleParams; deposit: U128 }): Promise<unknown> {
-    return this.call('create_circle', { name: input.name, params: input.params }, input.deposit, '30000000000000')
+  async createCircle(input: { name: string; params: CircleParams; theme?: CircleTheme | null; deposit: U128 }): Promise<unknown> {
+    const args: Record<string, unknown> = { name: input.name, params: input.params }
+    if (input.theme !== undefined) args.theme = input.theme
+    return this.call('create_circle', args, input.deposit, '50000000000000')
+  }
+
+  async setCircleTheme(input: { circleId: U64; theme: CircleTheme; deposit: U128 }): Promise<unknown> {
+    return this.call('set_circle_theme', { circle_id: input.circleId, theme: input.theme }, input.deposit, '50000000000000')
   }
 
   async createLoan(input: { circleId: U64; lenderId: string; amount: U128; durationDays: number; deposit: U128 }): Promise<unknown> {

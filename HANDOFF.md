@@ -181,10 +181,113 @@ entry from `git show lane/contracts:HANDOFF.md` dated 2026-11-11 01:30 UTC.
 These are web-lane follow-ups. No contract file or `contracts` job in
 `.github/workflows/commoncircle-gate1.yml` was changed.
 
+## 2026-11-11 — ops/web → lead (review fix and F4 relayer)
+
+- `3e40483` fixes `signInviteWithSecret`: contract signatures are now standard
+  padded base64 (`^[A-Za-z0-9+/]{86}==$`, 64 decoded bytes); only the invite
+  secret remains base64url in the URL fragment. `tests/invite.test.ts` covers
+  the exact format and round-trip length.
+- `8bdabef` adds `server/relayer.ts` and `tests/relayer.test.ts`. The policy
+  verifies current on-chain invite/passport state, checks the canonical invite
+  signature, enforces configured circle/vault/USDC receiver-method allowlists,
+  and reserves configurable per-account and total UTC-day budgets using BigInt
+  U128 strings. No relayer key or transaction submission is included.
+- Source TypeScript and claims self-test pass. The project Vitest runner could
+  not start in this checkout because dependencies are still unavailable; the
+  invite format and relayer valid-invite path were exercised directly with
+  Node 24 WebCrypto/Ed25519. No contract file or contracts CI job changed.
+
+## 2026-11-11 — ops/web → lead (ordered web build)
 ## 2026-11-11 01:30 UTC — lead (contracts lane) → ops/web lane
 
 The builder has made the contracts-lane session the lead for both lanes.
 
+TypeScript checks pass. No contract file or `contracts` CI job was changed.
+
+## 2026-11-11 — ops/web → lead (interface 1.1.0 client)
+
+- Added typed 1.1.0 theme input/view shapes, `CircleView.theme`,
+  `storage_costs().set_circle_theme`, `create_circle`'s optional theme argument,
+  and the admin-only `set_circle_theme` call with 50 Tgas.
+- Added the `E04_BAD_PARAMS` design error mapping and a client regression test
+  for the 1.1.0 call arguments. Passport metadata continues to accept the
+  contract's new `"<circle name> Passport"` title without a client-side legacy
+  title assumption.
+- The direct live RPC check for circle 2 could not complete in this Windows
+  environment (`Invoke-RestMethod`/Schannel authentication failure); the demo
+  update remains read-only and will fail closed if the configured RPC is
+  unreachable. No contract file or `contracts` CI job changed.
+
+## 2026-11-11 — ops/web → lead (theme picker and admin design screen)
+
+- Added the 1.1.0 theme picker to circle creation and a separate admin design
+  editor. Taglines are capped at 32 characters; colours are validated as
+  `#RRGGBB`; patterns are limited to None, Dots, Grid, Waves, and Rays.
+- Emblems are rejected when SVG, resized in-browser to 128×128 with canvas,
+  encoded as WebP first (PNG fallback), and rejected unless the raw image is at
+  most 12288 bytes. The contract receives raw base64 bytes, never an SVG or
+  data URI. A local passport preview is shown before saving; after save the
+  app fetches the admin's `card_svg` when a passport is available.
+- `E04_BAD_PARAMS` and `E05_NOT_ADMIN` are surfaced as plain design/admin
+  errors. `npm run typecheck` is currently unavailable because this checkout's
+  `node_modules/.bin/tsc` is missing. No contract file or `contracts` CI job
+  changed.
+
+## 2026-11-11 — ops/web → lead (circle 2 read-only demo)
+
+- The demo now defaults to circle `2`, labels it as **The Dogs (DEMO)**, and
+  queries its loans and passports from `commoncircle-light.testnet`.
+- Each returned passport is rendered with its read-only `card_svg`; card-view
+  failures are isolated per passport so the data list remains available. No
+  wallet or transaction is used by the demo. The live RPC check itself remains
+  unavailable in this Windows environment due Schannel authentication failure.
+
+## 2026-11-11 — ops/web → lead (Gate 2 member surface)
+
+- NEP-413 sign-in remains the only browser auth path: the app requests a
+  one-use server challenge, signs it with the wallet, and verifies it before
+  storing the short-lived session token.
+- Added a chat gate that calls `check_access` and keeps the composer disabled
+  unless the account has an Active passport. The unlocked composer is clearly
+  local-demo-only; no off-chain chat transport is claimed.
+- Renamed the loan request surface to **Request to fund** and retained the
+  typed `create_loan` call, which names the lender and moves no USDC.
+- Added a signed-in **My passport card** screen that reads the passport,
+  `nft_token` metadata (including the 1.1.0 `"<circle name> Passport"`
+  title), and `card_svg` without a transaction.
+- Dependency binaries remain unavailable for local type/test execution; no
+  contract file or `contracts` CI job changed.
+
+## 2026-11-11 — ops/web → lead (F4 relayer checkpoint)
+
+- Re-audited the existing relayer against the Gate 1 closed handoff. It checks
+  either a current, correctly named invite plus canonical standard-base64
+  Ed25519 signature or `check_access(...).allowed` for an active passport.
+- The receiver/method policy is explicit: `circle:redeem_invite`,
+  `vault:execute_repay|execute_auto_lend`, and `usdc:storage_deposit`. Unknown
+  receivers and methods are rejected before budget reservation.
+- BigInt UTC-day accounting enforces both per-account and total daily caps;
+  state resets on the next UTC day. Added coverage for expired/wrongly named
+  invites in addition to signature, allowlist, passport, cap, and rollover
+  tests. The relayer remains an authorization core with no private key or
+  transaction submission.
+- `npm install` was attempted with both the existing and a workspace-local
+  cache. The existing cache failed with Windows `EPERM`; the local-cache run
+  stalled and was stopped. `node_modules/.bin/tsc` and Vitest are still
+  unavailable, so local TypeScript/Vitest execution is pending CI. No contract
+  file or `contracts` CI job changed.
+
+## 2026-11-11 — ops/web → lead (1.1.0 polish)
+
+- The browser encoder now verifies that `canvas.toBlob('image/webp')` really
+  returned WebP before accepting it; unsupported browsers use the explicit PNG
+  fallback. The typed client exports `passportTokenTitle(name)`, and the card
+  screen displays the contract metadata title or the exact 1.1.0 fallback
+  `"<circle name> Passport"`.
+- Replaced the client constructor's TypeScript parameter properties with
+  explicit fields so Node 24's strip-only runtime can load the client and
+  relayer smoke paths without a transpiler. Direct source smoke checks now pass
+  for invite signing, the passport title, and a valid relayer reservation.
 - **Integration branch:** `lane/contracts` now contains `lane/web` (merge of
   `d5a06df`). Keep committing on `lane/web`; the lead merges it in.
 - **CI contracts job taken over by the lead.** In `commoncircle-gate1.yml` the
