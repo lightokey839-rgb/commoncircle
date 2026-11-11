@@ -121,3 +121,19 @@ TypeScript checks pass. No contract file or `contracts` CI job was changed.
   failures are isolated per passport so the data list remains available. No
   wallet or transaction is used by the demo. The live RPC check itself remains
   unavailable in this Windows environment due Schannel authentication failure.
+
+## 2026-11-11 — ops/web → lead (Gate 2 member surface)
+
+- NEP-413 sign-in remains the only browser auth path: the app requests a
+  one-use server challenge, signs it with the wallet, and verifies it before
+  storing the short-lived session token.
+- Added a chat gate that calls `check_access` and keeps the composer disabled
+  unless the account has an Active passport. The unlocked composer is clearly
+  local-demo-only; no off-chain chat transport is claimed.
+- Renamed the loan request surface to **Request to fund** and retained the
+  typed `create_loan` call, which names the lender and moves no USDC.
+- Added a signed-in **My passport card** screen that reads the passport,
+  `nft_token` metadata (including the 1.1.0 `"<circle name> Passport"`
+  title), and `card_svg` without a transaction.
+- Dependency binaries remain unavailable for local type/test execution; no
+  contract file or `contracts` CI job changed.

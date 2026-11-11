@@ -23,6 +23,7 @@ const config = window.COMMONCIRCLE_CONFIG ?? {
 const readClient = new CircleClient(config.rpcUrl, config.contractId)
 const client = () => new CircleClient(config.rpcUrl, config.contractId, window.commonCircleWallet)
 let accountId = ''
+let chatUnlocked = false
 
 const $ = <T extends HTMLElement>(selector: string): T => document.querySelector(selector) as T
 const status = () => $('#status')
@@ -152,6 +153,49 @@ async function loadPositions(): Promise<void> {
   show(`Loaded ${positions.borrowed.length + positions.lent.length} positions. Amounts are integer USDC base units.`)
 }
 
+async function checkChatAccess(): Promise<void> {
+  if (!accountId) throw new Error('Sign in before checking chat access.')
+  const circleId = $<HTMLInputElement>('#chat-circle-id').value.trim()
+  if (!/^\d+$/.test(circleId)) throw new Error('Enter a valid circle id.')
+  const access = await readClient.checkAccess(circleId, accountId)
+  chatUnlocked = access.allowed
+  const message = $<HTMLTextAreaElement>('#chat-message')
+  const send = $<HTMLButtonElement>('#send-chat')
+  message.disabled = !chatUnlocked
+  send.disabled = !chatUnlocked
+  $('#chat-access').textContent = chatUnlocked
+    ? `Chat unlocked for ${access.display_tier ?? 'member'} access.`
+    : `Chat locked: ${access.reason}. An Active passport is required.`
+  show(chatUnlocked ? 'On-chain chat access confirmed.' : 'On-chain chat access denied.')
+}
+
+function sendChat(): void {
+  if (!chatUnlocked) throw new Error('Check on-chain chat access first.')
+  const message = $<HTMLTextAreaElement>('#chat-message')
+  const value = message.value.trim()
+  if (!value) throw new Error('Write a message first.')
+  const item = document.createElement('li')
+  item.textContent = `${accountId}: ${value}`
+  $('#chat-log').prepend(item)
+  message.value = ''
+  show('Demo message added locally; a production chat transport is not part of this scaffold.')
+}
+
+async function loadMyCard(): Promise<void> {
+  if (!accountId) throw new Error('Sign in before loading your card.')
+  const circleId = $<HTMLInputElement>('#my-card-circle-id').value.trim()
+  if (!/^\d+$/.test(circleId)) throw new Error('Enter a valid circle id.')
+  const passport = await readClient.passportFor(circleId, accountId)
+  if (!passport) throw new Error('No passport exists for this account in that circle.')
+  const [svg, token] = await Promise.all([readClient.cardSvg(passport.token_id), readClient.nftToken(passport.token_id)])
+  if (!svg) throw new Error('The passport card is not available yet.')
+  const image = $<HTMLImageElement>('#my-card-image')
+  image.src = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }))
+  image.hidden = false
+  $<HTMLElement>('#my-card-title').textContent = token?.metadata?.title ?? 'Passport card title unavailable.'
+  show('Passport card loaded from the read-only card_svg view.')
+}
+
 async function loadDemo(): Promise<void> {
   const circleId = $<HTMLInputElement>('#demo-circle-id').value.trim() || '2'
   const snapshot = await loadReadOnlyDemo(circleId)
@@ -196,6 +240,9 @@ function wire(): void {
   $('#create-loan').addEventListener('click', () => void createLoan().catch((error) => show(plainContractError(error))))
   $('#save-design').addEventListener('click', () => void saveDesign().catch((error) => show(plainContractError(error))))
   $('#load-positions').addEventListener('click', () => void loadPositions().catch((error) => show(error instanceof Error ? error.message : String(error))))
+  $('#check-chat-access').addEventListener('click', () => void checkChatAccess().catch((error) => show(error instanceof Error ? error.message : String(error))))
+  $('#send-chat').addEventListener('click', () => void Promise.resolve().then(sendChat).catch((error) => show(error instanceof Error ? error.message : String(error))))
+  $('#load-my-card').addEventListener('click', () => void loadMyCard().catch((error) => show(error instanceof Error ? error.message : String(error))))
   $('#load-demo').addEventListener('click', () => void loadDemo().catch((error) => show(error instanceof Error ? error.message : String(error))))
   bindThemeForm('new-circle', () => $<HTMLInputElement>('#new-circle-name').value.trim() || 'New circle', (error) => show(error instanceof Error ? error.message : String(error)))
   bindThemeForm('design', () => `Circle ${$<HTMLInputElement>('#design-circle-id').value.trim() || '?'}`, (error) => show(error instanceof Error ? error.message : String(error)))

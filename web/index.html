@@ -100,7 +100,8 @@
       </section>
 
       <section class="card" aria-labelledby="create-loan-heading">
-        <h2 id="create-loan-heading">Create a loan request</h2>
+        <h2 id="create-loan-heading">Request to fund</h2>
+        <p class="muted">This creates an on-chain request naming the lender who may fund it with USDC. It does not move funds.</p>
         <label for="loan-circle-id">Circle id</label>
         <input id="loan-circle-id" inputmode="numeric" placeholder="1" />
         <label for="loan-lender-id">Named lender account</label>
@@ -109,13 +110,31 @@
         <input id="loan-amount" inputmode="numeric" placeholder="1000000" />
         <label for="loan-duration-days">Duration days</label>
         <input id="loan-duration-days" inputmode="numeric" value="1" />
-        <button id="create-loan">Create loan</button>
+        <button id="create-loan">Submit request to fund</button>
+      </section>
+
+      <section class="card" aria-labelledby="chat-heading">
+        <h2 id="chat-heading">Circle chat gate</h2>
+        <p class="muted">Chat is available only to an account with an Active passport. The gate is checked on-chain before the composer unlocks.</p>
+        <label for="chat-circle-id">Circle id</label>
+        <input id="chat-circle-id" inputmode="numeric" value="2" />
+        <button id="check-chat-access" class="secondary">Check chat access</button>
+        <p id="chat-access" class="status" role="status">Locked until access is checked.</p>
+        <textarea id="chat-message" rows="3" disabled placeholder="Write to your circle"></textarea>
+        <button id="send-chat" disabled>Post local demo message</button>
+        <ul id="chat-log" class="positions" aria-live="polite"></ul>
       </section>
 
       <section class="card" aria-labelledby="positions-heading">
         <h2 id="positions-heading">3. My positions</h2>
         <button id="load-positions" class="secondary">Refresh positions</button>
         <ul id="positions" class="positions" aria-live="polite"></ul>
+        <h3>My passport card</h3>
+        <label for="my-card-circle-id">Circle id</label>
+        <input id="my-card-circle-id" inputmode="numeric" value="2" />
+        <button id="load-my-card" class="secondary">Load my card</button>
+        <p id="my-card-title" class="muted">No passport card loaded.</p>
+        <img id="my-card-image" class="card-svg-preview" alt="My CommonCircle passport card" hidden />
       </section>
 
       <p id="status" class="status" role="status">Connect a wallet adapter to begin.</p>
