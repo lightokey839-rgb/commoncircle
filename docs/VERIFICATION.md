@@ -24,7 +24,7 @@ belong here.
 
 | Check | Status | Transaction hash / command output |
 | --- | --- | --- |
-| `ft_metadata` on both USDC IDs and `storage_balance_bounds` | BLOCKED | v3 pins mainnet `17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1` and testnet `3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af`. Read-only RPC attempts on 2026-11-10 failed with `The SSL connection could not be established` / curl could not connect, so symbol/decimals/storage bounds are not claimed. Circle's published list and SDK identify native USDC as 6 decimals: https://www.circle.com/multi-chain-usdc/near and https://docs-w3s-node-sdk.circle.com/variables/chains.NEAR_TESTNET.html |
+| `ft_metadata` on both USDC IDs and `storage_balance_bounds` | PASS (read-only RPC, see "USDC verification output" below) | Mainnet `17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1` and testnet `3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af` both return symbol `USDC`, name `USDC`, 6 decimals, storage bounds min = max = 1250000000000000000000 yoctoNEAR (0.00125 NEAR). The comparison against Circle's published list is still a manual step before any immutable init. |
 | NEP-366 brand-new account joins and repays through a relayer | UNVERIFIED | Requires a funded testnet relayer/member workflow and a disposable account; no transaction was run |
 | Sputnik factory by global contract hash and Transfer proposal | UNVERIFIED | v3 identifies the 6 NEAR standard-factory path and `sputnikv2.testnet` fallback but does not pin a global contract hash. No DAO account, proposal, gas measurement or transaction was run |
 | NEAR Intents destination delivery, exact output, refund address | PASS (docs only) | Read 2026-11-10: https://docs.agentsonintents.com/integration/distribution-channels/1click-api/swap-types documents destination `recipient`, `EXACT_OUTPUT`, `refundTo`, and refund of short/excess deposits; https://docs.agentsonintents.com/integration/agent-api/funding documents deposit-address delivery and notes that the agent-deposit API refunds to the agent balance with no selectable refund address. No live swap was run |
@@ -79,6 +79,38 @@ git push origin codex/loanbook-release-candidate
 The current `origin` is a local path to the LoanBook checkout, not a public
 remote. Do not run these commands until the intended public remote is configured
 and the original checkout accepts Git writes.
+
+## USDC verification output (2026-11-11, contracts lane)
+
+Method: JSON-RPC `query` / `call_function`, `finality: final`, `args_base64: e30=`
+(`{}`), sent from the in-app browser of the contracts-lane session to the
+amendment A6 FastNEAR endpoints. No keys or accounts were used. The `icon`
+data URI is truncated here.
+
+| Network | RPC | Method | Block height | Block hash | Result |
+| --- | --- | --- | --- | --- | --- |
+| mainnet | https://free.rpc.fastnear.com | `ft_metadata` | 223996062 | `85k4CViTdAZXgq4Pj88RtN7pX3z5BaPyY3DpMEqj5qaD` | `{"spec":"ft-1.0.0","name":"USDC","symbol":"USDC","icon":"data:image/svg+xml,...","reference":null,"reference_hash":null,"decimals":6}` |
+| mainnet | https://free.rpc.fastnear.com | `storage_balance_bounds` | 223996063 | `GY6ZLM9pNkPZmSkGQisqXVKLEJnWbMJFMarAMqDAM2w6` | `{"min":"1250000000000000000000","max":"1250000000000000000000"}` |
+| testnet | https://test.rpc.fastnear.com | `ft_metadata` | 277145790 | `72CD1XC16fLWGHm9oaKXpHWkVd6Wzp9fQvm42SSfGQ39` | `{"spec":"ft-1.0.0","name":"USDC","symbol":"USDC","icon":"data:image/svg+xml,...","reference":null,"reference_hash":null,"decimals":6}` |
+| testnet | https://test.rpc.fastnear.com | `storage_balance_bounds` | 277145791 | `CXeM3eZ36JmnQom2v7SQMNgaFBAm4jzn92pNMJZxhNMU` | `{"min":"1250000000000000000000","max":"1250000000000000000000"}` |
+
+Anyone can re-run this with `npm run verify:usdc` from the repository root after
+setting `NEAR_MAINNET_RPC_URL` and `NEAR_TESTNET_RPC_URL` to the URLs above.
+Per A5, mainnet init pins the Circle ID only with this output present; it is
+now present.
+
+## Toolchain pins (contracts lane, 2026-11-11)
+
+| Item | Pin | Evidence |
+| --- | --- | --- |
+| Rust | 1.99.1 (`rust-toolchain.toml`) | GitHub releases API for rust-lang/rust, latest tag 1.99.1 (2026-10-16) |
+| near-sdk / near-contract-standards | =5.30.1 | crates.io API: latest non-prerelease, rust_version 1.95 |
+| near-workspaces | =0.24.0 | crates.io API: latest, rust_version 1.95 |
+| cargo-near | 0.23.0 | crates.io API: latest, rust_version 1.95 |
+
+The Gate 0 pin of Rust 1.86 / near-sdk 5.17.2 is replaced: current near-sdk,
+near-workspaces and cargo-near all require Rust >= 1.95. Nothing has compiled
+yet; `Cargo.lock` will be committed from the first successful build.
 
 ## Evidence format
 
