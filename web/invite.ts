@@ -12,6 +12,12 @@ function base64UrlEncode(bytes: Uint8Array): string {
   return btoa(text).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
 }
 
+function base64Encode(bytes: Uint8Array): string {
+  let text = ''
+  for (let index = 0; index < bytes.length; index += 0x8000) text += String.fromCharCode(...bytes.subarray(index, index + 0x8000))
+  return btoa(text)
+}
+
 function base64UrlDecode(value: string): Uint8Array {
   const normalized = value.replace(/-/g, '+').replace(/_/g, '/')
   const raw = atob(normalized + '='.repeat((4 - normalized.length % 4) % 4))
@@ -56,7 +62,9 @@ export async function generateInviteKeyPair(): Promise<InviteKeyPair> {
 export const signInviteWithSecret: InviteSigner = async ({ message, secret }) => {
   const key = await globalThis.crypto.subtle.importKey('jwk', secretJwk(secret), ED25519, false, ['sign'])
   const signature = await globalThis.crypto.subtle.sign(ED25519, key, new TextEncoder().encode(message))
-  return base64UrlEncode(new Uint8Array(signature))
+  // Base64VecU8 in near-sdk expects standard padded base64. Only the secret
+  // stored in the URL fragment uses base64url.
+  return base64Encode(new Uint8Array(signature))
 }
 
 export function buildInviteLink(input: { circleId: string; invitePublicKey: string; inviteSecret: string; origin?: string; pathname?: string }): string {
