@@ -243,9 +243,13 @@ callback reserve and 30 Tgas own budget.
 
 Card art on chain: `nft_token("1:commoncircle-light-borrower.testnet")` at
 block 277222326 saved as `docs/card-art/testnet_token_trusted.json` (media is
-the on-chain SVG data URI; decoded `testnet_passport_trusted.svg`). Rendering
-in two wallets or explorers: NOT yet checked (NearBlocks shows a bot check to
-the automated browser; the builder checks it).
+the on-chain SVG data URI; decoded `testnet_passport_trusted.svg`). Rendering (checked by the builder, 2026-11-11, screenshots in chat):
+
+| Viewer | Result |
+| --- | --- |
+| Meteor Wallet (web, testnet), `wallet.meteorwallet.app/wallet/nfts/collection/commoncircle-light.testnet/token/1:commoncircle-light-borrower.testnet` | PASS with a defect: the on-chain SVG renders (green card, two gold rings, TRUSTED, description "Tier: Trusted. Status: active."), but Meteor crops it to a square, cutting the left and right edges of the 400x300 card ("MONCIRCLE #1", "TIME 1 / LATE 0", "ACT") |
+| MyNearWallet (testnet, "limited mode" since 1 Nov) | FAIL: Collectibles tab empty for the borrower account, although Kitwallet `likelyNFTs` lists `commoncircle-light.testnet` and `nft_tokens_for_owner` returns the token. Wallet-side |
+| NearBlocks testnet token page | not yet checked (bot check blocks the automated browser) |
 
 ## Evidence format
 
