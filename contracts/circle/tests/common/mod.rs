@@ -283,3 +283,76 @@ pub async fn members(w: &World) -> Result<()> {
     mint(&w.usdc, w.carol.id(), 100 * USDC).await?;
     Ok(())
 }
+
+/// Register an invite in circle 1 (named if `invitee` is Some).
+pub async fn register_invite(w: &World, inviter: &Account, pk: &str, invitee: Option<&AccountId>) -> Result<ExecutionFinalResult> {
+    let cost = storage_cost(w, "register_invite").await?;
+    Ok(inviter
+        .call(w.circle.id(), "register_invite")
+        .args_json(json!({
+            "circle_id": "1",
+            "invite_public_key": pk,
+            "expires_at": (u64::MAX / 2).to_string(),
+            "invitee_id": invitee
+        }))
+        .deposit(NearToken::from_yoctonear(cost))
+        .transact()
+        .await?)
+}
+
+/// `who` redeems the invite with a signature made for `who`.
+pub async fn redeem(w: &World, who: &Account, sk: &SigningKey, pk: &str) -> Result<ExecutionFinalResult> {
+    let sig = invite_signature(sk, w.circle.id(), 1, who.id(), pk);
+    let cost = storage_cost(w, "redeem_invite").await?;
+    Ok(who
+        .call(w.circle.id(), "redeem_invite")
+        .args_json(json!({ "circle_id": "1", "invite_public_key": pk, "signature": sig }))
+        .deposit(NearToken::from_yoctonear(cost))
+        .max_gas()
+        .transact()
+        .await?)
+}
+
+/// Admin-style call with 1 yoctoNEAR.
+pub async fn call1(w: &World, who: &Account, method: &str, args: Value) -> Result<ExecutionFinalResult> {
+    Ok(who
+        .call(w.circle.id(), method)
+        .args_json(args)
+        .deposit(NearToken::from_yoctonear(1))
+        .max_gas()
+        .transact()
+        .await?)
+}
+
+pub async fn passport(w: &World, who: &AccountId) -> Result<Value> {
+    Ok(w.circle
+        .view("passport_for")
+        .args_json(json!({ "circle_id": "1", "account_id": who }))
+        .await?
+        .json()?)
+}
+
+pub async fn token_media(w: &World, token_id: &str) -> Result<String> {
+    let t: Value = w.circle.view("nft_token").args_json(json!({ "token_id": token_id })).await?.json()?;
+    Ok(t["metadata"]["media"].as_str().unwrap_or_default().to_string())
+}
+
+pub fn failed_with(r: ExecutionFinalResult, code: &str) -> bool {
+    format!("{:?}", r.into_result()).contains(code)
+}
+
+/// Write a named sample into $ARTIFACT_DIR (CI uploads it) and stdout.
+pub fn save_artifact(name: &str, body: &str) {
+    println!("{}: {}", name, body);
+    if let Ok(dir) = std::env::var("ARTIFACT_DIR") {
+        let _ = std::fs::create_dir_all(&dir);
+        let _ = std::fs::write(format!("{}/{}", dir, name), body);
+    }
+}
+
+/// bob borrows 10 USDC from carol for `days`, carol funds, bob repays in full.
+pub async fn borrow_fund_repay(w: &World, loan_id: u64, days: u32) -> Result<ExecutionFinalResult> {
+    create_loan(w, &w.bob, w.carol.id(), 10 * USDC, days).await?.into_result()?;
+    ft_transfer_call(&w.carol, &w.usdc, w.circle.id(), 10 * USDC, fund_msg(loan_id), RECOMMENDED_TGAS).await?;
+    ft_transfer_call(&w.bob, &w.usdc, w.circle.id(), 10 * USDC, repay_msg(loan_id), RECOMMENDED_TGAS).await
+}

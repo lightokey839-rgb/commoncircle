@@ -245,3 +245,22 @@ async fn a3_repay_with_wrong_token_wrong_state_or_wrong_caller_is_refunded() -> 
     assert_eq!(l["total_repaid"], "0");
     assert_circle_holds_zero(&w).await
 }
+
+#[tokio::test]
+async fn storage_deposit_excess_is_refunded() -> Result<()> {
+    let w = world().await?;
+    let before = w.bob.view_account().await?.balance;
+    w.bob
+        .call(w.circle.id(), "create_circle")
+        .args_json(json!({ "name": "Refund check", "params": params() }))
+        .deposit(NearToken::from_near(1))
+        .transact()
+        .await?
+        .into_result()?;
+    let after = w.bob.view_account().await?.balance;
+    let spent = before.as_yoctonear() - after.as_yoctonear();
+    // Storage for a circle + passport is well under 0.05 NEAR; the rest of the
+    // 1 NEAR deposit must come back.
+    assert!(spent < NearToken::from_millinear(50).as_yoctonear(), "spent {} yocto", spent);
+    Ok(())
+}

@@ -11,6 +11,7 @@ use near_sdk::{env, ext_contract, near, require, AccountId, PromiseOrValue, Prom
 
 use crate::*;
 
+#[allow(dead_code)]
 #[ext_contract(ext_ft)]
 pub trait ExtFungibleToken {
     fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>);

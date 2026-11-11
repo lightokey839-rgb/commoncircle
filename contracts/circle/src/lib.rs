@@ -203,7 +203,7 @@ pub(crate) fn charge_storage(initial_usage: u64, reserve_bytes: u64) {
     }
     let refund = attached.saturating_sub(cost);
     if !refund.is_zero() {
-        Promise::new(env::predecessor_account_id()).transfer(refund);
+        Promise::new(env::predecessor_account_id()).transfer(refund).detach();
     }
 }
 

@@ -166,6 +166,6 @@ fn charge_storage_upto(initial: u64, measured_at: u64) {
     }
     let refund = attached.saturating_sub(cost);
     if !refund.is_zero() {
-        near_sdk::Promise::new(env::predecessor_account_id()).transfer(refund);
+        near_sdk::Promise::new(env::predecessor_account_id()).transfer(refund).detach();
     }
 }
