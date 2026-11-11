@@ -156,7 +156,14 @@ event `version` string is still `1.0.0`.
 
 ## Contract freeze notice (Gate 1 phase 1E)
 
-**Current (interface 1.1.0, recorded 2026-11-11 ~16:00 UTC):** frozen source
+**Pending builder approval (interface 1.1.1, D-009, recorded 2026-11-11 ~18:30 UTC):**
+source tree `c6daa1d066d041420597f932bf9dc51b404930a8` (commit `2e45eef`); deploy artifact = reproducible wasm of
+CI run `43059776368`, sha256
+`fd7d73903294bd371b79452861c243c7722cb0386a2a9c1fdcf80b410032526b`, code hash
+`J4X6efoAqFoKVYxaSNtpDYUTyKrKDzrqa2vPZxvMLxGr`, tested in the same job. Not
+deployed yet; testnet runs 1.1.0 until the builder redeploys.
+
+**Deployed on testnet (interface 1.1.0, recorded 2026-11-11 ~16:00 UTC):** frozen source
 `contracts/circle/src` tree `5941c7fd00c5caf221ee413ce8d39a097249b170` (commit `3a4f386`); deploy artifact =
 reproducible wasm of CI run `43042449897`, sha256
 `a6657716eb49b87f8716a16ac9f15104d84270002f9eef73ed64c5de428ee174`, code hash

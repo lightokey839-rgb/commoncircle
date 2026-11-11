@@ -1,6 +1,6 @@
 # New files since the LoanBook baseline
 
-Generated from `git diff --name-status --no-renames baseline-loanbook-port..HEAD` on 2026-11-11 at commit `3ef5f9b` (branch `lane/contracts`). A = added, M = modified, D = deleted relative to the baseline `940099e`.
+Generated from `git diff --name-status --no-renames baseline-loanbook-port..HEAD` on 2026-11-11 (branch `lane/contracts`). A = added, M = modified, D = deleted relative to the baseline `940099e`.
 
 | Status | Path |
 | --- | --- |
@@ -31,6 +31,7 @@ Generated from `git diff --name-status --no-renames baseline-loanbook-port..HEAD
 | A | `contracts/circle/tests/common/mod.rs` |
 | A | `contracts/circle/tests/fixtures/dog_emblem.png` |
 | A | `contracts/circle/tests/readme_checks.rs` |
+| A | `contracts/circle/tests/redteam.rs` |
 | A | `contracts/circle/tests/sandbox_f0.rs` |
 | A | `contracts/mock-ft/Cargo.toml` |
 | A | `contracts/mock-ft/src/lib.rs` |
@@ -74,6 +75,10 @@ Generated from `git diff --name-status --no-renames baseline-loanbook-port..HEAD
 | A | `server/COMMONCIRCLE_GATE0.md` |
 | M | `server/auth.ts` |
 | A | `server/nep413.ts` |
+| A | `server/relayer.ts` |
+| A | `tests/circle-client.test.ts` |
+| A | `tests/invite.test.ts` |
+| A | `tests/relayer.test.ts` |
 | A | `web/README.md` |
 | A | `web/app.ts` |
 | A | `web/circle-client.ts` |
@@ -82,3 +87,5 @@ Generated from `git diff --name-status --no-renames baseline-loanbook-port..HEAD
 | A | `web/invite.ts` |
 | A | `web/nep413.ts` |
 | A | `web/styles.css` |
+| A | `web/theme.ts` |
+| A | `docs/REDTEAM_GATE1.md` |

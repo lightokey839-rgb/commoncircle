@@ -20,7 +20,7 @@ the history is honest. The current state is:
 | F0 refund proof on testnet | PASS twice (1.0.0 and 1.1.0) | "F0 refund proof on testnet", "Interface 1.1.0" |
 | Card art in wallets | PASS: MyNearWallet and Meteor | "Interface 1.1.0" |
 | Both USDC ids | PASS (USDC, 6 decimals) | "USDC verification output" |
-| Red-team findings | see `docs/REDTEAM_GATE1.md` | — |
+| Red-team findings | see `docs/REDTEAM_GATE1.md`; a storage-charging fix (D-009, interface 1.1.1) is built and tested but **not deployed** | "Gate 1 red team and D-009" |
 | Still UNVERIFIED | NEP-366 relayer onboarding, Sputnik DAO proposal funding, event indexer, NEP-413 phone sign-in, any mainnet transaction | Gate 2 and later |
 
 Superseded rows below: "Annotated baseline tag in original checkout" (the tag
@@ -286,6 +286,20 @@ the on-chain SVG data URI; decoded `testnet_passport_trusted.svg`). Rendering (c
 | F0 refund proof on 1.1.0, themed circle "The Dogs (DEMO)" | PASS (`PROOF OK`) | circle 2 `6HMswarctHsEgzTuJDW9LgnPaeUuGTg3nsVmLzQRQtiN` (`circle_theme_set`, emblem image/png 2676 bytes); invite `Bmp5JUDGY9fmGaSyjbQurGSkaVNKJ1En6fsuz3Aotw6w` / `G2HJQ9eoLyPqoDiinHGRScyzmjrWR2hZmZu5Gh8XUFoe`; loan 2 `3pgx79ZsYsaJcwL5LUQPvPpPNsWh3uFepYjgxGBtDUJG`; **failed forward refunded** `HZTwyVYhigBoUsambrdrTbYVZndWtqXZ8QNnnhhkJa5r` (inner failure in USDC, memo `refund`, lender 20000000 before and after, circle 0); register borrower2 `3c8Px7SUuxBnBo4dKeiwfUWx2j3wusSRuYRZBGC2MiGo`; fund `GjMCruQpw1Mv5p7nbtqjcEFum8F2p1Nu9tJnH6tcBDVd`; repay `8Qw6WzK2hYiFqoXE19yLHJnJ7kFr1nCxgHu1SnFK39Gu` (on time, `tier_changed` Member → Trusted). All re-checked FINAL over FastNEAR |
 | Card art 1.1.0 in a wallet | PASS | MyNearWallet (testnet) `nft-detail/commoncircle-light.testnet/2:commoncircle-light-borrower2.testnet` renders the full square card: "The Dogs (DEMO)" name tag, tagline, dog emblem, Trusted gold rings and stars, ON TIME 1 / LATE 0, ACTIVE, title "The Dogs (DEMO) Passport" (builder screenshot, 2026-11-11). Meteor rendered 1.0.0 earlier (cropped) |
 | Card art 1.1.0 in a second wallet | PASS | Meteor Wallet (web, testnet), account `commoncircle-light-borrower.testnet`, token `1:commoncircle-light-borrower.testnet` (circle 1, created under 1.0.0, default theme): full square card, no cropping, name tag "DEMO testnet proof", Trusted gold rings and stars, ON TIME 1 / LATE 0, ACTIVE, title "DEMO testnet proof Passport" (builder screenshot, 2026-11-11). Also shows the redeployed code re-renders passports minted under 1.0.0 |
+
+## Gate 1 red team and D-009 (2026-11-11)
+
+Full report: `docs/REDTEAM_GATE1.md`.
+
+| Check | Status | Evidence |
+| --- | --- | --- |
+| Storage charging bug (F-01) | CONFIRMED on testnet, fixed in code, **fix not deployed** | deposits refunded in full: `6PwNu7df…` (0.029 of 0.029 NEAR), `GkWBK471…`; sandbox `rt_contract_never_subsidises_storage` failed on run `43056988857`, passes on `43059776368` |
+| D-009 build (interface 1.1.1) | PASS in CI | run `43059776368`, commit `2e45eef`: unit 49/49, sandbox 13/13, red team 8/8, README rows 9/9, same on the reproducible wasm; sha256 `fd7d7390…526b`, code hash `J4X6efoAqFoKVYxaSNtpDYUTyKrKDzrqa2vPZxvMLxGr` |
+| Reproducibility of the deployed 1.1.0 wasm | PASS | second independent build of `3a4f386` (run `43042449897`, attempt 2): identical sha256 `a6657716…e174` |
+| NEP-330 source metadata on testnet | PASS | `contract_source_metadata` returns commit `3a4f386`, the image digest and the build command |
+| Secret patterns, all 88 commits on all branches | PASS (0 hits for 6 patterns) | pattern scan in the lead session; gitleaks job green |
+| Web lane tests on a real install | FAIL 24/25 | `tests/relayer.test.ts` cap test (test bug), run `43056988857` |
+| NFT enumeration, 50 circles with 12 KiB emblems | PASS | `redteam_enumeration.json`: both views answer, 2,378,633 bytes |
 
 ## Incident: testnet secret key exposed in chat (2026-11-11)
 
