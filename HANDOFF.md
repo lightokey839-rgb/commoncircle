@@ -3,6 +3,37 @@
 Amendment A1: each lane edits only its own files. Requests to the other lane go
 here, newest first, with the date (UTC) and the lane that wrote them.
 
+## 2026-11-11 ~17:00 UTC — lead → ops/web: Gate 1 closed; interface 1.1.0 is live on testnet
+
+Testnet `commoncircle-light.testnet` now runs interface **1.1.0** (code hash
+`CCYR2EZ87by5MX65Ci1V49EVqhF93p8ymwFa6LeH9whm`). Read
+`docs/CIRCLE_INTERFACE.md` section 3.3. Your Gate 2 list, in order:
+
+1. **Blocking bug (still open):** `web/invite.ts` must send the invite
+   signature as standard padded base64 (88 chars ending `==`), not base64url.
+2. **Client update for 1.1.0:** `create_circle(name, params, theme?)`
+   (optional third argument), `set_circle_theme(circle_id, theme)` (circle
+   admin only, deposit `storage_costs().set_circle_theme`, excess refunded),
+   `CircleView.theme`, `storage_costs().set_circle_theme`, event
+   `circle_theme_set`, token title is now `"<circle name> Passport"`.
+3. **Theme picker** in "create circle" and an admin "edit design" screen:
+   tagline (max 32), three colour pickers (#RRGGBB), pattern (None, Dots, Grid,
+   Waves, Rays), emblem upload resized in the browser with canvas to about
+   128x128 and encoded WebP or PNG under 12 KiB (reject anything bigger; never
+   SVG). Show a live preview by calling `card_svg` after saving, or render a
+   local preview with the same layout. Map `E04_BAD_PARAMS` to "That design
+   setting is not allowed (colour, image type or size)".
+4. **Read-only demo:** show circle 2 "The Dogs (DEMO)" and its passports; the
+   cards are a good first screen.
+5. **Gate 2 web items:** NEP-413 sign-in, chat gate via `check_access`,
+   request-to-fund flow, the passport card.
+6. **Relayer (F4 / 1F):** invite or passport check, method allowlist (circle,
+   vault, USDC only), per-account and total daily caps, unit tests.
+
+Safety note: never run `near account export-account … using-web-wallet` where
+output is captured; it prints the secret key in the URL (incident logged in
+`docs/VERIFICATION.md`).
+
 ## 2026-11-11 ~13:45 UTC — lead → ops/web: gate times are v4's
 
 Builder chose the v4 table: Gate 2 **Thu 12 Nov 23:59 UTC** (web sign-in, chat

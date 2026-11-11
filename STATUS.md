@@ -6,6 +6,36 @@ Gate 1 contract freeze Wed 11 Nov 23:59 · Gate 2 Tier A proof **Thu 12 Nov
 23:59** · Gate 3 pilot/user-test proof and feature freeze **Fri 13 Nov 23:59** ·
 Ship Sat 14 Nov 17:59. This replaces amendment A11's Gate 2/3 times.
 
+## Gate 1 result (contract freeze), closed by the lead 2026-11-11 ~17:00 UTC
+
+Against the v4 Gate 1 row ("Must be true"):
+
+| v4 Gate 1 item | Result | Where |
+| --- | --- | --- |
+| F0 and F1 core (gates, tiers, invites, art) in sandbox tests | MET | CI run `43042449897`: unit 49/49, sandbox 13/13, contract README rows 9/9, also on the reproducible wasm |
+| Treasury-lender and vault-funding hooks in | MET | `treasury_loan_for_a_steward_or_with_fewer_than_two_stewards`, `vault_naming_the_lender_can_fund`, `docs/MSG_SCHEMA.md` |
+| On testnet with the wasm hash recorded | MET | `commoncircle-light.testnet`, code hash `CCYR2EZ87by5MX65Ci1V49EVqhF93p8ymwFa6LeH9whm` (interface 1.1.0) = tested reproducible artifact |
+| F0 refund proof on testnet (v4: "proven on testnet before it is claimed") | MET, twice | 1.0.0 and 1.1.0 runs, real Circle testnet USDC; hashes in `docs/VERIFICATION.md` |
+| Card art renders in two wallets (v4 "By Gate 1") | MET | MyNearWallet ("The Dogs (DEMO)", 1.1.0) and Meteor (circle 1, 1.1.0), both uncropped |
+| Mainnet deploy at the 50 USDC cap | NOT MET (decision) | builder budget about USD 4 vs about USD 27 needed; pilot becomes a labelled testnet user test; Real-World Money dropped |
+| Relayer live | NOT MET | ops/web lane, F4 (phase 1F) not started; moves to Gate 2 |
+| Pilot circle created and invites sent | NOT MET as specified | replaced by the testnet user test (Gate 3); "The Dogs (DEMO)" circle 2 exists on testnet |
+| Cut F1 recovery | DONE | methods exist and always fail; `features.recovery = false` |
+
+Contract changes after the original freeze build, inside the Gate 1 window:
+D-007 (square card) and D-008 (per-circle themes), interface 1.1.0, additive.
+From now on any change under `contracts/circle/src` needs a new
+`SPEC_DEVIATIONS.md` entry, a full CI re-run and a new reproducible hash.
+
+Still **NOT CLAIMABLE**: `evidence/evidence.json` has no rows yet; Tier A rows
+(Open Innovation, NFTs That Do Something, Social Money) are added at Gate 2
+from the testnet hashes above plus the DAO treasury loan.
+
+Next (Gate 2, Thu 12 Nov 23:59 UTC): Sputnik DAO by global hash on testnet,
+`attach_dao`, a passed proposal funding a treasury loan (contracts lane);
+web sign-in, chat gate, request-to-fund flow, card, theme picker, signature
+fix and relayer (ops/web lane); Tier A evidence rows and `npm run claims` green.
+
 ## Gate 1 — contracts (lead), updated 2026-11-11 ~09:15 UTC
 
 Status: CONTRACT FROZEN / ON TESTNET / F0 REFUND PROOF PASSED ON TESTNET / NOT YET CLAIMED (Tier A rows go into evidence.json at Gate 2)
