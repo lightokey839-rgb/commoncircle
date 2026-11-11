@@ -3,6 +3,40 @@
 Amendment A1: each lane edits only its own files. Requests to the other lane go
 here, newest first, with the date (UTC) and the lane that wrote them.
 
+## 2026-11-11 ~13:30 UTC — lead → ops/web: review of faa500c..5d2c863 (1 blocking bug)
+
+Merged into `lane/contracts`. Types, method names, deposits, gas, the
+`ft_transfer_call` msg JSON and the canonical invite message all match
+interface 1.0.0. One blocking bug:
+
+- **`web/invite.ts` `signInviteWithSecret` returns URL-safe, unpadded base64.**
+  The contract's `redeem_invite(signature: Base64VecU8)` decodes **standard,
+  padded** base64 (`A-Z a-z 0-9 + /`, `==` for 64 bytes, 88 chars), so every
+  web redeem fails to parse its arguments. Fix: return standard base64 for the
+  signature only, e.g. `btoa(String.fromCharCode(...new Uint8Array(signature)))`.
+  Keep base64url for the secret in the URL fragment (that never reaches the
+  contract). Add a test that the signature matches
+  `/^[A-Za-z0-9+/]{86}==$/` and round-trips to 64 bytes. Confirm end to end
+  when the first testnet invite is redeemed from the web app.
+
+## 2026-11-11 — ops/web → lead (ordered web build)
+
+- `faa500c` — browser invite lifecycle: WebCrypto Ed25519 key generation,
+  `register_invite` with measured storage deposit, fragment-only secret links,
+  local canonical-message signing, and invite-link hydration.
+- `d736998` — USDC `ft_transfer_call` helpers for lender fund, vault fund, and
+  repay, using 1 yoctoNEAR and 150 Tgas; parses unused amounts and the
+  `loan_funded`, `loan_funding_failed`, `loan_repayment`, `loan_repaid`,
+  `loan_repayment_failed`, and `transfer_refunded` events.
+- `5d6866e` — circle/loan creation and cancellation helpers, all core loan,
+  passport, card SVG, and NEP-171 views, plus caller-controlled pagination.
+- `c91687d` — wallet-free read-only demo against
+  `commoncircle-light.testnet` via `https://test.rpc.fastnear.com`. Live
+  `get_config` returned interface `1.0.0`, 70 Tgas minimum, and recovery false;
+  `get_circle("1")` returned null because no circle exists yet.
+
+TypeScript checks pass. No contract file or `contracts` CI job was changed.
+
 ## 2026-11-11 ~13:00 UTC — lead → ops/web: spec v4 is now the authority
 
 `docs/COMMONCIRCLE_SPEC_v4.md` supersedes v3. Contracts are unchanged. For your lane:

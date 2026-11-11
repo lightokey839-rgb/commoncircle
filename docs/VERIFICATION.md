@@ -65,6 +65,7 @@ belong here.
 | Web/server TypeScript typecheck | PASS (static) | TypeScript compiler completed with no errors for the new `web/*.ts` and `server/*.ts` files; it used the existing sibling checkout's compiler because this checkout's clean npm install is blocked. |
 | Contract files untouched by lane/web | PASS | `git diff -- contracts` is empty after the lane changes. |
 | Gate 1 Ubuntu CI workflow | PASS (definition) | `.github/workflows/commoncircle-gate1.yml` runs Rust build/test, requires a near-workspaces sandbox, runs npm tests/claims/USDC verification, scans full history with gitleaks, and uploads logs. It has not run in this sandbox. |
+| Read-only testnet demo RPC | PASS (live view) | `https://test.rpc.fastnear.com` → `commoncircle-light.testnet`: `get_config` returned interface `1.0.0`, pinned testnet USDC, `vault.commoncircle-light.testnet`, `min_ft_on_transfer: "70"`, and `features.recovery: false`; `get_circle("1")` returned `null` on 2026-11-11. No transaction was sent. |
 
 ### Required push handoff
 
