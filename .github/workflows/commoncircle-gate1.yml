@@ -9,8 +9,8 @@ permissions:
   contents: read
 
 env:
-  NEAR_MAINNET_RPC_URL: ${{ vars.NEAR_MAINNET_RPC_URL }}
-  NEAR_TESTNET_RPC_URL: ${{ vars.NEAR_TESTNET_RPC_URL }}
+  NEAR_MAINNET_RPC_URL: ${{ vars.NEAR_MAINNET_RPC_URL || 'https://free.rpc.fastnear.com' }}
+  NEAR_TESTNET_RPC_URL: ${{ vars.NEAR_TESTNET_RPC_URL || 'https://test.rpc.fastnear.com' }}
 
 jobs:
   contracts:

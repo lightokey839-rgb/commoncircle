@@ -90,7 +90,7 @@ covering tests are listed after it.
    rolled back and the token refunds the sender. The loan never enters the
    in-flight state without a scheduled callback.
 2. `ft_on_transfer` first requires `prepaid_gas >= MIN_GAS_FT_ON_TRANSFER`
-   (55 Tgas = 15 for the forward + 25 for the callback + 15 for itself). The
+   (70 Tgas = 15 for the forward + 25 for the callback + 30 for itself, which pays the fees of the two receipts it creates). The
    callback's 25 Tgas is attached as static gas when the promise is created, so
    it is reserved and cannot be consumed by the forward.
 3. NEAR runs a callback whether the promise it depends on succeeded or failed.

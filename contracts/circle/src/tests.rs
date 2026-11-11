@@ -375,14 +375,14 @@ fn vault_naming_the_lender_can_fund() {
 #[should_panic(expected = "E60_LOW_GAS")]
 fn low_gas_fails_early() {
     let (mut c, e) = with_loan();
-    testing_env!(e.ctx(USDC, NearToken::from_yoctonear(0), 54).build());
+    testing_env!(e.ctx(USDC, NearToken::from_yoctonear(0), MIN_GAS_FT_ON_TRANSFER.as_tgas() - 1).build());
     c.ft_on_transfer(acc("carol.near"), U128(10_000_000), fund_msg(1));
 }
 
 #[test]
 fn gas_at_minimum_is_accepted() {
     let (mut c, e) = with_loan();
-    testing_env!(e.ctx(USDC, NearToken::from_yoctonear(0), 55).build());
+    testing_env!(e.ctx(USDC, NearToken::from_yoctonear(0), MIN_GAS_FT_ON_TRANSFER.as_tgas()).build());
     assert!(value(c.ft_on_transfer(acc("carol.near"), U128(10_000_000), fund_msg(1))).is_none());
 }
 

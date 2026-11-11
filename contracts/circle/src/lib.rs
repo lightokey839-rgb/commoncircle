@@ -39,8 +39,10 @@ pub const GAS_FT_TRANSFER: Gas = Gas::from_tgas(15);
 /// Gas reserved for `on_fund_forwarded` / `on_repay_forwarded`.
 pub const GAS_CALLBACK: Gas = Gas::from_tgas(25);
 /// `ft_on_transfer` rejects (panics, so USDC refunds) below this prepaid gas:
-/// forward + callback + 15 Tgas for its own execution.
-pub const MIN_GAS_FT_ON_TRANSFER: Gas = Gas::from_tgas(55);
+/// forward (15) + callback (25) + 30 Tgas for its own execution, which pays
+/// the send/exec fees of the two receipts it creates (55 was measured too low
+/// in the mocked VM: GasExceeded while scheduling).
+pub const MIN_GAS_FT_ON_TRANSFER: Gas = Gas::from_tgas(70);
 /// What clients should attach to `ft_transfer_call` on USDC.
 pub const RECOMMENDED_FT_TRANSFER_CALL_TGAS: u64 = 150;
 

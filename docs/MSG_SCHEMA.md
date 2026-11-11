@@ -75,7 +75,7 @@ v3 F2: a passed Transfer proposal with a `msg` makes the DAO call
 ```
 
 Open, gate-2 check: v3 asks us to confirm that the gas Sputnik attaches to this
-`ft_transfer_call` covers `MIN_GAS_FT_ON_TRANSFER` (55 Tgas at the receiver).
+`ft_transfer_call` covers `MIN_GAS_FT_ON_TRANSFER` (70 Tgas at the receiver).
 If it does not, the call fails early and the DAO is refunded; use a
 `FunctionCall` proposal on the USDC contract with explicit gas (150 Tgas) and
 1 yoctoNEAR instead:
@@ -113,6 +113,6 @@ Any sender. The loan must be `Funded` (including `WrittenOff`).
 ## Gas and deposit
 
 Attach exactly 1 yoctoNEAR and 150 Tgas (recommended) to `ft_transfer_call`.
-Below about 55 Tgas reaching the receiver, the circle panics with
+Below 70 Tgas reaching the receiver, the circle panics with
 `E60_LOW_GAS` and the token refunds. Both the sender and the receiver of the
 forward must be registered with USDC (`storage_deposit`).
