@@ -24,8 +24,8 @@ Status: CONTRACT FROZEN / ON TESTNET / F0 REFUND PROOF PASSED ON TESTNET / NOT Y
   Testnet now runs 1.1.0 (redeployed in place; circle 1 intact). F0 refund proof
   passed again on 1.1.0 in the themed circle "The Dogs (DEMO)", and the card
   renders in MyNearWallet.
-- Open: rotate the exposed testnet key of `commoncircle-light-borrower2.testnet`
-  (see the incident in `docs/VERIFICATION.md`).
+- The exposed testnet key of `commoncircle-light-borrower2.testnet` was rotated
+  and deleted (see the incident in `docs/VERIFICATION.md`).
 - Recovery (F1) is cut for Gate 1: methods exist and always fail
   (`features.recovery = false`).
 

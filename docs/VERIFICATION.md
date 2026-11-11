@@ -274,7 +274,11 @@ key (add a new full-access key, delete
 `ed25519:51WoRhV345U75DX15vfJ7kK7FeKbxVHNX6fetoeVmfff`); the key value is not
 recorded anywhere in the repo. Rule from now on: never run
 `export-account` where its output is captured; use a wallet's own import or
-migration screen instead. Rotation status: PENDING.
+migration screen instead. Rotation status: **DONE**. New key
+`ed25519:93P2P45wDvoeFk2fdD9rGAa9nNq6m7pAaL2GH1b7HGhP` added (tx
+`3X9mcdnKwvuXTW8ptCDzHPqHreSu9BtZTGpLNE2Vfzdx`), exposed key deleted (tx
+`CKv34Jp4MiXwgDUjd3wESGtS8XifxyibehDnY5v1hhg6`), both SuccessValue;
+`view_access_key_list` at block 277234820 shows only the new key.
 
 ## Evidence format
 
