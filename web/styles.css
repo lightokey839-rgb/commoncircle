@@ -11,6 +11,8 @@ label { color: #a9b8af; font-size: .86rem; }
 input { width: 100%; padding: 12px 13px; border: 1px solid #345848; border-radius: 10px; color: #f7fff9; background: #09120f; }
 button { width: fit-content; padding: 11px 15px; border: 0; border-radius: 999px; color: #082014; background: #8ce3ae; font-weight: 700; cursor: pointer; }
 button.secondary { color: #dff7e7; background: #244936; }
+.demo-card { border-color: #527d62; }
+.demo-output { min-height: 92px; margin: 4px 0 0; padding: 12px; overflow: auto; border-radius: 9px; color: #bdebc9; background: #09120f; white-space: pre-wrap; font: .8rem/1.55 ui-monospace, monospace; }
 .muted, .risk { color: #91a69a; font-size: .88rem; }
 .status { min-height: 24px; margin-top: 22px; color: #8ce3ae; }
 .positions { display: grid; gap: 8px; margin: 10px 0 0; padding: 0; list-style: none; }

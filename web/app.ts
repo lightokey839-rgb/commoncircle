@@ -1,6 +1,7 @@
 import { CircleClient, plainContractError, type CircleParams, type NearWallet } from './circle-client'
 import { signInWithNep413, type Nep413Wallet } from './nep413'
 import { buildInviteLink, generateInviteKeyPair, parseInviteLink, signInviteWithSecret } from './invite'
+import { loadReadOnlyDemo } from './demo'
 
 type BrowserWallet = Nep413Wallet & NearWallet
 
@@ -128,6 +129,26 @@ async function loadPositions(): Promise<void> {
   show(`Loaded ${positions.borrowed.length + positions.lent.length} positions. Amounts are integer USDC base units.`)
 }
 
+async function loadDemo(): Promise<void> {
+  const circleId = $<HTMLInputElement>('#demo-circle-id').value.trim() || '1'
+  const snapshot = await loadReadOnlyDemo(circleId)
+  const lines = [
+    'READ-ONLY TESTNET DEMO',
+    `RPC: ${snapshot.rpcUrl}`,
+    `Contract: ${snapshot.contractId}`,
+    `Interface: ${snapshot.config.interface_version}`,
+    `USDC: ${snapshot.config.usdc_id}`,
+    `Circle requested: ${snapshot.circleId}`,
+  ]
+  if (!snapshot.circle) {
+    lines.push('No circle exists at this id yet. The contract is reachable and initialized.')
+  } else {
+    lines.push(`Circle: ${snapshot.circle.name}`, `Members: ${snapshot.circle.member_count}`, `Loans: ${snapshot.loans.length}`, `Passports: ${snapshot.passports.length}`)
+  }
+  $('#demo-output').textContent = lines.join('\n')
+  show('Read-only testnet data loaded. No wallet or transaction was used.')
+}
+
 function wire(): void {
   $('#sign-in').addEventListener('click', () => void signIn().catch((error) => show(error instanceof Error ? error.message : String(error))))
   $('#join-invite').addEventListener('click', () => void joinInvite().catch((error) => show(plainContractError(error))))
@@ -135,6 +156,7 @@ function wire(): void {
   $('#create-circle').addEventListener('click', () => void createCircle().catch((error) => show(plainContractError(error))))
   $('#create-loan').addEventListener('click', () => void createLoan().catch((error) => show(plainContractError(error))))
   $('#load-positions').addEventListener('click', () => void loadPositions().catch((error) => show(error instanceof Error ? error.message : String(error))))
+  $('#load-demo').addEventListener('click', () => void loadDemo().catch((error) => show(error instanceof Error ? error.message : String(error))))
 }
 
 function hydrateInviteFields(): void {
