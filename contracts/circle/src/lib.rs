@@ -174,7 +174,7 @@ pub(crate) fn secs_to_ns(sec: u64) -> u64 {
 pub(crate) fn is_plain_text(s: &str) -> bool {
     !s.chars().any(|c| {
         c.is_control()
-            || matches!(c, '؜' | '​'..='‏' | '‪'..='‮' | '⁠'..='⁩' | '﻿')
+            || matches!(c, '\u{061C}' | '\u{200B}'..='\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2060}'..='\u{2069}' | '\u{FEFF}')
     })
 }
 
