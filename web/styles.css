@@ -16,6 +16,10 @@ button { width: fit-content; padding: 11px 15px; border: 0; border-radius: 999px
 button.secondary { color: #dff7e7; background: #244936; }
 .demo-card { border-color: #527d62; }
 .demo-output { min-height: 92px; margin: 4px 0 0; padding: 12px; overflow: auto; border-radius: 9px; color: #bdebc9; background: #09120f; white-space: pre-wrap; font: .8rem/1.55 ui-monospace, monospace; }
+.demo-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.demo-cards figure { margin: 0; padding: 8px; border-radius: 12px; background: #09120f; }
+.demo-cards img { display: block; width: 100%; height: auto; border-radius: 8px; }
+.demo-cards figcaption { padding-top: 6px; overflow: hidden; color: #bdebc9; font-size: .75rem; text-overflow: ellipsis; white-space: nowrap; }
 .muted, .risk { color: #91a69a; font-size: .88rem; }
 .status { min-height: 24px; margin-top: 22px; color: #8ce3ae; }
 .positions { display: grid; gap: 8px; margin: 10px 0 0; padding: 0; list-style: none; }

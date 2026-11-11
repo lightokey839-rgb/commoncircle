@@ -14,11 +14,12 @@
 
       <section class="card demo-card" aria-labelledby="demo-heading">
         <h2 id="demo-heading">Read-only testnet demo</h2>
-        <p class="muted">No wallet is needed. This queries <code>commoncircle-light.testnet</code> through FastNEAR and never submits a transaction.</p>
+        <p class="muted">No wallet is needed. This queries <code>commoncircle-light.testnet</code> through FastNEAR and never submits a transaction. The default is circle 2, <strong>The Dogs (DEMO)</strong>.</p>
         <label for="demo-circle-id">Circle id to inspect</label>
         <input id="demo-circle-id" inputmode="numeric" value="2" />
         <button id="load-demo" class="secondary">Load testnet data</button>
         <pre id="demo-output" class="demo-output" aria-live="polite">Not loaded.</pre>
+        <div id="demo-cards" class="demo-cards" aria-label="Circle 2 passport cards"></div>
       </section>
 
       <section class="card" aria-labelledby="sign-in-heading">

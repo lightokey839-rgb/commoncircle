@@ -112,3 +112,12 @@ TypeScript checks pass. No contract file or `contracts` CI job was changed.
   errors. `npm run typecheck` is currently unavailable because this checkout's
   `node_modules/.bin/tsc` is missing. No contract file or `contracts` CI job
   changed.
+
+## 2026-11-11 — ops/web → lead (circle 2 read-only demo)
+
+- The demo now defaults to circle `2`, labels it as **The Dogs (DEMO)**, and
+  queries its loans and passports from `commoncircle-light.testnet`.
+- Each returned passport is rendered with its read-only `card_svg`; card-view
+  failures are isolated per passport so the data list remains available. No
+  wallet or transaction is used by the demo. The live RPC check itself remains
+  unavailable in this Windows environment due Schannel authentication failure.

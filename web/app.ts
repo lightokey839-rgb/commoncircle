@@ -153,7 +153,7 @@ async function loadPositions(): Promise<void> {
 }
 
 async function loadDemo(): Promise<void> {
-  const circleId = $<HTMLInputElement>('#demo-circle-id').value.trim() || '1'
+  const circleId = $<HTMLInputElement>('#demo-circle-id').value.trim() || '2'
   const snapshot = await loadReadOnlyDemo(circleId)
   const lines = [
     'READ-ONLY TESTNET DEMO',
@@ -167,8 +167,24 @@ async function loadDemo(): Promise<void> {
     lines.push('No circle exists at this id yet. The contract is reachable and initialized.')
   } else {
     lines.push(`Circle: ${snapshot.circle.name}`, `Members: ${snapshot.circle.member_count}`, `Loans: ${snapshot.loans.length}`, `Passports: ${snapshot.passports.length}`)
+    for (const passport of snapshot.passports) {
+      lines.push(`Passport: ${passport.owner_id} · ${passport.display_tier} · ${passport.status}`)
+    }
   }
   $('#demo-output').textContent = lines.join('\n')
+  const cards = $('#demo-cards')
+  cards.replaceChildren()
+  for (const card of snapshot.cards) {
+    if (!card.svg) continue
+    const figure = document.createElement('figure')
+    const image = document.createElement('img')
+    image.alt = `${card.passport.owner_id} passport card`
+    image.src = URL.createObjectURL(new Blob([card.svg], { type: 'image/svg+xml' }))
+    const caption = document.createElement('figcaption')
+    caption.textContent = `${card.passport.owner_id} · ${card.passport.display_tier}`
+    figure.append(image, caption)
+    cards.append(figure)
+  }
   show('Read-only testnet data loaded. No wallet or transaction was used.')
 }
 
