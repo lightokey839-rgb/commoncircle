@@ -16,49 +16,51 @@ jobs:
   contracts:
     name: Rust build, unit tests, and near-workspaces sandbox
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: contracts
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@stable
+      # Toolchain comes from rust-toolchain.toml (1.99.1 + wasm32 target).
+      - name: Install pinned Rust toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: taiki-e/install-action@v2
         with:
-          toolchain: 1.86.0
-          target: wasm32-unknown-unknown
-          components: rustfmt, clippy
+          tool: cargo-near@0.23.0
       - name: Prepare log directory
-        run: mkdir -p artifacts
-      - name: Build circle contract
-        shell: bash
+        run: mkdir -p ../artifacts
+      - name: Build wasm (cargo-near) and record sha256
         run: |
           set -o pipefail
-          cargo build --manifest-path contracts/circle/Cargo.toml --target wasm32-unknown-unknown 2>&1 | tee artifacts/cargo-build.log
-      - name: Test circle contract
-        shell: bash
+          ./scripts/build-wasm.sh 2>&1 | tee ../artifacts/wasm-build.log
+      - name: Unit tests
         run: |
           set -o pipefail
-          cargo test --manifest-path contracts/circle/Cargo.toml --no-fail-fast 2>&1 | tee artifacts/cargo-test.log
-      - name: Test near-workspaces sandbox
-        shell: bash
+          cargo test --workspace --lib --no-fail-fast 2>&1 | tee ../artifacts/unit-tests.log
+      - name: Sandbox starts
         run: |
           set -o pipefail
-          sandbox_manifest=""
-          for candidate in tests/near-workspaces/Cargo.toml near-workspaces/Cargo.toml; do
-            if [[ -f "$candidate" ]]; then
-              sandbox_manifest="$candidate"
-              break
-            fi
-          done
-          if [[ -z "$sandbox_manifest" ]]; then
-            echo "near-workspaces sandbox manifest is required but was not found" | tee artifacts/near-workspaces.log
-            exit 1
-          fi
-          cargo test --manifest-path "$sandbox_manifest" --no-fail-fast 2>&1 | tee artifacts/near-workspaces.log
-      - name: Upload Rust logs
+          cargo test -p commoncircle-sandbox-check 2>&1 | tee ../artifacts/sandbox-check.log
+      - name: F0 sandbox scenarios (refund proofs)
+        run: |
+          set -o pipefail
+          cargo test -p commoncircle-circle --test sandbox_f0 --no-fail-fast -- --test-threads=4 2>&1 | tee ../artifacts/sandbox-f0.log
+      - name: README checks (rows for later gates are expected to stay red)
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          cargo test -p commoncircle-circle --test readme_checks --no-fail-fast -- --test-threads=4 2>&1 | tee ../artifacts/readme-checks.log
+      - name: Upload Rust logs and wasm
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: commoncircle-rust-logs
-          path: artifacts/
+          path: |
+            artifacts/
+            contracts/target/near-wasm/*.wasm
           if-no-files-found: warn
 
   javascript:

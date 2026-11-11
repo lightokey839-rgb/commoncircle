@@ -1,0 +1,16 @@
+[workspace]
+resolver = "3"
+members = ["circle", "mock-ft", "sandbox-check"]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.95"
+publish = false
+
+[profile.release]
+codegen-units = 1
+opt-level = "z"
+lto = true
+debug = false
+panic = "abort"
+overflow-checks = true

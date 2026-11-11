@@ -1,178 +1,384 @@
-//! CommonCircle circle-contract data model scaffold.
+//! CommonCircle `circle` contract.
 //!
-//! Gate 0 intentionally contains no state-changing methods. The invariants in
-//! this file are the shape that Gate 1 behavior must preserve:
-//! - USDC amounts are integer base units (`u128` in storage; `U128` in JSON).
-//! - durations are supplied in `DurationConfig`; no duration is hard-coded.
-//! - the circle never stores loan principal at rest.
-//! - transfer-driven state changes will be committed only from private callbacks.
+//! Interface: docs/CIRCLE_INTERFACE.md 1.0.0. Events: docs/EVENTS.md.
+//! Invariants (AGENTS.md, Gate 1 rules):
+//! - integer base units only; U128/U64 strings in JSON; no floats;
+//! - every duration is a parameter (init floors + per-circle params);
+//! - no owner, no admin over the contract, no upgrade path;
+//! - transfer-driven state commits only in `#[private]` callbacks;
+//! - the contract holds zero USDC at rest: funding and repayment are forwarded in
+//!   the same receipt chain, and every rejected or failed transfer is returned
+//!   to the sender as the unused amount.
 
-use near_sdk::{AccountId, BorshStorageKey};
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::json_types::U128;
-use near_sdk::serde::{Deserialize, Serialize};
+use near_sdk::json_types::{U128, U64};
+use near_sdk::store::{LookupMap, Vector};
+use near_sdk::{
+    env, near, require, AccountId, BorshStorageKey, Gas, NearToken, PanicOnDefault, Promise,
+};
 
-#[derive(BorshStorageKey, BorshSerialize)]
+pub mod art;
+mod circles;
+pub mod events;
+mod invites;
+mod loans;
+pub mod types;
+mod views;
+
+#[cfg(test)]
+mod tests;
+
+pub use types::*;
+
+pub const INTERFACE_VERSION: &str = "1.0.0";
+pub const MAX_PAGE: u32 = 50;
+pub const NS_PER_SEC: u64 = 1_000_000_000;
+pub const ONE_YOCTO: NearToken = NearToken::from_yoctonear(1);
+
+/// Gas reserved for the `ft_transfer` that forwards funds (to borrower or lender).
+pub const GAS_FT_TRANSFER: Gas = Gas::from_tgas(15);
+/// Gas reserved for `on_fund_forwarded` / `on_repay_forwarded`.
+pub const GAS_CALLBACK: Gas = Gas::from_tgas(25);
+/// `ft_on_transfer` rejects (panics, so USDC refunds) below this prepaid gas:
+/// forward + callback + 15 Tgas for its own execution.
+pub const MIN_GAS_FT_ON_TRANSFER: Gas = Gas::from_tgas(55);
+/// What clients should attach to `ft_transfer_call` on USDC.
+pub const RECOMMENDED_FT_TRANSFER_CALL_TGAS: u64 = 150;
+
+/// Extra bytes charged at `create_loan` so that callbacks (which add
+/// `funded_at`, `due_at`, `repaid_at`, and possibly one lender on the borrower's
+/// passport) never need storage the contract has not been paid for. This is
+/// part of the "no stuck Funding/Repaying state" argument in docs/EVENTS.md.
+pub const LOAN_GROWTH_RESERVE_BYTES: u64 = 256;
+/// Upper bounds returned by `storage_costs()` (bytes). Excess is refunded.
+pub const CIRCLE_STORAGE_BOUND_BYTES: u64 = 2_000;
+pub const INVITE_STORAGE_BOUND_BYTES: u64 = 400;
+pub const PASSPORT_STORAGE_BOUND_BYTES: u64 = 900;
+pub const LOAN_STORAGE_BOUND_BYTES: u64 = 1_200;
+
+/// Bounds that keep per-passport vectors small.
+pub const MAX_TRUSTED_THRESHOLD: u32 = 50;
+pub const MAX_STEWARDS: usize = 20;
+pub const MAX_NAME_LEN: usize = 64;
+
+pub const RECOVERY_ENABLED: bool = false;
+
+#[near(serializers = [borsh])]
+#[derive(BorshStorageKey)]
 pub enum StorageKey {
     Circles,
-    Passports,
     Loans,
+    Passports,
+    CircleMembers,
+    CircleLoans,
+    BorrowerLoanCount,
+    BorrowerLoans,
+    LenderLoanCount,
+    LenderLoans,
+    OwnerTokenCount,
+    OwnerTokens,
+    AllTokens,
     Invites,
 }
 
-#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(crate = "near_sdk::serde")]
-pub enum DeploymentMode {
-    TestnetDemo,
-    Mainnet,
+#[near(contract_state)]
+#[derive(PanicOnDefault)]
+pub struct Contract {
+    pub(crate) usdc_id: AccountId,
+    pub(crate) vault_id: AccountId,
+    pub(crate) hard_loan_cap: u128,
+    pub(crate) floors: Floors,
+    pub(crate) circles: Vector<Circle>,
+    pub(crate) loans: Vector<Loan>,
+    pub(crate) passports: LookupMap<(u64, AccountId), Passport>,
+    pub(crate) circle_members: LookupMap<(u64, u32), AccountId>,
+    pub(crate) circle_loans: LookupMap<(u64, u32), u64>,
+    pub(crate) borrower_loan_count: LookupMap<AccountId, u32>,
+    pub(crate) borrower_loans: LookupMap<(AccountId, u32), u64>,
+    pub(crate) lender_loan_count: LookupMap<AccountId, u32>,
+    pub(crate) lender_loans: LookupMap<(AccountId, u32), u64>,
+    pub(crate) owner_token_count: LookupMap<AccountId, u32>,
+    pub(crate) owner_tokens: LookupMap<(AccountId, u32), u64>,
+    pub(crate) all_tokens: Vector<(u64, AccountId)>,
+    pub(crate) invites: LookupMap<String, Invite>,
 }
 
-#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(crate = "near_sdk::serde")]
-pub struct DurationConfig {
-    pub funding_window_ns: u64,
-    pub max_duration_ns: u64,
-    pub trusted_min_duration_ns: u64,
-    pub treasury_writeoff_grace_ns: u64,
-    pub recovery_timelock_ns: u64,
-    pub access_recheck_ns: u64,
-    pub invite_expiry_ns: u64,
+#[near]
+impl Contract {
+    /// One-time init by the contract account itself (deploy batch).
+    #[init]
+    #[private]
+    pub fn new(usdc_id: AccountId, vault_id: AccountId, hard_loan_cap: U128, floors: Floors) -> Self {
+        require!(hard_loan_cap.0 > 0, "E04_BAD_PARAMS: hard_loan_cap must be > 0");
+        Self {
+            usdc_id,
+            vault_id,
+            hard_loan_cap: hard_loan_cap.0,
+            floors,
+            circles: Vector::new(StorageKey::Circles),
+            loans: Vector::new(StorageKey::Loans),
+            passports: LookupMap::new(StorageKey::Passports),
+            circle_members: LookupMap::new(StorageKey::CircleMembers),
+            circle_loans: LookupMap::new(StorageKey::CircleLoans),
+            borrower_loan_count: LookupMap::new(StorageKey::BorrowerLoanCount),
+            borrower_loans: LookupMap::new(StorageKey::BorrowerLoans),
+            lender_loan_count: LookupMap::new(StorageKey::LenderLoanCount),
+            lender_loans: LookupMap::new(StorageKey::LenderLoans),
+            owner_token_count: LookupMap::new(StorageKey::OwnerTokenCount),
+            owner_tokens: LookupMap::new(StorageKey::OwnerTokens),
+            all_tokens: Vector::new(StorageKey::AllTokens),
+            invites: LookupMap::new(StorageKey::Invites),
+        }
+    }
+
+    // Recovery is cut until everything else in 1B-1E is green (Gate 1 rule).
+    // The methods exist so the interface is frozen; they always fail.
+
+    #[payable]
+    pub fn start_recovery(&mut self, circle_id: U64, new_account_id: AccountId) {
+        let _ = (circle_id, new_account_id);
+        env::panic_str("E50_RECOVERY_DISABLED: recovery is not available in this deployment");
+    }
+
+    #[payable]
+    pub fn cancel_recovery(&mut self, circle_id: U64) {
+        let _ = circle_id;
+        env::panic_str("E50_RECOVERY_DISABLED: recovery is not available in this deployment");
+    }
+
+    #[payable]
+    pub fn complete_recovery(&mut self, circle_id: U64, old_account_id: AccountId) -> String {
+        let _ = (circle_id, old_account_id);
+        env::panic_str("E50_RECOVERY_DISABLED: recovery is not available in this deployment");
+    }
 }
 
-#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(crate = "near_sdk::serde")]
-pub struct DurationFloorConfig {
-    pub funding_window_floor_ns: u64,
-    pub qualifying_duration_floor_ns: u64,
-    pub recovery_lock_floor_ns: u64,
-    pub dao_proposal_period_floor_ns: u64,
+// ------------------------------------------------------------ internals
+
+pub(crate) fn now() -> u64 {
+    env::block_timestamp()
 }
 
-#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(crate = "near_sdk::serde")]
-pub struct AmountConfig {
-    pub min_amount: U128,
-    pub max_amount: U128,
-    pub member_amount_cap: U128,
-    pub trusted_amount_cap: U128,
-    pub hackathon_loan_cap: U128,
+pub(crate) fn secs_to_ns(sec: u64) -> u64 {
+    sec.checked_mul(NS_PER_SEC)
+        .unwrap_or_else(|| env::panic_str("E04_BAD_PARAMS: duration overflows"))
 }
 
-#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(crate = "near_sdk::serde")]
-pub struct NetworkConfig {
-    pub usdc_contract_id: AccountId,
-    pub vault_account_id: AccountId,
+pub(crate) fn token_id(circle_id: u64, owner: &AccountId) -> String {
+    format!("{}:{}", circle_id, owner)
 }
 
-#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(crate = "near_sdk::serde")]
-pub struct DaoConfig {
-    pub proposal_period_ns: u64,
-    pub proposal_bond: U128,
-    pub threshold_numerator: u32,
-    pub threshold_denominator: u32,
-    pub strict_majority: bool,
+pub(crate) fn parse_token_id(token_id: &str) -> Option<(u64, AccountId)> {
+    let (cid, owner) = token_id.split_once(':')?;
+    let cid: u64 = cid.parse().ok()?;
+    let owner: AccountId = owner.parse().ok()?;
+    Some((cid, owner))
 }
 
-#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(crate = "near_sdk::serde")]
-pub struct CircleConfig {
-    pub deployment_mode: DeploymentMode,
-    pub network: NetworkConfig,
-    pub durations: DurationConfig,
-    pub duration_floors: DurationFloorConfig,
-    pub amounts: AmountConfig,
-    pub dao: DaoConfig,
+pub(crate) fn page(from_index: Option<u32>, limit: Option<u32>) -> (u32, u32) {
+    let from = from_index.unwrap_or(0);
+    let limit = limit.unwrap_or(MAX_PAGE).min(MAX_PAGE);
+    (from, limit)
 }
 
-#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(crate = "near_sdk::serde")]
-pub struct Circle {
-    pub circle_id: u64,
-    pub founder_id: AccountId,
-    pub treasury_id: AccountId,
-    pub steward_ids: Vec<AccountId>,
-    pub trusted_repayment_threshold: u32,
-    pub minimum_qualifying_duration_ns: u64,
-    pub config: CircleConfig,
+pub(crate) fn assert_one_yocto() {
+    require!(
+        env::attached_deposit() == ONE_YOCTO,
+        "E03_ONE_YOCTO: attach exactly 1 yoctoNEAR"
+    );
 }
 
-#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(crate = "near_sdk::serde")]
-pub struct Invite {
-    pub circle_id: u64,
-    pub invite_key_hash: Vec<u8>,
-    pub inviter_id: AccountId,
-    pub invitee_id: Option<AccountId>,
-    pub expires_at_ns: u64,
-    pub signature: Vec<u8>,
+/// Charge the caller for storage added since `initial_usage` plus `reserve_bytes`,
+/// refunding any excess deposit.
+pub(crate) fn charge_storage(initial_usage: u64, reserve_bytes: u64) {
+    let used = env::storage_usage().saturating_sub(initial_usage) + reserve_bytes;
+    let cost = env::storage_byte_cost().saturating_mul(used as u128);
+    let attached = env::attached_deposit();
+    if attached < cost {
+        env::panic_str(&format!(
+            "E02_DEPOSIT: attach at least {} yoctoNEAR",
+            cost.as_yoctonear()
+        ));
+    }
+    let refund = attached.saturating_sub(cost);
+    if !refund.is_zero() {
+        Promise::new(env::predecessor_account_id()).transfer(refund);
+    }
 }
 
-#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(crate = "near_sdk::serde")]
-pub enum PassportTier {
-    Member,
-    Trusted,
-    Steward,
-}
+impl Contract {
+    pub(crate) fn circle_index(&self, circle_id: u64) -> u32 {
+        if circle_id == 0 || circle_id > self.circles.len() as u64 {
+            env::panic_str("E01_NOT_FOUND: circle");
+        }
+        (circle_id - 1) as u32
+    }
 
-#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(crate = "near_sdk::serde")]
-pub struct Passport {
-    pub owner_id: AccountId,
-    pub tier: PassportTier,
-    pub active: bool,
-    pub on_time_repayments: u32,
-    pub late_repayments: u32,
-    pub overdue_open_loans: u32,
-    pub different_lenders: Vec<AccountId>,
-    /// JSON metadata is kept as text in the storage model; API view wrappers
-    /// will expose it without introducing non-integer financial types.
-    pub metadata_json: String,
-}
+    pub(crate) fn circle(&self, circle_id: u64) -> &Circle {
+        let idx = self.circle_index(circle_id);
+        self.circles.get(idx).unwrap_or_else(|| env::panic_str("E01_NOT_FOUND: circle"))
+    }
 
-#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(crate = "near_sdk::serde")]
-pub enum LoanState {
-    Open,
-    Funding,
-    Funded,
-    Repaying,
-    Repaid,
-    Cancelled,
-    WrittenOff,
-}
+    pub(crate) fn try_circle(&self, circle_id: u64) -> Option<&Circle> {
+        if circle_id == 0 || circle_id > self.circles.len() as u64 {
+            return None;
+        }
+        self.circles.get((circle_id - 1) as u32)
+    }
 
-#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(crate = "near_sdk::serde")]
-pub enum PendingTransfer {
-    Funding { amount: U128 },
-    Repayment { amount: U128 },
-}
+    pub(crate) fn try_loan(&self, loan_id: u64) -> Option<&Loan> {
+        if loan_id == 0 || loan_id > self.loans.len() as u64 {
+            return None;
+        }
+        self.loans.get((loan_id - 1) as u32)
+    }
 
-#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(crate = "near_sdk::serde")]
-pub struct Loan {
-    pub loan_id: u64,
-    pub circle_id: u64,
-    pub borrower_id: AccountId,
-    pub lender_id: AccountId,
-    pub principal: U128,
-    pub total_repaid: U128,
-    pub duration_ns: u64,
-    pub created_at_ns: u64,
-    pub funded_at_ns: Option<u64>,
-    pub due_at_ns: Option<u64>,
-    pub state: LoanState,
-    pub pending_transfer: Option<PendingTransfer>,
-}
+    pub(crate) fn loan(&self, loan_id: u64) -> Loan {
+        self.try_loan(loan_id)
+            .cloned()
+            .unwrap_or_else(|| env::panic_str("E01_NOT_FOUND: loan"))
+    }
 
-impl Loan {
-    /// Overdue is derived from due_at and current time; it is not a stored state.
-    pub fn is_overdue(&self, now_ns: u64) -> bool {
-        matches!(self.state, LoanState::Funded | LoanState::Repaying)
-            && self.due_at_ns.is_some_and(|due_at| now_ns > due_at)
-            && self.total_repaid.0 < self.principal.0
+    pub(crate) fn put_loan(&mut self, loan_id: u64, loan: Loan) {
+        self.loans.set((loan_id - 1) as u32, loan);
+    }
+
+    pub(crate) fn passport(&self, circle_id: u64, account: &AccountId) -> Option<&Passport> {
+        self.passports.get(&(circle_id, account.clone()))
+    }
+
+    pub(crate) fn assert_admin(&self, circle_id: u64) -> Circle {
+        let circle = self.circle(circle_id).clone();
+        require!(
+            env::predecessor_account_id() == circle.admin_id,
+            "E05_NOT_ADMIN: only the circle admin can do this"
+        );
+        circle
+    }
+
+    pub(crate) fn effective_status(p: &Passport, now: u64) -> EffectiveStatus {
+        match p.status {
+            PassportStatus::Suspended => EffectiveStatus::Suspended,
+            PassportStatus::Revoked => EffectiveStatus::Revoked,
+            PassportStatus::Active => {
+                if p.expires_at.is_some_and(|e| now >= e) {
+                    EffectiveStatus::Expired
+                } else {
+                    EffectiveStatus::Active
+                }
+            }
+        }
+    }
+
+    pub(crate) fn is_active(&self, circle_id: u64, account: &AccountId, now: u64) -> bool {
+        self.passport(circle_id, account)
+            .is_some_and(|p| Self::effective_status(p, now) == EffectiveStatus::Active)
+    }
+
+    /// Overdue loans as borrower that have not had their flag cleared.
+    pub(crate) fn overdue_count(&self, p: &Passport, now: u64) -> u32 {
+        p.open_loans
+            .iter()
+            .filter_map(|id| self.try_loan(*id))
+            .filter(|l| l.is_overdue(now) && !l.flag_cleared)
+            .count() as u32
+    }
+
+    pub(crate) fn open_count(&self, p: &Passport, now: u64) -> u32 {
+        p.open_loans
+            .iter()
+            .filter_map(|id| self.try_loan(*id))
+            .filter(|l| !l.is_closed(now))
+            .count() as u32
+    }
+
+    pub(crate) fn effective_tier(&self, p: &Passport, now: u64) -> Tier {
+        if p.tier == Tier::Trusted && self.overdue_count(p, now) == 0 {
+            Tier::Trusted
+        } else {
+            Tier::Member
+        }
+    }
+
+    pub(crate) fn active_steward_count(&self, circle_id: u64, circle: &Circle, now: u64) -> u32 {
+        circle
+            .stewards
+            .iter()
+            .filter(|s| self.is_active(circle_id, s, now))
+            .count() as u32
+    }
+
+    /// Treasury lending: DAO attached, >= 2 Active stewards, borrower effectively
+    /// Trusted and not a steward.
+    pub(crate) fn treasury_rules_hold(&self, circle_id: u64, borrower: &AccountId, now: u64) -> bool {
+        let circle = match self.try_circle(circle_id) {
+            Some(c) => c,
+            None => return false,
+        };
+        if circle.treasury_id.is_none() || self.active_steward_count(circle_id, circle, now) < 2 {
+            return false;
+        }
+        match self.passport(circle_id, borrower) {
+            Some(p) => !p.steward && self.effective_tier(p, now) == Tier::Trusted,
+            None => false,
+        }
+    }
+
+    /// Mint a passport (no storage charging here; callers measure).
+    pub(crate) fn mint_passport(
+        &mut self,
+        circle_id: u64,
+        owner: &AccountId,
+        invited_by: Option<AccountId>,
+    ) -> String {
+        let key = (circle_id, owner.clone());
+        require!(
+            !self.passports.contains_key(&key),
+            "E35_ALREADY_MEMBER: this account already has a passport in this circle"
+        );
+        let passport = Passport {
+            tier: Tier::Member,
+            steward: false,
+            status: PassportStatus::Active,
+            expires_at: None,
+            joined_at: now(),
+            invited_by,
+            on_time: 0,
+            late: 0,
+            qualifying: 0,
+            lenders: Vec::new(),
+            open_loans: Vec::new(),
+        };
+        self.passports.insert(key, passport);
+
+        let idx = self.circle_index(circle_id);
+        let circle = self.circles.get_mut(idx).unwrap();
+        let member_index = circle.member_count;
+        circle.member_count += 1;
+        self.circle_members.insert((circle_id, member_index), owner.clone());
+
+        let owned = self.owner_token_count.get(owner).copied().unwrap_or(0);
+        self.owner_tokens.insert((owner.clone(), owned), circle_id);
+        self.owner_token_count.insert(owner.clone(), owned + 1);
+        self.all_tokens.push((circle_id, owner.clone()));
+
+        let tid = token_id(circle_id, owner);
+        events::nft_mint(owner, &tid);
+        tid
+    }
+
+    pub(crate) fn index_loan(&mut self, loan_id: u64, circle_id: u64, borrower: &AccountId, lender: &AccountId) {
+        let idx = self.circle_index(circle_id);
+        let circle = self.circles.get_mut(idx).unwrap();
+        let ci = circle.loan_count;
+        circle.loan_count += 1;
+        self.circle_loans.insert((circle_id, ci), loan_id);
+
+        let b = self.borrower_loan_count.get(borrower).copied().unwrap_or(0);
+        self.borrower_loans.insert((borrower.clone(), b), loan_id);
+        self.borrower_loan_count.insert(borrower.clone(), b + 1);
+
+        let l = self.lender_loan_count.get(lender).copied().unwrap_or(0);
+        self.lender_loans.insert((lender.clone(), l), loan_id);
+        self.lender_loan_count.insert(lender.clone(), l + 1);
     }
 }
