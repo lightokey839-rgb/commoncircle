@@ -18,7 +18,7 @@ belong here.
 | Annotated baseline tag in original checkout | BLOCKED | Git rejected writing `.git/objects` in `C:\Users\HomePC\Documents\GitHub\Loanbook`; tag is pending there |
 | Annotated baseline tag in writable working clone | PASS | `baseline-loanbook-port` is created at the pre-change commit in this clone |
 | Secret material scan | PASS | `git ls-files` includes `.env.example` but no `.env`; scan for PEM private-key material returned 0 hits |
-| Toolchain pins and lockfiles | BLOCKED | `.nvmrc`, `.bun-version`, `rust-toolchain.toml`, and `bun.lock` are present; no `Cargo.lock` exists because Cargo is unavailable, and the pre-existing `package-lock.json` is malformed binary data |
+| Toolchain pins and lockfiles | BLOCKED | `.nvmrc`, `.bun-version`, `rust-toolchain.toml`, and `bun.lock` are present; no `Cargo.lock` exists because Cargo is unavailable. `package-lock.json` is now valid npm v3 data, but a clean install could not complete in this sandbox. |
 
 ## Testnet verification requested by Gate 0
 
@@ -35,11 +35,11 @@ belong here.
 
 | Check | Status | Evidence |
 | --- | --- | --- |
-| Claims harness reads `evidence/evidence.json` | PASS | `npm run claims` prints a Markdown table, writes `EVIDENCE.md`, and updates the README marker table with no verified tracks |
+| Claims harness reads A9 `evidence/evidence.json` | PASS | `node scripts/claims.mjs` prints a Markdown table, writes `EVIDENCE.md`, and updates the README marker table with no verified tracks; unsupported schema versions fail closed |
 | Claims harness wrong-hash behavior | PASS | `npm run claims:test` accepted a matching snapshot and rejected a deliberately wrong expected transaction hash |
 | Circle scaffold tests | BLOCKED | Rust/Cargo is not installed in the execution environment; tests are intentionally red placeholders for all 17 v3 README rows |
-| `npm ci` clean install | FAIL | `npm ci` rejected the committed `package-lock.json` because it is not valid JSON/lockfile data; npm cache-routed lockfile regeneration was attempted but could not complete due registry/cache host restrictions |
-| Existing LoanBook checks | FAIL | `npm test`/`npm run check`/`npm run test:contracts` could not run without dependencies; `npm run test:db` additionally fails because pre-existing `scripts/test-db.mjs` contains non-text bytes beginning `59 AA E7 8A 78 2D AE E9...` |
+| `npm ci` clean install | BLOCKED | The invalid binary lock was replaced with a valid npm v3 lock whose root dependencies match `package.json`. `npm ci --ignore-scripts --offline` still cannot complete because the sandbox cache lacks `zustand-5.0.3.tgz`; registry-routed install hangs/fails on restricted cache access. |
+| Existing LoanBook checks | BLOCKED | `npm test` cannot run because the incomplete local install has no `vitest` binary; the malformed `scripts/test-db.mjs` baseline file was removed as requested. |
 
 ## Gate 1 Phase 1A — toolchain and verification handoff
 
@@ -49,11 +49,22 @@ belong here.
 | wasm32 target and cargo-near checked | BLOCKED | No local `rustup` or `cargo-near` command exists; no target query could run. |
 | Near SDK pin | PASS (manifest only) | `contracts/circle/Cargo.toml` pins `near-sdk = 5.17.2`; compilation has not run locally. |
 | Cargo.lock committed | BLOCKED | Cannot generate a trustworthy lockfile without Cargo; CI must generate/verify it in a Linux runner before contract code is pushed. |
-| package-lock baseline comparison | PASS (baseline corruption confirmed) | `git ls-tree 940099e` and `git ls-tree origin/main` both point to blob `9f6cce0fc5c0aee2455048ed490a38ba46ec120a`; JSON parse fails with `Unexpected token 'Y'`. |
+| package-lock baseline comparison | PASS (baseline corruption confirmed) | `git ls-tree 940099e` and `git ls-tree origin/main` both point to blob `9f6cce0fc5c0aee2455048ed490a38ba46ec120a`; the baseline JSON parse fails with `Unexpected token 'Y'`. The lane has replaced it with valid npm v3 lock data. |
 | test-db baseline comparison | PASS (baseline corruption confirmed) | `git ls-tree 940099e` and `git ls-tree origin/main` both point to blob `b6dda0986fbb4aae61f8b8e0a674f2b715a9a40d`; the file begins with non-text bytes and no alternate copy exists in Git. |
-| npm lockfile regeneration | BLOCKED | `npm install --package-lock-only --ignore-scripts --no-audit --no-fund` could not access the registry/cache from this environment; `npm ci` still fails before installation because the lockfile is not JSON. |
+| npm lockfile regeneration | PASS (lock data) / BLOCKED (install) | The lockfile now parses as npm v3 and matches the package dependency sets. A registry-backed clean install remains blocked by the sandbox npm cache/network restrictions. |
 | read-only USDC verification script | PASS (fail-closed behavior) | `node --check scripts/verify-usdc.mjs` passed. `npm run verify:usdc` with no RPC variables failed closed for both pinned IDs with `missing RPC URL for this network`; no metadata claim is made. |
 | baseline tag target | PASS | `git rev-parse baseline-loanbook-port^{}` resolves to `940099e49466accf9110769056b0e50891e5f096` in this writable clone. |
+
+## Gate 1 ops/web lane handoff
+
+| Check | Status | Evidence |
+| --- | --- | --- |
+| Frozen circle interface available | PASS (handoff) | Contracts-lane `docs/CIRCLE_INTERFACE.md` 1.0.0 is frozen and was read from the sibling lane checkout; this web lane does not modify or duplicate that contracts-owned file. The source says the contract is not compiled or tested yet. |
+| NEP-413 server scaffold | PASS (static) | `server/nep413.ts` implements the NEP-413 Borsh prefix/payload hash, Ed25519 verification, and a full-access-key RPC check; `server/auth.ts` consumes each nonce before awaiting verification. No mobile wallet sign-in was run. |
+| Typed interface client and member screens | PASS (static) | `web/circle-client.ts`, `web/nep413.ts`, `web/app.ts`, `web/index.html`, and `web/styles.css` provide read-first views, invite joining, and my-positions UI. Contract calls remain unverified. |
+| Web/server TypeScript typecheck | PASS (static) | TypeScript compiler completed with no errors for the new `web/*.ts` and `server/*.ts` files; it used the existing sibling checkout's compiler because this checkout's clean npm install is blocked. |
+| Contract files untouched by lane/web | PASS | `git diff -- contracts` is empty after the lane changes. |
+| Gate 1 Ubuntu CI workflow | PASS (definition) | `.github/workflows/commoncircle-gate1.yml` runs Rust build/test, requires a near-workspaces sandbox, runs npm tests/claims/USDC verification, scans full history with gitleaks, and uploads logs. It has not run in this sandbox. |
 
 ### Required push handoff
 
@@ -71,8 +82,9 @@ and the original checkout accepts Git writes.
 
 ## Evidence format
 
-`evidence/evidence.json` uses a minimal schema until the missing v3 schema is
-supplied. A claim must include an `id`, `track`, `feature`, `claim`, `status`,
-and an `evidence` array containing only reproducible commands, transaction
-hashes, URLs, or committed artifacts. Allowed statuses are `PASS`, `FAIL`,
-`UNVERIFIED`, and `BLOCKED`.
+`evidence/evidence.json` uses the A9 schema. The document has
+`schema_version: "A9"`, a `project`, a `generated_at` timestamp, and a `claims`
+array. Each claim must include `id`, `track`, `feature`, `network`, `kind`
+(`tx`, `view`, or `test`), `reference` (with a committed JSON `snapshot` or
+`report` path), and the `expected` JSON subset. A track is not a README claim
+until every row for that track passes.

@@ -1,37 +1,54 @@
-# LoanBook
+# CommonCircle
 
-Private lending circles with persistent chat and zero-interest, unsecured USDC loans on Arc. LoanBook coordinates direct transfers; it does not pool or custody loan principal.
-
-Originally built in [Arc Studio](https://studio.arc.io/app/02e165d9-bda4-4b41-ab19-757f5511337e). Existing repository: https://github.com/lightokey839-rgb/Loanbook. Builder: https://x.com/LIGHTDESIGN2022.
-
-## Current release status — 29 October 2026
-
-This is a locally implemented, tested release candidate with its additive Supabase upgrade and receipt verifier now deployed to the existing Loanbook project. A review branch named `codex/loanbook-release-candidate` was created from the current GitHub `main` head; source changes have not yet been pushed into it. No public frontend has been deployed. Mainnet contract and demonstration transactions remain outstanding. GitHub reported the existing repository as private during inspection.
-
-## Local use
-
-Use Node 24 and npm. Run npm ci, copy .env.example to a local .env with public browser configuration, then npm run dev. For production preview: npm run build followed by npm run preview. npm is the canonical lockfile for this release; the original bun.lock is historical.
-
-Checks: npm run check; npm test; npm run test:db; npm run test:contracts. Contract compilation uses Solidity 0.8.28. Windows environments that cannot resolve Foundry's compiler home can pass --use with a verified local solc executable.
-
-## Main flows
-
-Connect wallet → sign the SIWE login message → create/join a circle → chat → request USDC → offer to lend → borrower selects a lender → create onchain agreement → lender approves and funds → borrower approves and repays. Direct Loans remains separate and does not depend on Supabase.
-
-RLS protects private conversations. Onchain terms, amounts and wallet addresses are public. Loans are unsecured; repayment cannot be forced. Use only trusted counterparties.
-
-Read DEPLOYMENT.md, TEST_RESULTS.md, SECURITY_REVIEW.md and NEXT_STEPS.md before release. Older documents under docs/ and Studio deployment scripts are retained for provenance, not current production instructions.
-
-## CommonCircle Gate 0
-
-CommonCircle is the NEAR hackathon continuation of the disclosed LoanBook port.
-The authoritative scope and UTC gates are in [docs/COMMONCIRCLE_SPEC_v3.md](docs/COMMONCIRCLE_SPEC_v3.md).
-The baseline is the annotated `baseline-loanbook-port` tag at `940099e`; see
-[NEW_FILES.md](NEW_FILES.md) for the generated diff inventory. Loans are
+CommonCircle is a private lending circle for people who already trust one
+another: zero-interest, unsecured USDC loans, an invite-gated circle, and a
+non-transferable passport that records repayment behaviour. Loans are
 unsecured; repayment cannot be forced. Chat is access-controlled, not
-end-to-end encrypted; loan terms, addresses and passport history are public
-on-chain. No CommonCircle track is claimed until `npm run claims` verifies its
-evidence.
+end-to-end encrypted. Loan terms, account ids, and passport history are public
+on-chain.
+
+This checkout is the ops/web lane for the disclosed LoanBook continuation. The
+baseline is the annotated `baseline-loanbook-port` tag at `940099e`; new files
+are listed in [NEW_FILES.md](NEW_FILES.md). The frozen contract handoff is
+the frozen `docs/CIRCLE_INTERFACE.md` handoff from the contracts lane. The contract lane has
+not yet compiled or tested that interface, so this README makes no deployment,
+transaction, pilot, or submission claim.
+
+## First user
+
+The first user is a member of a real family, friends, or community savings
+circle who already coordinates contributions in a group chat and needs a small,
+short-term USDC loan without collateral. They open a named invite on a phone,
+sign in with their NEAR wallet, join without handing a secret to the server,
+see their passport and positions, and later repay a lender directly. The first
+pilot should use 3–5 people, a 5–20 USDC principal, and a clearly displayed
+confirmation that the loan is unsecured.
+
+## Product wedge and why NEAR
+
+The wedge is a behaviour passport attached to one trusted circle: repayment
+history changes a member's effective tier without making reputation transferable
+or creating a platform admin. NEAR fits because the product can use free
+NEP-413 sign-in, low-cost storage paid by the caller, NEP-141 USDC transfers,
+NEP-297 event logs, and account-level access keys for a constrained relayer or
+agent. The contract remains the authority; the server mirrors confirmed events
+and never executes chat text.
+
+## Track map (targets, not claims)
+
+Every row below is a product/user story and an evidence target. A track becomes
+a claim only when `npm run claims` verifies its rows; the generated status table
+below is authoritative.
+
+| Track | User | Problem | Wedge | On-chain role | First milestone | Biggest risk | Why NEAR |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Open Innovation | Circle borrower and named lender | Small trusted loans are coordinated manually and repayment is hard to verify | Direct USDC forward with zero principal held at rest | Circle enforces membership, exact amount, funding window, callbacks and refunds | Sandbox fund → repay with refund proof | A failed forward or wrong-token path could strand funds | NEP-141 and cheap, inspectable contract calls |
+| NFTs That Do Something | Returning circle member | A repayment record has no portable, visible feedback | Non-transferable passport with tiered card art | Passport mint, gates, tiers, status and immutable ownership | One qualifying repayment changes tier/art | Thin tests could overstate reputation safety | NEP-171/177 metadata and low-cost state |
+| Social Money | Circle stewards | A group has no accountable way to approve treasury lending | Circle DAO and visible steward rules | DAO becomes admin; treasury loans require strict steward conditions | Testnet proposal funds one loan | DAO deployment and quorum math are unverified | NEAR account/DAO composition |
+| Real-World Money | 3–5 pilot participants | Mobile users may not have NEAR or a reliable way to join | Invite flow plus relayer onboarding | Invite binding and relayer caps are enforced around contract calls | Named invite redeemed by a phone user | No live pilot or participant evidence exists yet | NEP-413 and sponsored onboarding path |
+| Agent Economy | Borrower who wants reminders | Loan requests and due dates are easy to miss | Agent drafts and nudges; members still confirm | A restricted account can call only vault execution methods | One auto-repay hash signed by the agent | Prompt injection must never move funds | Function-call keys and explicit account permissions |
+| Autonomous Business | Keeper/agent operator | Automated upkeep has no sustainable caller incentive | Optional keeper tip paid by the set-aside owner | Vault caps tips and emits caller events | Measure tips against gas before claiming | Tips may be net-negative | Cheap execution makes the economics measurable |
+| Unstoppable DeFi | User moving value across chains | Cross-chain funding adds a second failure surface | F3 only after Tier A is proven | Circle accepts only pinned USDC and records final state | Go/no-go with origin and NEAR evidence | Delivery/refund semantics are not verified | NEAR as the destination settlement rail |
 
 <!-- COMMONCIRCLE_TRACK_TABLE_START -->
 <!-- Generated by `npm run claims`; do not edit this table manually. -->
@@ -39,3 +56,29 @@ evidence.
 | --- | --- | --- |
 | _No verified tracks yet_ | — | UNVERIFIED |
 <!-- COMMONCIRCLE_TRACK_TABLE_END -->
+
+## Local checks
+
+Use Node 24 and npm. The canonical commands are:
+
+```text
+npm ci
+npm test
+npm run claims:test
+npm run claims
+npm run verify:usdc
+```
+
+The web handoff is under [web/](web/README.md), and the NEP-413 Bun scaffold is
+under [server/auth.ts](server/auth.ts). `NEAR_MAINNET_RPC_URL` and
+`NEAR_TESTNET_RPC_URL` are required for the read-only USDC check; never commit
+populated environment files or keys.
+
+## Verification and status
+
+Read [docs/VERIFICATION.md](docs/VERIFICATION.md) for the evidence ledger and
+[STATUS.md](STATUS.md) for current gate blockers. CI runs on Ubuntu, uploads
+Rust/Node/gitleaks logs, scans full Git history, and fails closed when required
+RPC variables or the near-workspaces sandbox are absent. No public repository,
+deployment, mainnet transaction, participant quote, or hackathon submission is
+claimed here.

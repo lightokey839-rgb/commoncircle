@@ -9,6 +9,10 @@ const endMarker = "<!-- COMMONCIRCLE_TRACK_TABLE_END -->";
 const allowedKinds = new Set(["tx", "view", "test"]);
 
 const document = JSON.parse(await readFile(evidencePath, "utf8"));
+if (document.schema_version !== "A9") {
+  console.error(`unsupported evidence schema: expected A9, got ${document.schema_version ?? "missing"}`);
+  process.exitCode = 1;
+}
 const claims = Array.isArray(document.claims) ? document.claims : [];
 const failures = [];
 
@@ -41,7 +45,7 @@ async function readJson(path) {
   }
 }
 
-// Gate 0 intentionally has no claim rows. For populated rows, the harness
+// Gate 0 intentionally has no claim rows. For populated A9 rows, the harness
 // requires a committed JSON snapshot/report and compares the expected subset;
 // it never treats a free-form README sentence as proof.
 async function verifyClaim(claim) {
