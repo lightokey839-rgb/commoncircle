@@ -11,6 +11,10 @@
 #   EXPECTED_SHA256=<sha256 from the reproducible CI build> \
 #   ./contracts/scripts/deploy-testnet.sh
 #
+# REDEPLOY=1: if the contract is already initialised but runs other code,
+# deploy the new wasm in place WITHOUT calling init (state is kept). Only valid
+# while the account still has its key (testnet); never after key deletion.
+#
 # Optional: VAULT_ACCOUNT_ID (default vault.$CIRCLE_ACCOUNT_ID),
 # HARD_LOAN_CAP (default 50000000 = 50 USDC), NEAR_TESTNET_RPC_URL (default A6
 # FastNEAR), EXPECTED_CODE_HASH (base58; checked if set).
@@ -83,7 +87,13 @@ process.stdout.write(JSON.stringify({usdc_id:usdc,vault_id:vault,hard_loan_cap:c
 say "4/6 Deploy and init"
 CONFIG=$(view "$C" get_config '{}')
 if [[ "$CONFIG" != ERROR* ]]; then
-  echo "already initialised, skipping deploy"
+  CUR=$(code_hash "$C")
+  if [ -n "${EXPECTED_CODE_HASH:-}" ] && [ "$CUR" != "$EXPECTED_CODE_HASH" ] && [ "${REDEPLOY:-0}" = 1 ]; then
+    echo "initialised with code $CUR; REDEPLOY=1: deploying new code in place (no init)"
+    near contract deploy "$C" use-file "$WASM" without-init-call       network-config "$NETWORK" sign-with-keychain send
+  else
+    echo "already initialised (code $CUR), skipping deploy"
+  fi
 elif [ "$(code_hash "$C")" != "11111111111111111111111111111111" ]; then
   echo "code present but not initialised: calling new"
   near contract call-function as-transaction "$C" new json-args "$INIT_ARGS" \

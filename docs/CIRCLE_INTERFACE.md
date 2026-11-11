@@ -1,11 +1,11 @@
 # CommonCircle `circle` contract interface
 
-Interface version: **1.0.0** (frozen 2026-11-11, contracts lane).
+Interface version: **1.1.0** (2026-11-11, contracts lane). 1.1.0 adds per-circle passport themes and a square card; every 1.0.0 call still works unchanged.
 Authority: `docs/COMMONCIRCLE_SPEC_v3.md` and the Gate 1 prompt with amendments A1 to A11.
 Owner: contracts lane (`lane/contracts`). The web lane builds against this file.
 
-**Status: interface only.** The contract behind this interface is not compiled or
-tested yet (see `STATUS.md`). Nothing here is a README claim.
+**Status:** 1.0.0 is deployed on testnet (`commoncircle-light.testnet`). 1.1.0
+is in CI; see `STATUS.md` and `docs/VERIFICATION.md` before relying on it.
 
 Change rule: after this commit, any change to a method name, argument, return
 shape, event name or error code needs a version bump here and an entry in
@@ -54,7 +54,8 @@ the sandbox measurements are recorded in `docs/VERIFICATION.md`.
 
 | Method | Caller | Deposit | Gas | Returns |
 | --- | --- | --- | --- | --- |
-| `create_circle(name, params)` | anyone (becomes founder and admin; founder gets a Member passport) | `storage_costs().create_circle` | 30 Tgas | `circle_id` (U64) |
+| `create_circle(name, params, theme?)` | anyone (becomes founder and admin; founder gets a Member passport). `theme` is optional (section 3.3) | `storage_costs().create_circle` | 50 Tgas | `circle_id` (U64) |
+| `set_circle_theme(circle_id, theme)` | circle admin (founder until `attach_dao`, then the DAO); replaces the whole theme | `storage_costs().set_circle_theme` (excess refunded) | 50 Tgas | — |
 | `attach_dao(circle_id, dao_id)` | founder, once, while founder is admin | 1 yoctoNEAR | 30 Tgas | — |
 | `register_invite(circle_id, invite_public_key, expires_at, invitee_id?)` | founder while admin, or an Active passport holder with effective Trusted tier | `storage_costs().register_invite` | 30 Tgas | — |
 | `redeem_invite(circle_id, invite_public_key, signature)` | the invitee (or anyone, for an open invite) | `storage_costs().redeem_invite` | 50 Tgas | `token_id` |
@@ -99,6 +100,35 @@ params: {
 
 Checks: `min_amount <= member_max_amount <= trusted_max_amount <= hard_loan_cap`,
 `qualifying_min_amount >= min_amount`, every value at or above its init floor.
+
+### 3.3 Passport themes (1.1.0)
+
+Each circle styles its own passports. All fields are optional; a missing field
+uses the default (navy `#1D3557`, aqua `#A8DADC`, white text, Dots, built-in
+"circle of members" emblem).
+
+```text
+theme: {
+  tagline:    string | null,   // up to 32 chars, shown under the name tag
+  background: "#RRGGBB" | null,
+  accent:     "#RRGGBB" | null,
+  text:       "#RRGGBB" | null,
+  pattern:    "None" | "Dots" | "Grid" | "Waves" | "Rays" | null,
+  emblem:     base64 string | null   // PNG, JPEG, GIF or WebP, at most 12288 bytes
+}
+```
+
+- The **name tag** on every card is the circle's `name` (set at creation).
+- SVG emblems are rejected (they can carry script); text is XML-escaped.
+- The web app should resize uploads in the browser (canvas) to about 128x128
+  and encode WebP or PNG so they fit under 12 KiB.
+- The card is a square 512x512 SVG: name tag, tagline, emblem in a circular
+  frame, a tier frame (Member: one ring; Trusted: gold double ring and stars;
+  Steward: three rings and a crown), tier ribbon, on-time / late counts,
+  status chip, "OVERDUE - PERKS PAUSED" sash when perks are paused, greyed
+  out when the passport is not Active.
+- Errors: `E04_BAD_PARAMS` (bad colour, tagline, image type or size),
+  `E05_NOT_ADMIN`, `E02_DEPOSIT`.
 
 ### 3.2 Invites
 
@@ -209,7 +239,7 @@ circle contract's USDC balance is zero at rest.
 | View | Returns |
 | --- | --- |
 | `get_config()` | `ConfigView` |
-| `storage_costs()` | `{ create_circle, register_invite, redeem_invite, create_loan }`, each U128 yoctoNEAR (upper bound; excess refunded) |
+| `storage_costs()` | `{ create_circle, set_circle_theme, register_invite, redeem_invite, create_loan }`, each U128 yoctoNEAR (upper bound; excess refunded) |
 | `get_circle(circle_id)` | `CircleView \| null` |
 | `get_loan(loan_id)` | `LoanView \| null` |
 | `loans_by_borrower(account_id, from_index?, limit?)` | `LoanView[]` (all circles) |
@@ -253,6 +283,11 @@ type CircleView = {
   steward_count: number;                    // stewards whose passport is Active now
   loan_count: number;
   treasury_lending_enabled: boolean;        // dao_attached && steward_count >= 2
+  theme: {                                  // 1.1.0; defaults when custom is false
+    tagline: string | null; background: string; accent: string; text: string;
+    pattern: "None" | "Dots" | "Grid" | "Waves" | "Rays";
+    emblem_mime: string | null; emblem_bytes: number; custom: boolean;
+  };
 };
 
 type LoanView = {
@@ -302,11 +337,12 @@ type InviteView = {
 };
 ```
 
-NEP-177 token metadata: `title` = `"CommonCircle Passport #<circle_id>"`,
-`description` = fixed text with the display tier and status, `media` =
+NEP-177 token metadata: `title` = `"<circle name> Passport"` (1.1.0),
+`description` = fixed text with the circle name, display tier and status, `media` =
 `data:image/svg+xml;base64,<svg>`, `media_hash` = null, `copies` = 1,
-`issued_at` = join time in ms as a string. No personal data in the art; it is
-derived only from circle id, display tier, status and the on-time and late counts.
+`issued_at` = join time in ms as a string. No member data in the art; it is
+derived only from the circle (id, name, theme), display tier, status and the
+on-time and late counts.
 
 ## 7. Events (NEP-297)
 
@@ -314,7 +350,7 @@ Every state change logs `EVENT_JSON:{"standard":"commoncircle","version":"1.0.0"
 Passport mint and burn also log the standard `nep171` `nft_mint` / `nft_burn`
 events so explorers index them. Payload fields are in `docs/EVENTS.md`.
 
-Event names: `circle_created`, `dao_attached`, `invite_registered`,
+Event names: `circle_created`, `circle_theme_set` (1.1.0), `dao_attached`, `invite_registered`,
 `invite_redeemed`, `passport_status_changed`, `passport_expiry_set`,
 `steward_set`, `tier_changed`, `loan_created`, `loan_cancelled`,
 `loan_funding_started`, `loan_funded`, `loan_funding_failed`,

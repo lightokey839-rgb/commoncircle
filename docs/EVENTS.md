@@ -1,6 +1,6 @@
 # CommonCircle events (NEP-297)
 
-Contract: `circle`. Interface: `docs/CIRCLE_INTERFACE.md` 1.0.0.
+Contract: `circle`. Interface: `docs/CIRCLE_INTERFACE.md` 1.1.0.
 Status: matches the source in `contracts/circle/src`. Not yet compiled or tested;
 see `STATUS.md`.
 
@@ -29,6 +29,7 @@ index only events from successful receipts.
 | Event | Emitted by | `data` fields |
 | --- | --- | --- |
 | `circle_created` | `create_circle` | `circle_id`, `founder_id`, `name`, `params` (CircleParams, interface 3.1) |
+| `circle_theme_set` (1.1.0) | `create_circle` with a theme, `set_circle_theme` | `circle_id`, `by`, `tagline`, `background`, `accent`, `text`, `pattern`, `emblem_mime`, `emblem_bytes` (the image itself is not logged) |
 | `dao_attached` | `attach_dao` | `circle_id`, `dao_id`, `previous_admin_id` |
 | `invite_registered` | `register_invite` | `circle_id`, `inviter_id`, `invitee_id` (null for open invites), `invite_public_key`, `expires_at` |
 | `invite_redeemed` | `redeem_invite`, and `create_circle` for the founder | `circle_id`, `account_id`, `token_id`, `inviter_id` (null for the founder), `invite_public_key` (null for the founder) |

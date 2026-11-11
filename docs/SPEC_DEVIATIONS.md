@@ -78,6 +78,44 @@ corresponding behavior is shipped.
 - Covering test: an on-time repayment below `qualifying_min_amount` does not
   increase `qualifying_count`.
 
+## D-007 — square passport card (change inside the Gate 1 window)
+
+- Status: implemented in interface 1.1.0, before the Gate 1 freeze deadline
+  (Wed 11 Nov 23:59 UTC), at the builder's request.
+- Why: Meteor Wallet (testnet) crops NFT media to a square; the 400x300 card
+  lost its edges ("MONCIRCLE #1", "TIME 1 / LATE 0"). v3/v4 ask that the art
+  render in two wallets.
+- What: 512x512 card with every element at least 40 px from the edge. Art
+  only; no change to loans, money paths or stored records.
+- Covering tests: `themed_card_has_name_tag_tagline_colours_and_emblem`
+  (square viewBox), `card_samples_for_every_tier_and_state`, the existing
+  tier-flip and paused-card checks; rendering re-checked in a wallet after the
+  testnet redeploy.
+
+## D-008 — per-circle passport themes (addition)
+
+- Status: implemented in interface 1.1.0 (additive; 1.0.0 calls unchanged).
+- Spec surface: v3/v4 F1 say card art is generated on-chain from tier and
+  status with no personal data. The builder asked that each community styles
+  its own passports (name tag such as "The Dogs", its own emblem art).
+- Safe reading: the circle admin (founder, then the DAO, so no platform
+  admin) sets a theme: tagline, three colours, a pattern and an optional
+  raster emblem (PNG/JPEG/GIF/WebP, max 12 KiB, magic-byte checked; SVG
+  rejected so no script can be embedded). The circle name is the name tag. Tier
+  and status still drive the frame, ribbon, chip and sash, so the card still
+  changes on a tier flip. No member data is drawn; all text is XML-escaped; no
+  floating point. Themes are stored under raw keys outside `Circle`, so the
+  stored layout is unchanged and testnet can be redeployed in place.
+- Cost and limits: the admin pays theme storage (up to about 0.128 NEAR for a
+  full 12 KiB emblem); freed bytes are not refunded. A 50-token enumeration
+  stays around 1 MB.
+- Covering tests: `themed_card_has_name_tag_tagline_colours_and_emblem`,
+  `circle_name_and_tagline_are_xml_escaped`, `bad_colour_is_rejected`,
+  `svg_emblem_is_rejected`, `oversize_emblem_is_rejected`,
+  `only_the_admin_can_set_the_theme`, `dao_sets_the_theme_after_attach`,
+  `default_theme_is_reported_when_none_is_set`, sandbox
+  `themed_circle_passport_art_in_sandbox`.
+
 ## Contract freeze notice (Gate 1 phase 1E)
 
 - Frozen source: `contracts/circle/src` git tree `227e4b9dc155fc7a93dffc7df4f9e90e0e538d55`

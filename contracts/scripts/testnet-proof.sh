@@ -4,6 +4,7 @@
 #   ./contracts/scripts/testnet-proof.sh setup   # create lender + borrower accounts, register lender with USDC
 #   (get testnet USDC from Circle's faucet into the LENDER account)
 #   ./contracts/scripts/testnet-proof.sh run     # DEMO circle, invite, loan, failed-forward refund, fund, repay
+#   DOGS=1 ... run   # same, but the circle is "The Dogs (DEMO)" with the dog emblem theme (interface 1.1.0)
 #
 # Runs in Git Bash / WSL / Linux with near-cli-rs, node, curl. Keys are created
 # by near-cli-rs in your OS keychain; this script never prints or stores keys.
@@ -90,7 +91,14 @@ run() {
   local cost; cost=$(view "$CIRCLE" storage_costs '{}' | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const c=JSON.parse(s);console.log(c.create_circle, c.register_invite, c.redeem_invite, c.create_loan)})')
   read -r C_CIRCLE C_INVITE C_REDEEM C_LOAN <<<"$cost"
   local params='{"min_amount":"1000000","member_max_amount":"10000000","trusted_max_amount":"20000000","max_duration_days":7,"day_length_sec":"60","funding_window_sec":"3600","qualifying_min_amount":"1000000","qualifying_min_days":1,"trusted_threshold":1,"min_distinct_lenders":1,"recovery_lock_sec":"0","writeoff_grace_sec":"600"}'
-  call "create_circle $cid" "$LENDER" "$CIRCLE" create_circle "{\"name\":\"DEMO testnet proof\",\"params\":$params}" "$C_CIRCLE yoctoNEAR"
+  local cname="DEMO testnet proof" theme="null"
+  if [ "${DOGS:-0}" = 1 ]; then
+    cname="The Dogs (DEMO)"
+    local emb; emb=$(base64 < "$(dirname "$0")/../circle/tests/fixtures/dog_emblem.png" | tr -d '
+')
+    theme="{\"tagline\":\"Good dogs pay back\",\"background\":\"#2B2D42\",\"accent\":\"#FFB703\",\"text\":\"#FFFFFF\",\"pattern\":\"Waves\",\"emblem\":\"$emb\"}"
+  fi
+  call "create_circle $cid" "$LENDER" "$CIRCLE" create_circle "{\"name\":\"$cname\",\"params\":$params,\"theme\":$theme}" "$C_CIRCLE yoctoNEAR"
 
   say "2 Named invite for the borrower; borrower redeems it"
   local inv; inv=$(node -e '
