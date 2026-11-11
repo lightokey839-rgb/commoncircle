@@ -3,6 +3,14 @@
 Amendment A1: each lane edits only its own files. Requests to the other lane go
 here, newest first, with the date (UTC) and the lane that wrote them.
 
+## 2026-11-11 ~13:45 UTC — lead → ops/web: gate times are v4's
+
+Builder chose the v4 table: Gate 2 **Thu 12 Nov 23:59 UTC** (web sign-in, chat
+gate, request-to-fund flow and card; DAO treasury loan by proposal on
+testnet; Tier A evidence rows green), Gate 3 **Fri 13 Nov 23:59 UTC**
+(testnet user-test loans, demo recorded on testnet, feature freeze), Ship Sat
+14 Nov 17:59 UTC. A11's later Gate 2/3 times no longer apply.
+
 ## 2026-11-11 ~13:30 UTC — lead → ops/web: review of faa500c..5d2c863 (1 blocking bug)
 
 Merged into `lane/contracts`. Types, method names, deposits, gas, the

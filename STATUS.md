@@ -1,5 +1,11 @@
 # CommonCircle status
 
+## Gate schedule (builder decision, 2026-11-11): spec v4 table, UTC
+
+Gate 1 contract freeze Wed 11 Nov 23:59 · Gate 2 Tier A proof **Thu 12 Nov
+23:59** · Gate 3 pilot/user-test proof and feature freeze **Fri 13 Nov 23:59** ·
+Ship Sat 14 Nov 17:59. This replaces amendment A11's Gate 2/3 times.
+
 ## Gate 1 — contracts (lead), updated 2026-11-11 ~09:15 UTC
 
 Status: CONTRACT FROZEN / DEPLOYED ON TESTNET (commoncircle-light.testnet) / NOT CLAIMABLE
