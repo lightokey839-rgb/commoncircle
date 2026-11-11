@@ -157,7 +157,7 @@ async fn rt_bidi_and_control_characters_in_circle_name() -> Result<()> {
     let t = w
         .bob
         .call(w.circle.id(), "create_circle")
-        .args_json(json!({ "name": "Plain", "params": params(), "theme": { "tagline": "evil‮txet" } }))
+        .args_json(json!({ "name": "Plain", "params": params(), "theme": { "tagline": "evil\u{202E}txet" } }))
         .deposit(NearToken::from_yoctonear(deposit))
         .max_gas()
         .transact()
