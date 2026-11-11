@@ -2,6 +2,7 @@ import { CircleClient, plainContractError, type CircleParams, type NearWallet } 
 import { signInWithNep413, type Nep413Wallet } from './nep413'
 import { buildInviteLink, generateInviteKeyPair, parseInviteLink, signInviteWithSecret } from './invite'
 import { loadReadOnlyDemo } from './demo'
+import { bindThemeForm, readThemeForm, renderThemePreview } from './theme'
 
 type BrowserWallet = Nep413Wallet & NearWallet
 
@@ -98,8 +99,30 @@ async function createCircle(): Promise<void> {
   const name = $<HTMLInputElement>('#new-circle-name').value.trim()
   if (!name) throw new Error('Circle name is required.')
   const storage = await readClient.storageCosts()
-  await client().createCircle({ name, params: testnetDemoParams, deposit: storage.create_circle })
+  await client().createCircle({ name, params: testnetDemoParams, theme: readThemeForm('new-circle'), deposit: storage.create_circle })
   show('Circle creation submitted with the testnet DEMO parameters.')
+}
+
+async function saveDesign(): Promise<void> {
+  if (!window.commonCircleWallet) throw new Error('Connect a NEAR wallet adapter before editing a design.')
+  if (!accountId) throw new Error('Sign in before editing a design.')
+  const circleId = $<HTMLInputElement>('#design-circle-id').value.trim()
+  if (!/^\d+$/.test(circleId)) throw new Error('Enter a valid circle id.')
+  const circle = await readClient.getCircle(circleId)
+  if (!circle) throw new Error('That circle does not exist.')
+  if (circle.admin_id !== accountId) throw new Error('Only the circle admin can edit this design.')
+  const storage = await readClient.storageCosts()
+  await client().setCircleTheme({ circleId, theme: readThemeForm('design'), deposit: storage.set_circle_theme })
+  const passport = await readClient.passportFor(circleId, accountId)
+  if (passport) {
+    const svg = await readClient.cardSvg(passport.token_id)
+    if (svg) {
+      const image = $<HTMLImageElement>('#design-card-preview')
+      image.src = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }))
+      image.hidden = false
+    }
+  }
+  show('Design update submitted. The saved passport card preview will appear after finality.')
 }
 
 async function createLoan(): Promise<void> {
@@ -155,8 +178,12 @@ function wire(): void {
   $('#create-invite').addEventListener('click', () => void createInvite().catch((error) => show(plainContractError(error))))
   $('#create-circle').addEventListener('click', () => void createCircle().catch((error) => show(plainContractError(error))))
   $('#create-loan').addEventListener('click', () => void createLoan().catch((error) => show(plainContractError(error))))
+  $('#save-design').addEventListener('click', () => void saveDesign().catch((error) => show(plainContractError(error))))
   $('#load-positions').addEventListener('click', () => void loadPositions().catch((error) => show(error instanceof Error ? error.message : String(error))))
   $('#load-demo').addEventListener('click', () => void loadDemo().catch((error) => show(error instanceof Error ? error.message : String(error))))
+  bindThemeForm('new-circle', () => $<HTMLInputElement>('#new-circle-name').value.trim() || 'New circle', (error) => show(error instanceof Error ? error.message : String(error)))
+  bindThemeForm('design', () => `Circle ${$<HTMLInputElement>('#design-circle-id').value.trim() || '?'}`, (error) => show(error instanceof Error ? error.message : String(error)))
+  $<HTMLInputElement>('#new-circle-name').addEventListener('input', () => renderThemePreview('new-circle', $('#new-circle-preview'), $<HTMLInputElement>('#new-circle-name').value.trim() || 'New circle'))
 }
 
 function hydrateInviteFields(): void {

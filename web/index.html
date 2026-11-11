@@ -16,7 +16,7 @@
         <h2 id="demo-heading">Read-only testnet demo</h2>
         <p class="muted">No wallet is needed. This queries <code>commoncircle-light.testnet</code> through FastNEAR and never submits a transaction.</p>
         <label for="demo-circle-id">Circle id to inspect</label>
-        <input id="demo-circle-id" inputmode="numeric" value="1" />
+        <input id="demo-circle-id" inputmode="numeric" value="2" />
         <button id="load-demo" class="secondary">Load testnet data</button>
         <pre id="demo-output" class="demo-output" aria-live="polite">Not loaded.</pre>
       </section>
@@ -58,7 +58,44 @@
         <p class="muted">This attaches the frozen short-duration testnet parameters; it is not a mainnet pilot configuration.</p>
         <label for="new-circle-name">Circle name</label>
         <input id="new-circle-name" value="CommonCircle demo" maxlength="64" />
+        <label for="new-circle-tagline">Passport tagline (optional, 32 characters)</label>
+        <input id="new-circle-tagline" maxlength="32" placeholder="Small turns, stronger ties" />
+        <div class="theme-grid">
+          <label>Background <input id="new-circle-background" type="color" value="#1D3557" /></label>
+          <label>Accent <input id="new-circle-accent" type="color" value="#A8DADC" /></label>
+          <label>Text <input id="new-circle-text" type="color" value="#FFFFFF" /></label>
+        </div>
+        <label for="new-circle-pattern">Pattern</label>
+        <select id="new-circle-pattern">
+          <option>None</option><option selected>Dots</option><option>Grid</option><option>Waves</option><option>Rays</option>
+        </select>
+        <label for="new-circle-emblem">Emblem (PNG, WebP, JPEG or GIF; resized to 128×128 and capped at 12 KiB)</label>
+        <input id="new-circle-emblem" type="file" accept="image/png,image/webp,image/jpeg,image/gif" />
+        <div id="new-circle-preview" class="theme-preview" aria-label="New circle passport preview"></div>
         <button id="create-circle">Create circle</button>
+      </section>
+
+      <section class="card" aria-labelledby="design-heading">
+        <h2 id="design-heading">Edit passport design</h2>
+        <p class="muted">Only the circle admin can save a design. SVG uploads are rejected; the browser submits only a small raster emblem.</p>
+        <label for="design-circle-id">Circle id</label>
+        <input id="design-circle-id" inputmode="numeric" value="2" />
+        <label for="design-tagline">Passport tagline (optional, 32 characters)</label>
+        <input id="design-tagline" maxlength="32" placeholder="Small turns, stronger ties" />
+        <div class="theme-grid">
+          <label>Background <input id="design-background" type="color" value="#1D3557" /></label>
+          <label>Accent <input id="design-accent" type="color" value="#A8DADC" /></label>
+          <label>Text <input id="design-text" type="color" value="#FFFFFF" /></label>
+        </div>
+        <label for="design-pattern">Pattern</label>
+        <select id="design-pattern">
+          <option>None</option><option selected>Dots</option><option>Grid</option><option>Waves</option><option>Rays</option>
+        </select>
+        <label for="design-emblem">Emblem (PNG, WebP, JPEG or GIF; resized to 128×128 and capped at 12 KiB)</label>
+        <input id="design-emblem" type="file" accept="image/png,image/webp,image/jpeg,image/gif" />
+        <div id="design-preview" class="theme-preview" aria-label="Edited passport preview"></div>
+        <button id="save-design">Save design</button>
+        <img id="design-card-preview" class="card-svg-preview" alt="Saved passport card preview" hidden />
       </section>
 
       <section class="card" aria-labelledby="create-loan-heading">

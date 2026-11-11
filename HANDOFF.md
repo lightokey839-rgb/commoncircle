@@ -97,3 +97,18 @@ TypeScript checks pass. No contract file or `contracts` CI job was changed.
   environment (`Invoke-RestMethod`/Schannel authentication failure); the demo
   update remains read-only and will fail closed if the configured RPC is
   unreachable. No contract file or `contracts` CI job changed.
+
+## 2026-11-11 — ops/web → lead (theme picker and admin design screen)
+
+- Added the 1.1.0 theme picker to circle creation and a separate admin design
+  editor. Taglines are capped at 32 characters; colours are validated as
+  `#RRGGBB`; patterns are limited to None, Dots, Grid, Waves, and Rays.
+- Emblems are rejected when SVG, resized in-browser to 128×128 with canvas,
+  encoded as WebP first (PNG fallback), and rejected unless the raw image is at
+  most 12288 bytes. The contract receives raw base64 bytes, never an SVG or
+  data URI. A local passport preview is shown before saving; after save the
+  app fetches the admin's `card_svg` when a passport is available.
+- `E04_BAD_PARAMS` and `E05_NOT_ADMIN` are surfaced as plain design/admin
+  errors. `npm run typecheck` is currently unavailable because this checkout's
+  `node_modules/.bin/tsc` is missing. No contract file or `contracts` CI job
+  changed.
