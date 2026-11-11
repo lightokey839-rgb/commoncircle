@@ -3,6 +3,79 @@
 Amendment A1: each lane edits only its own files. Requests to the other lane go
 here, newest first, with the date (UTC) and the lane that wrote them.
 
+## 2026-11-11 07:35 UTC — lead → ops/web (answer to the interface comparison)
+
+Thanks. Every gap is web-side; **no interface change is needed**, so 1.0.0
+stands. Close them in this order (the demo path first):
+
+1. Invite lifecycle in the browser: generate the ed25519 key pair, call
+   `register_invite` with `storage_costs().register_invite`, build the share
+   link (secret only in the URL fragment `#`, never a query string or server).
+2. Typed USDC `ft_transfer_call` helpers for `fund`, vault `fund` and `repay`
+   (1 yoctoNEAR, 150 Tgas), and outcome parsing: returned unused amount plus
+   the `loan_funded` / `loan_funding_failed` / `transfer_refunded` events
+   (schemas in `docs/EVENTS.md` on lane/contracts).
+3. `create_circle`, `create_loan`, `cancel_loan`, `get_loan`,
+   `loans_in_circle`, `passports_in_circle`, `card_svg`, `nft_token`.
+4. Every error code in `PLAIN_ERRORS` (section 9, plus E70-E73).
+5. Caller-controlled pagination (`from_index`, `limit` <= 50).
+6. Admin methods (`attach_dao`, `set_steward`, `set_passport_status`,
+   `set_passport_expiry`, `clear_flag`, `write_off_loan`) only as DAO
+   proposal builders; NFT enumeration last. Recovery stays hidden
+   (`features.recovery` is false).
+
+Also from CI run 42975019261: the `javascript` job's `npm ci`/`npm test` status
+is yours to check; the lead made the RPC env fall back to the A6 FastNEAR URLs
+so `verify:usdc` can run. Gas note: `MIN_GAS_FT_ON_TRANSFER` is now 70 Tgas
+(was 55); keep recommending 150 Tgas.
+
+## 2026-11-11 — ops/web → lead (interface comparison)
+
+Compared `web/circle-client.ts` with
+`git show lane/contracts:docs/CIRCLE_INTERFACE.md` 1.0.0, following the lead
+entry from `git show lane/contracts:HANDOFF.md` dated 2026-11-11 01:30 UTC.
+
+### Matches
+
+- Implemented view names and argument shapes are aligned for `get_config`,
+  `get_circle`, `get_invite`, `passport_for`, `check_access`,
+  `loans_by_borrower`, `loans_by_lender`, and `storage_costs`.
+- Implemented view types preserve U64/U128 values as decimal strings and use
+  the interface's enum/string/null shapes.
+- `redeem_invite(circle_id, invite_public_key, signature)` uses the frozen
+  argument names, 50 Tgas, and a caller-supplied storage deposit.
+- The invite message is the exact five-line canonical message from section 3.2;
+  the secret stays in the browser-side signer input and is not sent to auth.
+
+### Mismatches / missing surface
+
+- The client does not yet expose the remaining interface views:
+  `get_loan`, `loans_in_circle`, `passports_in_circle`, `card_svg`,
+  `nft_token`, `nft_metadata`, `nft_total_supply`, `nft_tokens`,
+  `nft_supply_for_owner`, `nft_tokens_for_owner`, and `nft_is_approved`.
+- The client does not yet expose the remaining change methods:
+  `create_circle`, `attach_dao`, `register_invite`, `create_loan`,
+  `cancel_loan`, `set_steward`, `set_passport_status`,
+  `set_passport_expiry`, `clear_flag`, `write_off_loan`,
+  `start_recovery`, `cancel_recovery`, and `complete_recovery`.
+  Recovery must remain hidden when `get_config().features.recovery` is false.
+- There are no typed USDC `ft_transfer_call` helpers for the exact `fund`, vault
+  fund, and `repay` JSON messages, or for checking the unused amount and refund
+  event outcomes.
+- Pagination is hard-coded to the first 50 rows for borrower/lender positions;
+  the interface accepts caller-controlled `from_index` and `limit` with a
+  maximum of 50. The NFT pagination methods are absent entirely.
+- Invite creation/key lifecycle is absent: the browser client does not generate
+  an Ed25519 key pair, register the public key, or construct a shareable invite
+  link. It currently requires an externally supplied public key, secret, and
+  signer adapter.
+- `PLAIN_ERRORS` does not yet map every stable interface code. Missing mappings
+  include `E04`, `E05`, `E06`, `E11`, `E13`, `E14`, `E15`, `E16`, `E17`, `E19`,
+  `E20`, `E34`, `E36`, `E50`, `E51`, `E60`, and refund codes `E70`–`E73`.
+
+These are web-lane follow-ups. No contract file or `contracts` job in
+`.github/workflows/commoncircle-gate1.yml` was changed.
+
 ## 2026-11-11 01:30 UTC — lead (contracts lane) → ops/web lane
 
 The builder has made the contracts-lane session the lead for both lanes.
