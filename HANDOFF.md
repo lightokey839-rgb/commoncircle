@@ -137,3 +137,22 @@ TypeScript checks pass. No contract file or `contracts` CI job was changed.
   title), and `card_svg` without a transaction.
 - Dependency binaries remain unavailable for local type/test execution; no
   contract file or `contracts` CI job changed.
+
+## 2026-11-11 — ops/web → lead (F4 relayer checkpoint)
+
+- Re-audited the existing relayer against the Gate 1 closed handoff. It checks
+  either a current, correctly named invite plus canonical standard-base64
+  Ed25519 signature or `check_access(...).allowed` for an active passport.
+- The receiver/method policy is explicit: `circle:redeem_invite`,
+  `vault:execute_repay|execute_auto_lend`, and `usdc:storage_deposit`. Unknown
+  receivers and methods are rejected before budget reservation.
+- BigInt UTC-day accounting enforces both per-account and total daily caps;
+  state resets on the next UTC day. Added coverage for expired/wrongly named
+  invites in addition to signature, allowlist, passport, cap, and rollover
+  tests. The relayer remains an authorization core with no private key or
+  transaction submission.
+- `npm install` was attempted with both the existing and a workspace-local
+  cache. The existing cache failed with Windows `EPERM`; the local-cache run
+  stalled and was stopped. `node_modules/.bin/tsc` and Vitest are still
+  unavailable, so local TypeScript/Vitest execution is pending CI. No contract
+  file or `contracts` CI job changed.

@@ -1,6 +1,6 @@
 import { generateKeyPairSync, sign } from 'node:crypto'
 import { describe, expect, it, vi } from 'vitest'
-import { RelayerGuard, RelayerError, type RelayerConfig, type RelayerReader } from '../server/relayer'
+import { RelayerGuard, type RelayerConfig, type RelayerReader } from '../server/relayer'
 
 const nowMs = 1_762_819_200_000
 const config: RelayerConfig = {
@@ -82,6 +82,14 @@ describe('relayer allowlist and daily caps', () => {
     const guard = new RelayerGuard(config, () => nowMs)
     const result = await guard.authorize({ accountId: 'member.testnet', circleId: '1', receiverId: config.receivers.usdc, methodName: 'storage_deposit', estimatedCost: '10' }, readerFor(null, true))
     expect(result.receiver).toBe('usdc')
+  })
+
+  it('does not treat an expired or wrongly named invite as redeem authorization', async () => {
+    const proof = inviteProof()
+    const wrongName = { ...proof.invite, invitee_id: 'carol.testnet' }
+    await expect(new RelayerGuard(config, () => nowMs).authorize(request(proof), readerFor(wrongName))).rejects.toMatchObject({ code: 'RELAYER_INVITE' })
+    const expired = { ...proof.invite, expires_at: (BigInt(nowMs) * 1_000_000n - 1n).toString() }
+    await expect(new RelayerGuard(config, () => nowMs).authorize(request(proof), readerFor(expired))).rejects.toMatchObject({ code: 'RELAYER_INVITE' })
   })
 
   it('rejects receivers and methods outside the explicit allowlist', async () => {
