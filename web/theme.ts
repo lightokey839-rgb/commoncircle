@@ -58,7 +58,7 @@ export async function encodeThemeEmblem(file: File): Promise<{ base64: string; m
 
   for (const quality of [0.88, 0.75, 0.62, 0.5, 0.35, 0.2]) {
     const blob = await canvasBlob(canvas, 'image/webp', quality)
-    if (blob && blob.size <= THEME_MAX_EMBLEM_BYTES) {
+    if (blob && blob.type === 'image/webp' && blob.size <= THEME_MAX_EMBLEM_BYTES) {
       return { base64: rawBytesToBase64(new Uint8Array(await blob.arrayBuffer())), mime: 'image/webp', bytes: blob.size }
     }
   }

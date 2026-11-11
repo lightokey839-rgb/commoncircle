@@ -25,6 +25,10 @@ export type CircleThemeView = {
   custom: boolean
 }
 
+export function passportTokenTitle(circleName: string): string {
+  return `${circleName} Passport`
+}
+
 export type CircleParams = {
   min_amount: U128
   member_max_amount: U128

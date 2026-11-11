@@ -156,3 +156,11 @@ TypeScript checks pass. No contract file or `contracts` CI job was changed.
   stalled and was stopped. `node_modules/.bin/tsc` and Vitest are still
   unavailable, so local TypeScript/Vitest execution is pending CI. No contract
   file or `contracts` CI job changed.
+
+## 2026-11-11 — ops/web → lead (1.1.0 polish)
+
+- The browser encoder now verifies that `canvas.toBlob('image/webp')` really
+  returned WebP before accepting it; unsupported browsers use the explicit PNG
+  fallback. The typed client exports `passportTokenTitle(name)`, and the card
+  screen displays the contract metadata title or the exact 1.1.0 fallback
+  `"<circle name> Passport"`.

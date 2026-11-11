@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CircleClient, type CircleParams, type FunctionCallAction, type NearWallet } from '../web/circle-client'
+import { CircleClient, passportTokenTitle, type CircleParams, type FunctionCallAction, type NearWallet } from '../web/circle-client'
 
 const params: CircleParams = {
   min_amount: '1000000',
@@ -17,6 +17,10 @@ const params: CircleParams = {
 }
 
 describe('CommonCircle interface 1.1.0 client', () => {
+  it('uses the circle-specific 1.1.0 passport title', () => {
+    expect(passportTokenTitle('The Dogs (DEMO)')).toBe('The Dogs (DEMO) Passport')
+  })
+
   it('passes the optional create theme and uses the 50 Tgas method budget', async () => {
     const calls: FunctionCallAction[] = []
     const wallet: NearWallet = {

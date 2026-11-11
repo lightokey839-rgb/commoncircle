@@ -1,4 +1,4 @@
-import { CircleClient, plainContractError, type CircleParams, type NearWallet } from './circle-client'
+import { CircleClient, passportTokenTitle, plainContractError, type CircleParams, type NearWallet } from './circle-client'
 import { signInWithNep413, type Nep413Wallet } from './nep413'
 import { buildInviteLink, generateInviteKeyPair, parseInviteLink, signInviteWithSecret } from './invite'
 import { loadReadOnlyDemo } from './demo'
@@ -187,12 +187,12 @@ async function loadMyCard(): Promise<void> {
   if (!/^\d+$/.test(circleId)) throw new Error('Enter a valid circle id.')
   const passport = await readClient.passportFor(circleId, accountId)
   if (!passport) throw new Error('No passport exists for this account in that circle.')
-  const [svg, token] = await Promise.all([readClient.cardSvg(passport.token_id), readClient.nftToken(passport.token_id)])
+  const [svg, token, circle] = await Promise.all([readClient.cardSvg(passport.token_id), readClient.nftToken(passport.token_id), readClient.getCircle(circleId)])
   if (!svg) throw new Error('The passport card is not available yet.')
   const image = $<HTMLImageElement>('#my-card-image')
   image.src = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }))
   image.hidden = false
-  $<HTMLElement>('#my-card-title').textContent = token?.metadata?.title ?? 'Passport card title unavailable.'
+  $<HTMLElement>('#my-card-title').textContent = token?.metadata?.title ?? (circle ? passportTokenTitle(circle.name) : 'Passport card title unavailable.')
   show('Passport card loaded from the read-only card_svg view.')
 }
 
