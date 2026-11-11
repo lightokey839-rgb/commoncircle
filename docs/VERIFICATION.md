@@ -259,7 +259,22 @@ the on-chain SVG data URI; decoded `testnet_passport_trusted.svg`). Rendering (c
 | Layout fix (tagline clear of stars and crown) | PASS | run `43042449897`, commit `3a4f386`: unit 49/49, F0 sandbox 13/13, sandbox on the reproducible wasm 13/13, contract README rows 9/9 (8 later-gate rows red as expected), gitleaks, npm/claims |
 | Card samples | generated | `docs/card-art/*.svg` from `card_samples_for_every_tier_and_state` (default member; Dogs theme member, trusted, trusted paused, steward, steward suspended), contact sheet `docs/card-art/v1.1.0_card_samples.png` (headless Chrome render) |
 | **Deploy artifact 1.1.0** | PASS | reproducible wasm of run `43042449897`: sha256 `a6657716eb49b87f8716a16ac9f15104d84270002f9eef73ed64c5de428ee174`, code hash `CCYR2EZ87by5MX65Ci1V49EVqhF93p8ymwFa6LeH9whm`; `contracts/circle/src` tree `5941c7fd00c5caf221ee413ce8d39a097249b170`. Supersedes the 1.0.0 artifact (`3tF3gb…JrB8`), which stays recorded as the code that ran the first testnet proof |
-| Testnet redeploy to 1.1.0 | NOT RUN | builder runs `deploy-testnet.sh` with `REDEPLOY=1` |
+| Testnet redeploy to 1.1.0 (in place, no init) | PASS | tx `2XexKj5twYfM3dTE48q52UThHGtmHu7hLZzksHP3UXXd` (SuccessValue, 28.4 Tgas); `view_account` code hash `CCYR2EZ87by5MX65Ci1V49EVqhF93p8ymwFa6LeH9whm`; `get_config` interface 1.1.0; circle 1 intact after redeploy (2 members, 1 loan, default theme); circle USDC 0. Script ended `VERIFY OK` |
+| F0 refund proof on 1.1.0, themed circle "The Dogs (DEMO)" | PASS (`PROOF OK`) | circle 2 `6HMswarctHsEgzTuJDW9LgnPaeUuGTg3nsVmLzQRQtiN` (`circle_theme_set`, emblem image/png 2676 bytes); invite `Bmp5JUDGY9fmGaSyjbQurGSkaVNKJ1En6fsuz3Aotw6w` / `G2HJQ9eoLyPqoDiinHGRScyzmjrWR2hZmZu5Gh8XUFoe`; loan 2 `3pgx79ZsYsaJcwL5LUQPvPpPNsWh3uFepYjgxGBtDUJG`; **failed forward refunded** `HZTwyVYhigBoUsambrdrTbYVZndWtqXZ8QNnnhhkJa5r` (inner failure in USDC, memo `refund`, lender 20000000 before and after, circle 0); register borrower2 `3c8Px7SUuxBnBo4dKeiwfUWx2j3wusSRuYRZBGC2MiGo`; fund `GjMCruQpw1Mv5p7nbtqjcEFum8F2p1Nu9tJnH6tcBDVd`; repay `8Qw6WzK2hYiFqoXE19yLHJnJ7kFr1nCxgHu1SnFK39Gu` (on time, `tier_changed` Member → Trusted). All re-checked FINAL over FastNEAR |
+| Card art 1.1.0 in a wallet | PASS | MyNearWallet (testnet) `nft-detail/commoncircle-light.testnet/2:commoncircle-light-borrower2.testnet` renders the full square card: "The Dogs (DEMO)" name tag, tagline, dog emblem, Trusted gold rings and stars, ON TIME 1 / LATE 0, ACTIVE, title "The Dogs (DEMO) Passport" (builder screenshot, 2026-11-11). Meteor rendered 1.0.0 earlier (cropped); 1.1.0 in Meteor: not yet re-checked |
+
+## Incident: testnet secret key exposed in chat (2026-11-11)
+
+`near account export-account <id> using-web-wallet` prints a MyNearWallet
+import URL whose fragment contains the account's **secret key**. The lead's
+instructions wrongly said the key would not appear. Running it for
+`commoncircle-light-borrower2.testnet` (testnet only, 1 test USDC and a
+passport) put that key in the session chat. Action: the builder rotates the
+key (add a new full-access key, delete
+`ed25519:51WoRhV345U75DX15vfJ7kK7FeKbxVHNX6fetoeVmfff`); the key value is not
+recorded anywhere in the repo. Rule from now on: never run
+`export-account` where its output is captured; use a wallet's own import or
+migration screen instead. Rotation status: PENDING.
 
 ## Evidence format
 

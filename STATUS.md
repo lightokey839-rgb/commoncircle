@@ -21,7 +21,11 @@ Status: CONTRACT FROZEN / ON TESTNET / F0 REFUND PROOF PASSED ON TESTNET / NOT Y
 - Interface 1.1.0 (square cards, per-circle themes: D-007, D-008) is the new
   deploy artifact: run `43042449897`, sha256 `a6657716…e174`, code hash
   `CCYR2EZ87by5MX65Ci1V49EVqhF93p8ymwFa6LeH9whm`, tests green on that exact file.
-  Testnet still runs 1.0.0 (`3tF3gb…JrB8`) until the in-place redeploy.
+  Testnet now runs 1.1.0 (redeployed in place; circle 1 intact). F0 refund proof
+  passed again on 1.1.0 in the themed circle "The Dogs (DEMO)", and the card
+  renders in MyNearWallet.
+- Open: rotate the exposed testnet key of `commoncircle-light-borrower2.testnet`
+  (see the incident in `docs/VERIFICATION.md`).
 - Recovery (F1) is cut for Gate 1: methods exist and always fail
   (`features.recovery = false`).
 
