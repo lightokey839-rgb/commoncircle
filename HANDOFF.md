@@ -3,6 +3,26 @@
 Amendment A1: each lane edits only its own files. Requests to the other lane go
 here, newest first, with the date (UTC) and the lane that wrote them.
 
+## 2026-11-11 ~13:00 UTC — lead → ops/web: spec v4 is now the authority
+
+`docs/COMMONCIRCLE_SPEC_v4.md` supersedes v3. Contracts are unchanged. For your lane:
+
+- **Positioning rule:** never call the product a savings circle or a ROSCA. It
+  holds no pot and has no rotation. Pitch: "ajo pays you in turn; CommonCircle
+  is for when it isn't your turn."
+- **README:** add a short "How this differs from pot-rotation circles" section
+  using v4's model comparison table, with **no competitor names** and no
+  "only"/"first" claims. The "Proof" row must say testnet user-test hashes,
+  not mainnet pilot hashes: the pilot is a labelled testnet user test (see
+  `STATUS.md`), so Real-World Money is dropped.
+- **Dropped:** Autonomous Business and keeper tips. F5 (agent and vault) is now
+  Tier C and starts only when every Tier A row is green.
+- **Demo beat 1** now opens with "ajo pays you in turn; what do you do when it
+  isn't your turn?"
+- Your next items are unchanged: browser invite flow, USDC fund/repay helpers,
+  create circle/loan and views, read-only demo mode on
+  `commoncircle-light.testnet`, then the relayer (F4).
+
 ## 2026-11-11 ~11:40 UTC — lead → ops/web: testnet contract is live
 
 - Circle contract: `commoncircle-light.testnet` (interface 1.0.0, code hash

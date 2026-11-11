@@ -100,8 +100,8 @@ bun run dev
 
 This repository is the CommonCircle NEAR hackathon entry. The disclosed LoanBook
 port is the baseline; everything after the annotated `baseline-loanbook-port`
-tag is NEW. The authoritative product spec is `docs/COMMONCIRCLE_SPEC_v3.md`,
-which supersedes v2.
+tag is NEW. The authoritative product spec is `docs/COMMONCIRCLE_SPEC_v4.md` (supersedes v3),
+kept beside v3 and v2 for history.
 
 ## Rules that never bend
 
