@@ -49,3 +49,21 @@ entry from `git show lane/contracts:HANDOFF.md` dated 2026-11-11 01:30 UTC.
 
 These are web-lane follow-ups. No contract file or `contracts` job in
 `.github/workflows/commoncircle-gate1.yml` was changed.
+
+## 2026-11-11 — ops/web → lead (ordered web build)
+
+- `faa500c` — browser invite lifecycle: WebCrypto Ed25519 key generation,
+  `register_invite` with measured storage deposit, fragment-only secret links,
+  local canonical-message signing, and invite-link hydration.
+- `d736998` — USDC `ft_transfer_call` helpers for lender fund, vault fund, and
+  repay, using 1 yoctoNEAR and 150 Tgas; parses unused amounts and the
+  `loan_funded`, `loan_funding_failed`, `loan_repayment`, `loan_repaid`,
+  `loan_repayment_failed`, and `transfer_refunded` events.
+- `5d6866e` — circle/loan creation and cancellation helpers, all core loan,
+  passport, card SVG, and NEP-171 views, plus caller-controlled pagination.
+- `c91687d` — wallet-free read-only demo against
+  `commoncircle-light.testnet` via `https://test.rpc.fastnear.com`. Live
+  `get_config` returned interface `1.0.0`, 70 Tgas minimum, and recovery false;
+  `get_circle("1")` returned null because no circle exists yet.
+
+TypeScript checks pass. No contract file or `contracts` CI job was changed.
