@@ -215,6 +215,38 @@ Sandbox suite on that run: unit 40/40, F0 sandbox 12/12, contract README rows
 9/9. Gas is from the sandbox runtime; the testnet proof run will add on-chain
 figures.
 
+## Gate 1 — F0 refund proof on testnet (2026-11-11, run by the builder)
+
+Command: `contracts/scripts/testnet-proof.sh setup` then `run`, contract
+`commoncircle-light.testnet` (code hash `3tF3gb…JrB8`), real Circle testnet USDC
+from faucet.circle.com (20 USDC to the lender). Output ended `PROOF OK`. The
+contracts lane re-checked every transaction over FastNEAR (`tx`,
+`wait_until: FINAL`): all `SuccessValue`.
+
+| Step | Transaction | Result |
+| --- | --- | --- |
+| Create lender / borrower accounts (faucet) | `76XbRwp3SRHWt4aMQTMrW1Afowg5MyW5FnD8fzBZ9spb`, `JChKK37VozGgdawJ6EtiSk9BUuJ6UVLrqFCs9QP933Z2` | SuccessValue |
+| Register lender with USDC (borrower left unregistered) | `rPqNXf4HMVN2YgTTayys6ZaezQRMdjwSGtbKALV6caf` | SuccessValue |
+| Lender creates DEMO circle 1 (60 s days, N=1) | `6PwNu7dfT4ZujncoiTzZseGhSTjhageK9XJaDEAb3eU3` | `circle_created`, founder passport minted |
+| Named invite registered / redeemed by the borrower | `GkWBK471ew1gQGXTNRHyYvJzWBTteUsPpcWhAhCD5kuu` / `9qq8KVMmwLU8eHqVpgHje1EuHFxvwwWuM58jJagm8qi` | `invite_registered`, `nft_mint`, `invite_redeemed` (ed25519 signature verified on chain) |
+| Borrower creates loan 1 (1 USDC, 1 day) | `2ihs24UettsERCFG2nBZqqZwnu6iAkp3rMg54kAXN5Eb` | `loan_created` |
+| **Refund proof:** fund while borrower is unregistered | `gxciUUtWipGGiwa1pHyxLKM5Ynj9Cg1AFbpqwKoJT7g` | inner `ft_transfer` to borrower failed (receipt failure in the USDC contract), `loan_funding_failed`, nep141 `ft_transfer` circle → lender 1000000 memo `refund`. Lender 20000000 before and after; circle USDC 0; loan Open |
+| Borrower registers with USDC | `2RpSNHBMbAXxpN1cjskeNeiRtRFGD9KzRm7EAeQfYUfd` | SuccessValue |
+| Lender funds | `DRrESKc8apQbETKAyb7SirGGSdthR4q5Ej7bTvvY7sTP` | `loan_funded`, borrower +1000000, circle USDC 0 |
+| Borrower repays in full | `GPaN26CgZqDGSQqTF2TnmYyGmEmdR3qGMsYmSbw548Nn` | `loan_repaid` on_time true, qualifying true; `tier_changed` Member → Trusted |
+| Views after | `get_loan(1)`: Repaid, on time; `passport_for`: Trusted, on_time_count 1; circle USDC 0; lender 20000000 | PASS |
+
+On-chain gas (testnet receipts): `ft_on_transfer` 2.90 Tgas (fund), 2.74 Tgas
+(repay); `on_fund_forwarded` 2.02 Tgas (ok), 1.92 Tgas (failed forward);
+`on_repay_forwarded` with tier flip 2.53 Tgas. All far inside the 25 Tgas
+callback reserve and 30 Tgas own budget.
+
+Card art on chain: `nft_token("1:commoncircle-light-borrower.testnet")` at
+block 277222326 saved as `docs/card-art/testnet_token_trusted.json` (media is
+the on-chain SVG data URI; decoded `testnet_passport_trusted.svg`). Rendering
+in two wallets or explorers: NOT yet checked (NearBlocks shows a bot check to
+the automated browser; the builder checks it).
+
 ## Evidence format
 
 `evidence/evidence.json` uses the A9 schema. The document has

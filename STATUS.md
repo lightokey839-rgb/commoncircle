@@ -8,7 +8,7 @@ Ship Sat 14 Nov 17:59. This replaces amendment A11's Gate 2/3 times.
 
 ## Gate 1 — contracts (lead), updated 2026-11-11 ~09:15 UTC
 
-Status: CONTRACT FROZEN / DEPLOYED ON TESTNET (commoncircle-light.testnet) / NOT CLAIMABLE
+Status: CONTRACT FROZEN / ON TESTNET / F0 REFUND PROOF PASSED ON TESTNET / NOT YET CLAIMED (Tier A rows go into evidence.json at Gate 2)
 
 - Branch `lane/contracts` (integration; includes `lane/web` up to `b6449bb`),
   pushed only to the PRIVATE repo `lightokey839-rgb/commoncircle` (A10).
@@ -29,11 +29,13 @@ Status: CONTRACT FROZEN / DEPLOYED ON TESTNET (commoncircle-light.testnet) / NOT
   (= tested artifact), vault pinned to `vault.commoncircle-light.testnet`,
   registered with testnet USDC, holds 0 USDC. Tx hashes in `docs/VERIFICATION.md`.
 
+- Testnet refund proof: PASSED (`docs/VERIFICATION.md`, "F0 refund proof on
+  testnet"): failed forward refunded the lender in full, then fund, repay and a
+  Member → Trusted tier flip, circle USDC 0 throughout.
+
 Builder actions needed:
-1. Testnet refund proof: get testnet USDC (Circle faucet, NEAR Testnet) for
-   two test accounts, then run the fund/repay and failed-forward script the
-   lead provides.
-2. Open the passport card in two NEAR wallets or explorers once one exists.
+1. Card art: open passport `1:commoncircle-light-borrower.testnet` in two
+   explorers or wallets and say whether the image renders.
 3. Mainnet deploy kit (1G) is the ops/web lane; if mainnet is not deployed by
    Thu 12 Nov 11:59 UTC, the pilot becomes a labelled testnet user test.
 
@@ -42,8 +44,8 @@ mainnet deploy (contract storage alone is about 3.6 NEAR) plus participant USDC.
 The pilot is planned as a labelled TESTNET user test and the Real-World Money
 row is dropped, unless mainnet funding appears before Thu 12 Nov 11:59 UTC.
 
-Open items: F0 refund proof on testnet (faucet rate-limited until about
-14:15 UTC), card art in two wallets. Callback gas: measured, well inside budget.
+Open items: card art in two wallets/explorers. Callback gas: measured in the
+sandbox and on testnet, well inside budget.
 
 Updated: 2026-11-11 (Africa/Lagos)
 

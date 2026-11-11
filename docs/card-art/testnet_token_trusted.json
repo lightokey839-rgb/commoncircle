@@ -1,0 +1,23 @@
+{
+  "block_height": 277222326,
+  "block_hash": "6eyDZVFg5K3LaiioNk1W3JDY1bgJyuegvoZ42apVAoic",
+  "token": {
+    "token_id": "1:commoncircle-light-borrower.testnet",
+    "owner_id": "commoncircle-light-borrower.testnet",
+    "metadata": {
+      "title": "CommonCircle Passport #1",
+      "description": "Non-transferable CommonCircle membership passport. Tier: Trusted. Status: active.",
+      "media": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIiB2aWV3Qm94PSIwIDAgNDAwIDMwMCI+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSIzMDAiIHJ4PSIyNCIgZmlsbD0iIzJhNmY0ZSIvPjxjaXJjbGUgY3g9IjIwMCIgY3k9IjE1MCIgcj0iNDYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2YxYzQ1MyIgc3Ryb2tlLXdpZHRoPSI2Ii8+PGNpcmNsZSBjeD0iMjAwIiBjeT0iMTUwIiByPSI2MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZjFjNDUzIiBzdHJva2Utd2lkdGg9IjYiLz48dGV4dCB4PSIyNCIgeT0iNDAiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIGZvbnQtc2l6ZT0iMTYiIGZpbGw9IiNmMWM0NTMiPkNPTU1PTkNJUkNMRSAjMTwvdGV4dD48dGV4dCB4PSIyMDAiIHk9IjE1OCIgZm9udC1mYW1pbHk9Im1vbm9zcGFjZSIgZm9udC1zaXplPSIyMiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZmZmZiI+VFJVU1RFRDwvdGV4dD48dGV4dCB4PSIyNCIgeT0iMjM2IiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiBmb250LXNpemU9IjE0IiBmaWxsPSIjZmZmZmZmIj5PTiBUSU1FIDEgLyBMQVRFIDA8L3RleHQ+PHRleHQgeD0iMzc2IiB5PSIyMzYiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIGZvbnQtc2l6ZT0iMTQiIHRleHQtYW5jaG9yPSJlbmQiIGZpbGw9IiNmMWM0NTMiPkFDVElWRTwvdGV4dD48L3N2Zz4=",
+      "media_hash": null,
+      "copies": 1,
+      "issued_at": "1794403978016",
+      "expires_at": null,
+      "starts_at": null,
+      "updated_at": null,
+      "extra": null,
+      "reference": null,
+      "reference_hash": null
+    },
+    "approved_account_ids": {}
+  }
+}
