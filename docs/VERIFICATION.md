@@ -251,6 +251,16 @@ the on-chain SVG data URI; decoded `testnet_passport_trusted.svg`). Rendering (c
 | MyNearWallet (testnet, "limited mode" since 1 Nov) | FAIL: Collectibles tab empty for the borrower account, although Kitwallet `likelyNFTs` lists `commoncircle-light.testnet` and `nft_tokens_for_owner` returns the token. Wallet-side |
 | NearBlocks testnet token page | not yet checked (bot check blocks the automated browser) |
 
+## Interface 1.1.0 — square themed passport cards (D-007, D-008)
+
+| Check | Status | Evidence |
+| --- | --- | --- |
+| First compile, all CI jobs | PASS | run `43040890913`, commit `980ad1a`: unit 49/49, sandbox 13/13 (adds `themed_circle_passport_art_in_sandbox`), contract README rows 9/9, also on the reproducible wasm |
+| Layout fix (tagline clear of stars and crown) | PASS | run `43042449897`, commit `3a4f386`: unit 49/49, F0 sandbox 13/13, sandbox on the reproducible wasm 13/13, contract README rows 9/9 (8 later-gate rows red as expected), gitleaks, npm/claims |
+| Card samples | generated | `docs/card-art/*.svg` from `card_samples_for_every_tier_and_state` (default member; Dogs theme member, trusted, trusted paused, steward, steward suspended), contact sheet `docs/card-art/v1.1.0_card_samples.png` (headless Chrome render) |
+| **Deploy artifact 1.1.0** | PASS | reproducible wasm of run `43042449897`: sha256 `a6657716eb49b87f8716a16ac9f15104d84270002f9eef73ed64c5de428ee174`, code hash `CCYR2EZ87by5MX65Ci1V49EVqhF93p8ymwFa6LeH9whm`; `contracts/circle/src` tree `5941c7fd00c5caf221ee413ce8d39a097249b170`. Supersedes the 1.0.0 artifact (`3tF3gb…JrB8`), which stays recorded as the code that ran the first testnet proof |
+| Testnet redeploy to 1.1.0 | NOT RUN | builder runs `deploy-testnet.sh` with `REDEPLOY=1` |
+
 ## Evidence format
 
 `evidence/evidence.json` uses the A9 schema. The document has

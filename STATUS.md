@@ -18,10 +18,10 @@ Status: CONTRACT FROZEN / ON TESTNET / F0 REFUND PROOF PASSED ON TESTNET / NOT Y
 - Green in CI: unit 40/40, F0 sandbox 11/11 (refund proofs; circle holds zero
   USDC after every scenario), all 9 contract README rows, gitleaks full
   history, npm/claims, USDC metadata on both networks.
-- Frozen source tree `227e4b9d` (since `913998e`). Deploy artifact: reproducible
-  wasm from run `42984600861`, sha256 `2ad7e094…0e37`, code hash
-  `3tF3gbHWdjhoSfMe2KDHrP7TSCEPAXNZh8dm9q97JrB8`, refund proofs passed on that
-  exact file (details in `docs/VERIFICATION.md`).
+- Interface 1.1.0 (square cards, per-circle themes: D-007, D-008) is the new
+  deploy artifact: run `43042449897`, sha256 `a6657716…e174`, code hash
+  `CCYR2EZ87by5MX65Ci1V49EVqhF93p8ymwFa6LeH9whm`, tests green on that exact file.
+  Testnet still runs 1.0.0 (`3tF3gb…JrB8`) until the in-place redeploy.
 - Recovery (F1) is cut for Gate 1: methods exist and always fail
   (`features.recovery = false`).
 

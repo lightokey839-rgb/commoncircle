@@ -118,6 +118,14 @@ corresponding behavior is shipped.
 
 ## Contract freeze notice (Gate 1 phase 1E)
 
+**Current (interface 1.1.0, recorded 2026-11-11 ~16:00 UTC):** frozen source
+`contracts/circle/src` tree `5941c7fd00c5caf221ee413ce8d39a097249b170` (commit `3a4f386`); deploy artifact =
+reproducible wasm of CI run `43042449897`, sha256
+`a6657716eb49b87f8716a16ac9f15104d84270002f9eef73ed64c5de428ee174`, code hash
+`CCYR2EZ87by5MX65Ci1V49EVqhF93p8ymwFa6LeH9whm`, tested in the same job. The
+1.0.0 entry below is kept as history (it ran the first testnet proof).
+
+
 - Frozen source: `contracts/circle/src` git tree `227e4b9dc155fc7a93dffc7df4f9e90e0e538d55`
   (first at commit `913998e` on `lane/contracts`).
 - Deploy artifact: reproducible wasm from CI run `42984600861` (commit `0c4b4f4`,
