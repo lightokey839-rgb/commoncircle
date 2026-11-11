@@ -317,7 +317,15 @@ export function parseFtTransferCallOutcome(outcome: unknown): FtTransferCallOutc
 }
 
 export class CircleClient {
-  constructor(readonly rpcUrl: string, readonly contractId: string, readonly wallet?: NearWallet) {}
+  readonly rpcUrl: string
+  readonly contractId: string
+  readonly wallet?: NearWallet
+
+  constructor(rpcUrl: string, contractId: string, wallet?: NearWallet) {
+    this.rpcUrl = rpcUrl
+    this.contractId = contractId
+    this.wallet = wallet
+  }
 
   async view<T>(methodName: string, args: Record<string, unknown> = {}): Promise<T> {
     const encoded = encodeBase64(new TextEncoder().encode(JSON.stringify(args)))

@@ -164,3 +164,7 @@ TypeScript checks pass. No contract file or `contracts` CI job was changed.
   fallback. The typed client exports `passportTokenTitle(name)`, and the card
   screen displays the contract metadata title or the exact 1.1.0 fallback
   `"<circle name> Passport"`.
+- Replaced the client constructor's TypeScript parameter properties with
+  explicit fields so Node 24's strip-only runtime can load the client and
+  relayer smoke paths without a transpiler. Direct source smoke checks now pass
+  for invite signing, the passport title, and a valid relayer reservation.
