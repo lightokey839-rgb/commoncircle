@@ -82,7 +82,7 @@ fn setup() -> (Contract, Env) {
     e.call(CIRCLE, NearToken::from_yoctonear(0));
     let mut c = Contract::new(acc(USDC), acc(VAULT), U128(50_000_000), floors_zero());
     e.call("founder.near", big());
-    let cid = c.create_circle("Pilot".into(), params());
+    let cid = c.create_circle("Pilot".into(), params(), None);
     assert_eq!(cid.0, 1);
     (c, e)
 }
@@ -165,7 +165,7 @@ fn day_length_below_mainnet_floor_is_rejected() {
     f.day_length_sec = U64(86_400);
     let mut c = Contract::new(acc(USDC), acc(VAULT), U128(50_000_000), f);
     e.call("founder.near", big());
-    c.create_circle("x".into(), params()); // DAY = 10 s < 86400
+    c.create_circle("x".into(), params(), None); // DAY = 10 s < 86400
 }
 
 #[test]
@@ -177,7 +177,7 @@ fn circle_cap_above_hard_cap_is_rejected() {
     let mut p = params();
     p.trusted_max_amount = U128(50_000_001);
     e.call("founder.near", big());
-    c.create_circle("x".into(), p);
+    c.create_circle("x".into(), p, None);
 }
 
 #[test]
@@ -188,7 +188,7 @@ fn min_distinct_lenders_is_clamped_to_threshold() {
     let mut p = params();
     p.min_distinct_lenders = 2; // pilot N = 1
     e.call("founder.near", big());
-    c.create_circle("x".into(), p);
+    c.create_circle("x".into(), p, None);
     assert_eq!(c.get_circle(U64(1)).unwrap().params.min_distinct_lenders, 1);
 }
 
@@ -633,4 +633,172 @@ fn recovery_is_disabled() {
     let (mut c, e) = setup();
     e.call("founder.near", NearToken::from_yoctonear(1));
     c.start_recovery(U64(1), acc("new.near"));
+}
+
+// ------------------------------------------------------------ circle themes (1.1.0)
+
+const DOG_PNG: &[u8] = include_bytes!("../tests/fixtures/dog_emblem.png");
+
+fn dog_theme() -> CircleThemeInput {
+    CircleThemeInput {
+        tagline: Some("Good dogs pay back".into()),
+        background: Some("#2B2D42".into()),
+        accent: Some("#FFB703".into()),
+        text: Some("#FFFFFF".into()),
+        pattern: Some(CardPattern::Waves),
+        emblem: Some(Base64VecU8(DOG_PNG.to_vec())),
+    }
+}
+
+fn save_sample(name: &str, svg: &str) {
+    if let Ok(dir) = std::env::var("ARTIFACT_DIR") {
+        let _ = std::fs::create_dir_all(format!("{}/card-samples", dir));
+        let _ = std::fs::write(format!("{}/card-samples/{}", dir, name), svg);
+    }
+}
+
+fn themed() -> (Contract, Env) {
+    let e = Env { now_ns: 1_000 * SEC };
+    e.call(CIRCLE, NearToken::from_yoctonear(0));
+    let mut c = Contract::new(acc(USDC), acc(VAULT), U128(50_000_000), floors_zero());
+    e.call("founder.near", big());
+    c.create_circle("The Dogs".into(), params(), Some(dog_theme()));
+    (c, e)
+}
+
+#[test]
+fn themed_card_has_name_tag_tagline_colours_and_emblem() {
+    let (c, _e) = themed();
+    let svg = c.card_svg("1:founder.near".into()).unwrap();
+    assert!(svg.contains("viewBox=\"0 0 512 512\""), "square card");
+    assert!(svg.contains(">The Dogs<"));
+    assert!(svg.contains(">Good dogs pay back<"));
+    assert!(svg.contains("#FFB703"));
+    assert!(svg.contains("href=\"data:image/png;base64,"));
+    assert!(!svg.contains("founder"), "no member data in the art");
+    let v = c.get_circle(U64(1)).unwrap().theme;
+    assert!(v.custom);
+    assert_eq!(v.emblem_mime.as_deref(), Some("image/png"));
+    assert_eq!(v.emblem_bytes as usize, DOG_PNG.len());
+    save_sample("themed_member.svg", &svg);
+    let t = c.nft_token("1:founder.near".into()).unwrap();
+    assert_eq!(t.metadata.unwrap().title.as_deref(), Some("The Dogs Passport"));
+}
+
+#[test]
+fn card_samples_for_every_tier_and_state() {
+    // Default theme member, plus themed Member / Trusted / Steward / paused /
+    // suspended, written to $ARTIFACT_DIR/card-samples for review.
+    let (mut c, mut e) = with_loan();
+    save_sample("default_member.svg", &c.card_svg("1:bob.near".into()).unwrap());
+    e.call("founder.near", big());
+    c.set_circle_theme(U64(1), dog_theme());
+    save_sample("themed_member_bob.svg", &c.card_svg("1:bob.near".into()).unwrap());
+    fund_ok(&mut c, &e);
+    e.call(USDC, NearToken::from_yoctonear(0));
+    c.ft_on_transfer(acc("bob.near"), U128(10_000_000), repay_msg(1));
+    e.callback(PromiseResult::Successful(vec![]));
+    c.on_repay_forwarded(U64(1), U128(10_000_000), U128(10_000_000));
+    let trusted = c.card_svg("1:bob.near".into()).unwrap();
+    assert!(trusted.contains(">TRUSTED<"));
+    save_sample("themed_trusted.svg", &trusted);
+    // overdue -> paused
+    e.call("bob.near", big());
+    c.create_loan(U64(1), acc("carol.near"), U128(30_000_000), 1);
+    e.call(USDC, NearToken::from_yoctonear(0));
+    c.ft_on_transfer(acc("carol.near"), U128(30_000_000), fund_msg(2));
+    e.callback(PromiseResult::Successful(vec![]));
+    c.on_fund_forwarded(U64(2), U128(30_000_000));
+    e.now_ns += 2 * DAY * SEC;
+    e.call("bob.near", big());
+    let paused = c.card_svg("1:bob.near".into()).unwrap();
+    assert!(paused.contains("PERKS PAUSED"));
+    save_sample("themed_trusted_paused.svg", &paused);
+    // steward and suspended
+    e.call("founder.near", NearToken::from_yoctonear(1));
+    c.set_steward(U64(1), acc("carol.near"), true);
+    let steward = c.card_svg("1:carol.near".into()).unwrap();
+    assert!(steward.contains(">STEWARD<"));
+    save_sample("themed_steward.svg", &steward);
+    e.call("founder.near", NearToken::from_yoctonear(1));
+    c.set_passport_status(U64(1), acc("carol.near"), PassportStatus::Suspended);
+    let suspended = c.card_svg("1:carol.near".into()).unwrap();
+    assert!(suspended.contains("url(#mono)") && suspended.contains(">SUSPENDED<"));
+    save_sample("themed_steward_suspended.svg", &suspended);
+    assert_ne!(trusted, steward);
+}
+
+#[test]
+fn circle_name_and_tagline_are_xml_escaped() {
+    let e = Env { now_ns: SEC };
+    e.call(CIRCLE, NearToken::from_yoctonear(0));
+    let mut c = Contract::new(acc(USDC), acc(VAULT), U128(50_000_000), floors_zero());
+    e.call("founder.near", big());
+    let mut t = CircleThemeInput::default();
+    t.tagline = Some("\"a\" & 'b' </text>".into());
+    c.create_circle("<script>x</script>".into(), params(), Some(t));
+    let svg = c.card_svg("1:founder.near".into()).unwrap();
+    assert!(!svg.contains("<script>"));
+    assert!(svg.contains("&lt;script&gt;x&lt;/script&gt;"));
+    assert!(svg.contains("&quot;a&quot; &amp; &apos;b&apos; &lt;/text&gt;"));
+}
+
+#[test]
+#[should_panic(expected = "E04_BAD_PARAMS")]
+fn bad_colour_is_rejected() {
+    let (mut c, e) = setup();
+    let mut t = CircleThemeInput::default();
+    t.accent = Some("red".into());
+    e.call("founder.near", big());
+    c.set_circle_theme(U64(1), t);
+}
+
+#[test]
+#[should_panic(expected = "E04_BAD_PARAMS")]
+fn svg_emblem_is_rejected() {
+    let (mut c, e) = setup();
+    let mut t = CircleThemeInput::default();
+    t.emblem = Some(Base64VecU8(b"<svg xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script></svg>".to_vec()));
+    e.call("founder.near", big());
+    c.set_circle_theme(U64(1), t);
+}
+
+#[test]
+#[should_panic(expected = "E04_BAD_PARAMS")]
+fn oversize_emblem_is_rejected() {
+    let (mut c, e) = setup();
+    let mut big_png = DOG_PNG.to_vec();
+    big_png.resize(themes::MAX_EMBLEM_BYTES + 1, 0);
+    let mut t = CircleThemeInput::default();
+    t.emblem = Some(Base64VecU8(big_png));
+    e.call("founder.near", big());
+    c.set_circle_theme(U64(1), t);
+}
+
+#[test]
+#[should_panic(expected = "E05_NOT_ADMIN")]
+fn only_the_admin_can_set_the_theme() {
+    let (mut c, e) = setup();
+    join(&mut c, &e, "founder.near", "bob.near", 1);
+    e.call("bob.near", big());
+    c.set_circle_theme(U64(1), dog_theme());
+}
+
+#[test]
+fn dao_sets_the_theme_after_attach() {
+    let (mut c, e) = setup();
+    e.call("founder.near", NearToken::from_yoctonear(1));
+    c.attach_dao(U64(1), acc("dao.near"));
+    e.call("dao.near", big());
+    c.set_circle_theme(U64(1), dog_theme());
+    assert!(c.get_circle(U64(1)).unwrap().theme.custom);
+}
+
+#[test]
+fn default_theme_is_reported_when_none_is_set() {
+    let (c, _e) = setup();
+    let v = c.get_circle(U64(1)).unwrap().theme;
+    assert!(!v.custom);
+    assert_eq!(v.background, "#1D3557");
+    assert_eq!(v.emblem_bytes, 0);
 }

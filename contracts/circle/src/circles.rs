@@ -11,7 +11,7 @@ impl Contract {
     /// Create a circle. The caller becomes founder and admin and receives a
     /// Member passport. Caller pays storage (excess refunded).
     #[payable]
-    pub fn create_circle(&mut self, name: String, params: CircleParams) -> U64 {
+    pub fn create_circle(&mut self, name: String, params: CircleParams, theme: Option<CircleThemeInput>) -> U64 {
         let initial = env::storage_usage();
         let founder = env::predecessor_account_id();
         let params = self.validate_params(&name, params);
@@ -36,6 +36,9 @@ impl Contract {
                 "params": params,
             }),
         );
+        if let Some(t) = theme {
+            self.apply_theme(circle_id, t);
+        }
         let tid = self.mint_passport(circle_id, &founder, None);
         events::emit(
             "invite_redeemed",

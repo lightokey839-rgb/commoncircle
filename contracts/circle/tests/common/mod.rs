@@ -192,7 +192,7 @@ pub fn invite_signature(sk: &SigningKey, contract: &AccountId, circle_id: u64, c
 }
 
 /// Tiny standard base64 encoder so tests do not need another crate.
-mod base64_engine {
+pub mod base64_engine {
     const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     pub fn encode(input: &[u8]) -> String {
         let mut out = String::new();

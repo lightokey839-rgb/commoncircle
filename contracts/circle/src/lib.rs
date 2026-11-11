@@ -20,6 +20,7 @@ pub mod art;
 mod circles;
 pub mod events;
 mod invites;
+pub mod themes;
 mod loans;
 pub mod types;
 mod views;
@@ -29,7 +30,7 @@ mod tests;
 
 pub use types::*;
 
-pub const INTERFACE_VERSION: &str = "1.0.0";
+pub const INTERFACE_VERSION: &str = "1.1.0";
 pub const MAX_PAGE: u32 = 50;
 pub const NS_PER_SEC: u64 = 1_000_000_000;
 pub const ONE_YOCTO: NearToken = NearToken::from_yoctonear(1);
@@ -56,6 +57,8 @@ pub const CIRCLE_STORAGE_BOUND_BYTES: u64 = 2_000;
 pub const INVITE_STORAGE_BOUND_BYTES: u64 = 400;
 pub const PASSPORT_STORAGE_BOUND_BYTES: u64 = 900;
 pub const LOAN_STORAGE_BOUND_BYTES: u64 = 1_200;
+/// Upper bound for one stored theme (12 KiB emblem + colours, tagline, key).
+pub const THEME_STORAGE_BOUND_BYTES: u64 = 12_800;
 
 /// Bounds that keep per-passport vectors small.
 pub const MAX_TRUSTED_THRESHOLD: u32 = 50;

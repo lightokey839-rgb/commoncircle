@@ -326,3 +326,57 @@ async fn gas_measurements_fit_reserved_budgets() -> Result<()> {
     assert_circle_holds_zero(&w).await?;
     assert_circle_holds_zero(&w2).await
 }
+
+/// Interface 1.1.0: a founder-styled circle ("The Dogs") on a real runtime.
+#[tokio::test]
+async fn themed_circle_passport_art_in_sandbox() -> Result<()> {
+    let w = world().await?;
+    let dog = std::fs::read("tests/fixtures/dog_emblem.png")?;
+    let cost: serde_json::Value = w.circle.view("storage_costs").await?.json()?;
+    let deposit: u128 = cost["create_circle"].as_str().unwrap().parse()?;
+    w.carol
+        .call(w.circle.id(), "create_circle")
+        .args_json(json!({
+            "name": "The Dogs",
+            "params": params(),
+            "theme": {
+                "tagline": "Good dogs pay back",
+                "background": "#2B2D42",
+                "accent": "#FFB703",
+                "text": "#FFFFFF",
+                "pattern": "Waves",
+                "emblem": common::base64_engine::encode(&dog)
+            }
+        }))
+        .deposit(NearToken::from_yoctonear(deposit))
+        .max_gas()
+        .transact()
+        .await?
+        .into_result()?;
+    let c: serde_json::Value = w.circle.view("get_circle").args_json(json!({ "circle_id": "2" })).await?.json()?;
+    assert_eq!(c["name"], "The Dogs");
+    assert_eq!(c["theme"]["custom"], true);
+    assert_eq!(c["theme"]["emblem_mime"], "image/png");
+    assert_eq!(c["theme"]["accent"], "#FFB703");
+    let tid = format!("2:{}", w.carol.id());
+    let t: serde_json::Value = w.circle.view("nft_token").args_json(json!({ "token_id": tid })).await?.json()?;
+    assert_eq!(t["metadata"]["title"], "The Dogs Passport");
+    let media = t["metadata"]["media"].as_str().unwrap_or_default().to_string();
+    assert!(media.starts_with("data:image/svg+xml;base64,"));
+    save_artifact("token_uri_the_dogs_member.txt", &media);
+
+    // Only the admin (here: the founder, carol) may restyle the circle.
+    let r = w
+        .bob
+        .call(w.circle.id(), "set_circle_theme")
+        .args_json(json!({ "circle_id": "2", "theme": { "accent": "#000000" } }))
+        .deposit(NearToken::from_millinear(200))
+        .max_gas()
+        .transact()
+        .await?;
+    assert!(failed_with(r, "E05_NOT_ADMIN"));
+    // Circle 1 (created without a theme) keeps the default look.
+    let c1: serde_json::Value = w.circle.view("get_circle").args_json(json!({ "circle_id": "1" })).await?.json()?;
+    assert_eq!(c1["theme"]["custom"], false);
+    assert_circle_holds_zero(&w).await
+}

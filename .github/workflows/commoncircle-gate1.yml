@@ -40,6 +40,8 @@ jobs:
           set -o pipefail
           ./scripts/build-wasm.sh 2>&1 | tee ../artifacts/wasm-build.log
       - name: Unit tests
+        env:
+          ARTIFACT_DIR: ${{ github.workspace }}/artifacts
         run: |
           set -o pipefail
           cargo test --workspace --lib --no-fail-fast 2>&1 | tee ../artifacts/unit-tests.log

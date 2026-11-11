@@ -27,7 +27,8 @@ impl Contract {
     pub fn storage_costs(&self) -> StorageCostsView {
         let byte = env::storage_byte_cost().as_yoctonear();
         StorageCostsView {
-            create_circle: U128(byte * (CIRCLE_STORAGE_BOUND_BYTES + PASSPORT_STORAGE_BOUND_BYTES) as u128),
+            create_circle: U128(byte * (CIRCLE_STORAGE_BOUND_BYTES + PASSPORT_STORAGE_BOUND_BYTES + THEME_STORAGE_BOUND_BYTES) as u128),
+            set_circle_theme: U128(byte * THEME_STORAGE_BOUND_BYTES as u128),
             register_invite: U128(byte * INVITE_STORAGE_BOUND_BYTES as u128),
             redeem_invite: U128(byte * PASSPORT_STORAGE_BOUND_BYTES as u128),
             create_loan: U128(byte * (LOAN_STORAGE_BOUND_BYTES + LOAN_GROWTH_RESERVE_BYTES) as u128),
@@ -52,6 +53,7 @@ impl Contract {
             steward_count: stewards,
             loan_count: c.loan_count,
             treasury_lending_enabled: c.treasury_id.is_some() && stewards >= 2,
+            theme: crate::themes::theme_view(crate::themes::load_theme(cid).as_ref()),
         })
     }
 
@@ -303,6 +305,8 @@ impl Contract {
         let overdue = self.overdue_count(p, t);
         CardInput {
             circle_id: cid,
+            circle_name: self.try_circle(cid).map(|c| c.name.clone()).unwrap_or_default(),
+            theme: crate::themes::load_theme(cid).unwrap_or_default(),
             tier: display_tier(p),
             status: Self::effective_status(p, t),
             on_time: p.on_time,
@@ -357,10 +361,10 @@ impl Contract {
             token_id: token_id(cid, owner),
             owner_id: owner.clone(),
             metadata: Some(TokenMetadata {
-                title: Some(format!("CommonCircle Passport #{}", cid)),
+                title: Some(format!("{} Passport", input.circle_name)),
                 description: Some(format!(
-                    "Non-transferable CommonCircle membership passport. Tier: {}. Status: {}.",
-                    tier_text, status_text
+                    "Non-transferable CommonCircle membership passport for {} (circle #{}). Tier: {}. Status: {}.",
+                    input.circle_name, cid, tier_text, status_text
                 )),
                 media: Some(data_uri(&svg)),
                 media_hash: None,

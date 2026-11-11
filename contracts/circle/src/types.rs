@@ -207,6 +207,7 @@ pub struct ConfigView {
 #[derive(Clone, Debug)]
 pub struct StorageCostsView {
     pub create_circle: U128,
+    pub set_circle_theme: U128,
     pub register_invite: U128,
     pub redeem_invite: U128,
     pub create_loan: U128,
@@ -227,6 +228,7 @@ pub struct CircleView {
     pub steward_count: u32,
     pub loan_count: u32,
     pub treasury_lending_enabled: bool,
+    pub theme: CircleThemeView,
 }
 
 #[near(serializers = [json])]
@@ -384,4 +386,74 @@ pub struct NftContractMetadata {
     pub base_uri: Option<String>,
     pub reference: Option<String>,
     pub reference_hash: Option<String>,
+}
+
+// ---------------------------------------------------------------- circle themes (interface 1.1.0)
+
+/// Background pattern drawn behind the passport card.
+#[near(serializers = [borsh, json])]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CardPattern {
+    None,
+    Dots,
+    Grid,
+    Waves,
+    Rays,
+}
+
+/// What a founder (or the circle DAO) sends to style the circle's passports.
+/// Every field is optional; a missing field uses the default theme. A call
+/// replaces the whole theme.
+#[near(serializers = [json])]
+#[derive(Clone, Debug, Default)]
+pub struct CircleThemeInput {
+    /// Short line under the name tag, e.g. "Good boys pay back". Max 32 chars.
+    pub tagline: Option<String>,
+    /// "#RRGGBB"
+    pub background: Option<String>,
+    pub accent: Option<String>,
+    pub text: Option<String>,
+    pub pattern: Option<CardPattern>,
+    /// Raster emblem (PNG, JPEG, GIF or WebP), at most `MAX_EMBLEM_BYTES`.
+    /// SVG is not accepted, so an emblem can never carry script.
+    pub emblem: Option<near_sdk::json_types::Base64VecU8>,
+}
+
+/// Stored under its own raw key per circle (not inside `Circle`), so adding
+/// themes did not change the stored layout of existing circles.
+#[near(serializers = [borsh])]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StoredTheme {
+    pub tagline: Option<String>,
+    pub background: [u8; 3],
+    pub accent: [u8; 3],
+    pub text: [u8; 3],
+    pub pattern: CardPattern,
+    pub emblem: Option<Vec<u8>>,
+}
+
+impl Default for StoredTheme {
+    fn default() -> Self {
+        Self {
+            tagline: None,
+            background: [0x1d, 0x35, 0x57],
+            accent: [0xa8, 0xda, 0xdc],
+            text: [0xff, 0xff, 0xff],
+            pattern: CardPattern::Dots,
+            emblem: None,
+        }
+    }
+}
+
+#[near(serializers = [json])]
+#[derive(Clone, Debug)]
+pub struct CircleThemeView {
+    pub tagline: Option<String>,
+    pub background: String,
+    pub accent: String,
+    pub text: String,
+    pub pattern: CardPattern,
+    pub emblem_mime: Option<String>,
+    pub emblem_bytes: u32,
+    pub custom: bool,
 }
