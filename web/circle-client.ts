@@ -113,6 +113,25 @@ export type StorageCosts = {
   create_loan: U128
 }
 
+export type FundMessage = { action: 'fund'; loan_id: U64; lender_id?: string }
+export type RepayMessage = { action: 'repay'; loan_id: U64 }
+export type CommonCircleEvent = {
+  standard: string
+  version: string
+  event: string
+  data: Array<Record<string, unknown>>
+}
+export type FtTransferCallOutcome = {
+  unusedAmount: U128 | null
+  events: CommonCircleEvent[]
+  refunded: CommonCircleEvent[]
+  funded: CommonCircleEvent[]
+  fundingFailed: CommonCircleEvent[]
+  repayment: CommonCircleEvent[]
+  repaid: CommonCircleEvent[]
+  repaymentFailed: CommonCircleEvent[]
+}
+
 export type FunctionCallAction = {
   type: 'FunctionCall'
   params: { methodName: string; args: Record<string, unknown>; gas: U64; deposit: U128 }
@@ -166,6 +185,64 @@ export function canonicalInviteMessage(contractId: string, circleId: U64, caller
   return ['commoncircle-invite-v1', contractId, circleId, callerId, invitePublicKey].join('\n')
 }
 
+function assertBaseUnits(value: string, field: string): asserts value is U128 {
+  if (!/^[0-9]+$/.test(value) || value === '0') throw new Error(`${field} must be a positive integer base-unit string.`)
+}
+
+function decodeSuccessValue(outcome: unknown): U128 | null {
+  if (!outcome || typeof outcome !== 'object') return null
+  const statuses: unknown[] = []
+  const visit = (value: unknown): void => {
+    if (!value || typeof value !== 'object') return
+    if ('SuccessValue' in value && typeof value.SuccessValue === 'string') statuses.push(value.SuccessValue)
+    for (const child of Object.values(value)) visit(child)
+  }
+  visit(outcome)
+  const encoded = statuses.at(-1)
+  if (typeof encoded !== 'string' || encoded.length === 0) return null
+  try {
+    const decoded = atob(encoded)
+    const value = JSON.parse(decoded) as unknown
+    return typeof value === 'string' && /^[0-9]+$/.test(value) ? value : null
+  } catch {
+    return null
+  }
+}
+
+function collectEvents(outcome: unknown): CommonCircleEvent[] {
+  const events: CommonCircleEvent[] = []
+  const visit = (value: unknown): void => {
+    if (typeof value === 'string' && value.startsWith('EVENT_JSON:')) {
+      try {
+        const parsed = JSON.parse(value.slice('EVENT_JSON:'.length)) as CommonCircleEvent
+        if (parsed && typeof parsed.event === 'string' && Array.isArray(parsed.data)) events.push(parsed)
+      } catch {
+        // Ignore non-JSON logs; wallet receipts can contain arbitrary contract logs.
+      }
+      return
+    }
+    if (!value || typeof value !== 'object') return
+    for (const child of Object.values(value)) visit(child)
+  }
+  visit(outcome)
+  return events
+}
+
+export function parseFtTransferCallOutcome(outcome: unknown): FtTransferCallOutcome {
+  const events = collectEvents(outcome)
+  const byName = (name: string) => events.filter((event) => event.event === name)
+  return {
+    unusedAmount: decodeSuccessValue(outcome),
+    events,
+    refunded: byName('transfer_refunded'),
+    funded: byName('loan_funded'),
+    fundingFailed: byName('loan_funding_failed'),
+    repayment: byName('loan_repayment'),
+    repaid: byName('loan_repaid'),
+    repaymentFailed: byName('loan_repayment_failed'),
+  }
+}
+
 export class CircleClient {
   constructor(readonly rpcUrl: string, readonly contractId: string, readonly wallet?: NearWallet) {}
 
@@ -207,12 +284,26 @@ export class CircleClient {
     return { borrowed, lent }
   }
 
-  private async call(methodName: string, args: Record<string, unknown>, deposit: U128, gas: U64): Promise<unknown> {
+  private async sendFunctionCall(receiverId: string, methodName: string, args: Record<string, unknown>, deposit: U128, gas: U64): Promise<unknown> {
     if (!this.wallet) throw new Error('A connected NEAR wallet is required for this action.')
     return this.wallet.signAndSendTransaction({
-      receiverId: this.contractId,
+      receiverId,
       actions: [{ type: 'FunctionCall', params: { methodName, args, gas, deposit } }],
     })
+  }
+
+  private call(methodName: string, args: Record<string, unknown>, deposit: U128, gas: U64): Promise<unknown> {
+    return this.sendFunctionCall(this.contractId, methodName, args, deposit, gas)
+  }
+
+  private async transferCall(usdcId: string, amount: U128, message: FundMessage | RepayMessage): Promise<FtTransferCallOutcome> {
+    assertBaseUnits(amount, 'amount')
+    const outcome = await this.sendFunctionCall(usdcId, 'ft_transfer_call', {
+      receiver_id: this.contractId,
+      amount,
+      msg: JSON.stringify(message),
+    }, '1', '150000000000000')
+    return parseFtTransferCallOutcome(outcome)
   }
 
   async joinByInvite(input: { circleId: U64; callerId: string; invitePublicKey: string; inviteSecret: string; signInvite: InviteSigner; deposit: U128 }): Promise<unknown> {
@@ -221,5 +312,17 @@ export class CircleClient {
       secret: input.inviteSecret,
     })
     return this.call('redeem_invite', { circle_id: input.circleId, invite_public_key: input.invitePublicKey, signature }, input.deposit, '50000000000000')
+  }
+
+  fundLoan(input: { usdcId: string; loanId: U64; amount: U128 }): Promise<FtTransferCallOutcome> {
+    return this.transferCall(input.usdcId, input.amount, { action: 'fund', loan_id: input.loanId })
+  }
+
+  fundLoanFromVault(input: { usdcId: string; loanId: U64; lenderId: string; amount: U128 }): Promise<FtTransferCallOutcome> {
+    return this.transferCall(input.usdcId, input.amount, { action: 'fund', loan_id: input.loanId, lender_id: input.lenderId })
+  }
+
+  repayLoan(input: { usdcId: string; loanId: U64; amount: U128 }): Promise<FtTransferCallOutcome> {
+    return this.transferCall(input.usdcId, input.amount, { action: 'repay', loan_id: input.loanId })
   }
 }
