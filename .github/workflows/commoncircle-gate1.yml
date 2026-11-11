@@ -55,6 +55,13 @@ jobs:
         run: |
           set -o pipefail
           cargo test -p commoncircle-circle --test sandbox_f0 --no-fail-fast -- --test-threads=4 2>&1 | tee ../artifacts/sandbox-f0.log
+      - name: Red-team tests (known-issue tests assert current behaviour)
+        continue-on-error: true
+        env:
+          ARTIFACT_DIR: ${{ github.workspace }}/artifacts
+        run: |
+          set -o pipefail
+          cargo test -p commoncircle-circle --test redteam --no-fail-fast -- --test-threads=4 2>&1 | tee ../artifacts/redteam.log
       - name: README checks (rows for later gates are expected to stay red)
         continue-on-error: true
         env:
