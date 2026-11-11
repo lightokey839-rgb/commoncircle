@@ -264,3 +264,65 @@ async fn storage_deposit_excess_is_refunded() -> Result<()> {
     assert!(spent < NearToken::from_millinear(50).as_yoctonear(), "spent {} yocto", spent);
     Ok(())
 }
+
+/// Gas actually burnt by the receipts that carry a given event.
+fn gas_for_event(r: &near_workspaces::result::ExecutionFinalResult, event: &str) -> u64 {
+    r.receipt_outcomes()
+        .iter()
+        .filter(|o| o.logs.iter().any(|l| l.contains(&format!("\"event\":\"{}\"", event))))
+        .map(|o| o.gas_burnt.as_gas())
+        .max()
+        .unwrap_or(0)
+}
+
+/// Evidence for docs/EVENTS.md "cannot stay stuck": the private callbacks must
+/// fit inside their reserved static gas (GAS_CALLBACK = 25 Tgas), and
+/// ft_on_transfer must fit its own 30 Tgas budget.
+#[tokio::test]
+async fn gas_measurements_fit_reserved_budgets() -> Result<()> {
+    const TGAS: u64 = 1_000_000_000_000;
+    let w = world().await?;
+    members(&w).await?;
+    register(&w.bob, &w.usdc, w.bob.id()).await?;
+    create_loan(&w, &w.bob, w.carol.id(), 10 * USDC, 2).await?.into_result()?;
+
+    let fund = ft_transfer_call(&w.carol, &w.usdc, w.circle.id(), 10 * USDC, fund_msg(1), RECOMMENDED_TGAS).await?;
+    let on_transfer_fund = gas_for_event(&fund, "loan_funding_started");
+    let on_fund_cb = gas_for_event(&fund, "loan_funded");
+
+    let partial = ft_transfer_call(&w.bob, &w.usdc, w.circle.id(), 4 * USDC, repay_msg(1), RECOMMENDED_TGAS).await?;
+    let on_repay_partial_cb = gas_for_event(&partial, "loan_repayment");
+
+    let full = ft_transfer_call(&w.bob, &w.usdc, w.circle.id(), 6 * USDC, repay_msg(1), RECOMMENDED_TGAS).await?;
+    let on_transfer_repay = gas_for_event(&full, "loan_repayment_started");
+    let on_repay_full_cb = gas_for_event(&full, "loan_repaid"); // includes tier_changed
+
+    // Failed forward path (unregistered borrower).
+    let w2 = world().await?;
+    members(&w2).await?;
+    create_loan(&w2, &w2.bob, w2.carol.id(), 10 * USDC, 2).await?.into_result()?;
+    let failed = ft_transfer_call(&w2.carol, &w2.usdc, w2.circle.id(), 10 * USDC, fund_msg(1), RECOMMENDED_TGAS).await?;
+    let on_fund_failed_cb = gas_for_event(&failed, "loan_funding_failed");
+
+    let report = format!(
+        "{{\"unit\":\"gas\",\"ft_on_transfer_fund\":{},\"ft_on_transfer_repay\":{},\"on_fund_forwarded_ok\":{},\"on_fund_forwarded_failed\":{},\"on_repay_forwarded_partial\":{},\"on_repay_forwarded_full_with_tier_flip\":{},\"budget_callback\":{},\"budget_ft_on_transfer_own\":{}}}",
+        on_transfer_fund, on_transfer_repay, on_fund_cb, on_fund_failed_cb, on_repay_partial_cb, on_repay_full_cb, 25 * TGAS, 30 * TGAS
+    );
+    save_artifact("gas_measurements.json", &report);
+
+    for (name, g) in [
+        ("on_fund_forwarded ok", on_fund_cb),
+        ("on_fund_forwarded failed", on_fund_failed_cb),
+        ("on_repay_forwarded partial", on_repay_partial_cb),
+        ("on_repay_forwarded full", on_repay_full_cb),
+    ] {
+        assert!(g > 0, "{}: no receipt found", name);
+        assert!(g < 25 * TGAS, "{} burnt {} gas, over the 25 Tgas reserve", name, g);
+    }
+    for (name, g) in [("ft_on_transfer fund", on_transfer_fund), ("ft_on_transfer repay", on_transfer_repay)] {
+        assert!(g > 0, "{}: no receipt found", name);
+        assert!(g < 30 * TGAS, "{} burnt {} gas, over its 30 Tgas own budget", name, g);
+    }
+    assert_circle_holds_zero(&w).await?;
+    assert_circle_holds_zero(&w2).await
+}

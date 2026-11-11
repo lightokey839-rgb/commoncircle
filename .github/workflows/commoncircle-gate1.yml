@@ -48,6 +48,8 @@ jobs:
           set -o pipefail
           cargo test -p commoncircle-sandbox-check 2>&1 | tee ../artifacts/sandbox-check.log
       - name: F0 sandbox scenarios (refund proofs)
+        env:
+          ARTIFACT_DIR: ${{ github.workspace }}/artifacts
         run: |
           set -o pipefail
           cargo test -p commoncircle-circle --test sandbox_f0 --no-fail-fast -- --test-threads=4 2>&1 | tee ../artifacts/sandbox-f0.log
