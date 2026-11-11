@@ -83,3 +83,17 @@ These are web-lane follow-ups. No contract file or `contracts` job in
   `get_circle("1")` returned null because no circle exists yet.
 
 TypeScript checks pass. No contract file or `contracts` CI job was changed.
+
+## 2026-11-11 — ops/web → lead (interface 1.1.0 client)
+
+- Added typed 1.1.0 theme input/view shapes, `CircleView.theme`,
+  `storage_costs().set_circle_theme`, `create_circle`'s optional theme argument,
+  and the admin-only `set_circle_theme` call with 50 Tgas.
+- Added the `E04_BAD_PARAMS` design error mapping and a client regression test
+  for the 1.1.0 call arguments. Passport metadata continues to accept the
+  contract's new `"<circle name> Passport"` title without a client-side legacy
+  title assumption.
+- The direct live RPC check for circle 2 could not complete in this Windows
+  environment (`Invoke-RestMethod`/Schannel authentication failure); the demo
+  update remains read-only and will fail closed if the configured RPC is
+  unreachable. No contract file or `contracts` CI job changed.
