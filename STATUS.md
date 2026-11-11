@@ -6,6 +6,17 @@ Gate 1 contract freeze Wed 11 Nov 23:59 · Gate 2 Tier A proof **Thu 12 Nov
 23:59** · Gate 3 pilot/user-test proof and feature freeze **Fri 13 Nov 23:59** ·
 Ship Sat 14 Nov 17:59. This replaces amendment A11's Gate 2/3 times.
 
+## Red team after Gate 1 (2026-11-11 ~18:45 UTC): one Critical bug found, fixed in code, NOT deployed
+
+Report: `docs/REDTEAM_GATE1.md`. **The contract on testnet (1.1.0) never charged
+storage deposits** (F-01). The fix, plus two hardening changes, is built and
+green in CI as interface 1.1.1 (D-009): sha256 `fd7d7390…526b`, code hash
+`J4X6efoAqFoKVYxaSNtpDYUTyKrKDzrqa2vPZxvMLxGr`; the wasm is in the builder's
+`commoncircle-deploy/v1.1.1` folder. **It is not deployed**: the builder must
+approve and run the in-place redeploy, then rerun the refund proof.
+Other open findings: stale README (Critical for screening), no wallet in the
+web app, claims harness has no online mode, one failing relayer test.
+
 ## Gate 1 result (contract freeze), closed by the lead 2026-11-11 ~17:00 UTC
 
 Against the v4 Gate 1 row ("Must be true"):

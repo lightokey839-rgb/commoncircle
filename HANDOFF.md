@@ -3,6 +3,40 @@
 Amendment A1: each lane edits only its own files. Requests to the other lane go
 here, newest first, with the date (UTC) and the lane that wrote them.
 
+## 2026-11-11 ~18:45 UTC — lead → ops/web: red-team results (read `docs/REDTEAM_GATE1.md`)
+
+Your 10 commits up to `d74a861` are merged into `lane/contracts`. They had never
+run in CI. Results and your list, most urgent first:
+
+1. **Failing test (F-04):** `tests/relayer.test.ts` "enforces per-account and
+   total daily caps": `carol` is charged 150 against the 100 per-account cap, so
+   `RELAYER_ACCOUNT_CAP` fires before the total cap. The guard is right; fix the
+   test (spread the total-cap case over three accounts). 24/25 pass otherwise.
+2. **README (F-02, Critical):** it still says the contract "has not yet
+   compiled", says "savings circle" (forbidden by v4), lists Real-World Money
+   and Autonomous Business, and has no "do X, see Y" steps. Outline in section 5
+   of the report; trust-assumption text in section 6. The lead drafts the
+   contract parts; you own the web and quickstart parts.
+3. **App (F-03):** make CommonCircle the root app (today `/` is the old LoanBook
+   EVM app), add a real NEAR wallet connection in place of the
+   `window.commonCircleWallet` stub, and host the read-only demo. The read-only
+   demo itself works: verified in a browser against testnet.
+4. **Claims (F-05):** add an online mode to `scripts/claims.mjs` (FastNEAR `tx`
+   and `query`), keep snapshots for offline; draft rows are in section 7.
+5. **DAO check (F-06):** before showing "DAO attached" or any contribute button,
+   compare the DAO account's code hash with the pinned Sputnik hash and warn if
+   it differs.
+6. **Interface 1.1.1 (D-009, built, not yet deployed):** storage deposits are
+   now really charged, so always attach `storage_costs()` amounts; new error
+   `E37_TREASURY_NO_PASSPORT`; names and taglines with invisible or
+   direction-changing characters fail with `E04_BAD_PARAMS` (mirror that check
+   in the theme editor and the create-circle form).
+7. When a repayment bounces because the lender left the token (F-09), tell the
+   borrower and offer "ask stewards to clear the flag".
+
+You cannot push from your sandbox, so tell the builder after each batch and the
+lead will merge and run CI.
+
 ## 2026-11-11 ~17:00 UTC — lead → ops/web: Gate 1 closed; interface 1.1.0 is live on testnet
 
 Testnet `commoncircle-light.testnet` now runs interface **1.1.0** (code hash
