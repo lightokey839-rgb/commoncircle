@@ -100,7 +100,7 @@ fn pattern_layer(p: CardPattern, accent: &str) -> String {
             let mut g = format!("<g opacity=\"0.13\" stroke=\"{}\" stroke-width=\"14\">", accent);
             for i in 0..12 {
                 g.push_str(&format!(
-                    "<line x1=\"256\" y1=\"262\" x2=\"256\" y2=\"-120\" transform=\"rotate({} 256 262)\"/>",
+                    "<line x1=\"256\" y1=\"276\" x2=\"256\" y2=\"-120\" transform=\"rotate({} 256 276)\"/>",
                     i * 30
                 ));
             }
@@ -138,12 +138,12 @@ fn default_emblem(accent: &str, text: &str) -> String {
         g.push_str(&format!(
             "<circle cx=\"{}\" cy=\"{}\" r=\"15\" fill=\"{}\"/>",
             256 + dx,
-            262 + dy,
+            276 + dy,
             accent
         ));
     }
     g.push_str(&format!(
-        "<circle cx=\"256\" cy=\"262\" r=\"26\" fill=\"{t}\"/><circle cx=\"256\" cy=\"262\" r=\"62\" fill=\"none\" stroke=\"{a}\" stroke-width=\"3\" stroke-dasharray=\"4 7\"/>",
+        "<circle cx=\"256\" cy=\"276\" r=\"26\" fill=\"{t}\"/><circle cx=\"256\" cy=\"276\" r=\"62\" fill=\"none\" stroke=\"{a}\" stroke-width=\"3\" stroke-dasharray=\"4 7\"/>",
         t = text,
         a = accent
     ));
@@ -153,18 +153,18 @@ fn default_emblem(accent: &str, text: &str) -> String {
 fn tier_frame(t: DisplayTier, accent: &str) -> String {
     match t {
         DisplayTier::Member => format!(
-            "<circle cx=\"256\" cy=\"262\" r=\"112\" fill=\"none\" stroke=\"{}\" stroke-width=\"6\"/>",
+            "<circle cx=\"256\" cy=\"276\" r=\"112\" fill=\"none\" stroke=\"{}\" stroke-width=\"6\"/>",
             accent
         ),
         DisplayTier::Trusted => format!(
-            "<circle cx=\"256\" cy=\"262\" r=\"112\" fill=\"none\" stroke=\"{g}\" stroke-width=\"7\"/><circle cx=\"256\" cy=\"262\" r=\"124\" fill=\"none\" stroke=\"{g}\" stroke-width=\"3\"/>{s1}{s2}{s3}",
+            "<circle cx=\"256\" cy=\"276\" r=\"112\" fill=\"none\" stroke=\"{g}\" stroke-width=\"7\"/><circle cx=\"256\" cy=\"276\" r=\"124\" fill=\"none\" stroke=\"{g}\" stroke-width=\"3\"/>{s1}{s2}{s3}",
             g = GOLD,
-            s1 = star(216, 140, 11, GOLD),
-            s2 = star(256, 128, 15, GOLD),
-            s3 = star(296, 140, 11, GOLD),
+            s1 = star(216, 154, 11, GOLD),
+            s2 = star(256, 142, 15, GOLD),
+            s3 = star(296, 154, 11, GOLD),
         ),
         DisplayTier::Steward => format!(
-            "<circle cx=\"256\" cy=\"262\" r=\"108\" fill=\"none\" stroke=\"{s}\" stroke-width=\"5\"/><circle cx=\"256\" cy=\"262\" r=\"118\" fill=\"none\" stroke=\"{g}\" stroke-width=\"6\"/><circle cx=\"256\" cy=\"262\" r=\"129\" fill=\"none\" stroke=\"{s}\" stroke-width=\"3\"/><path d=\"M222 146 L230 116 L244 134 L256 108 L268 134 L282 116 L290 146 Z\" fill=\"{g}\" stroke=\"{s}\" stroke-width=\"2\"/>",
+            "<circle cx=\"256\" cy=\"276\" r=\"108\" fill=\"none\" stroke=\"{s}\" stroke-width=\"5\"/><circle cx=\"256\" cy=\"276\" r=\"118\" fill=\"none\" stroke=\"{g}\" stroke-width=\"6\"/><circle cx=\"256\" cy=\"276\" r=\"129\" fill=\"none\" stroke=\"{s}\" stroke-width=\"3\"/><path d=\"M222 160 L230 130 L244 148 L256 122 L268 148 L282 130 L290 160 Z\" fill=\"{g}\" stroke=\"{s}\" stroke-width=\"2\"/>",
             s = STEWARD,
             g = GOLD
         ),
@@ -190,7 +190,7 @@ pub fn render_card_svg(c: &CardInput) -> String {
         .as_deref()
         .map(|t| {
             format!(
-                "<text x=\"256\" y=\"122\" text-anchor=\"middle\" font-family=\"{f}\" font-size=\"15\" letter-spacing=\"1.5\" fill=\"{a}\">{t}</text>",
+                "<text x=\"256\" y=\"117\" text-anchor=\"middle\" font-family=\"{f}\" font-size=\"15\" letter-spacing=\"1.5\" fill=\"{a}\">{t}</text>",
                 f = FONT,
                 a = accent,
                 t = xml_escape(&truncate(t, 32))
@@ -202,7 +202,7 @@ pub fn render_card_svg(c: &CardInput) -> String {
         Some((mime, bytes)) => {
             let uri = format!("data:{};base64,{}", mime, base64(bytes));
             format!(
-                "<image x=\"152\" y=\"158\" width=\"208\" height=\"208\" preserveAspectRatio=\"xMidYMid slice\" clip-path=\"url(#em)\" href=\"{u}\" xlink:href=\"{u}\"/>",
+                "<image x=\"152\" y=\"172\" width=\"208\" height=\"208\" preserveAspectRatio=\"xMidYMid slice\" clip-path=\"url(#em)\" href=\"{u}\" xlink:href=\"{u}\"/>",
                 u = uri
             )
         }
@@ -219,7 +219,7 @@ pub fn render_card_svg(c: &CardInput) -> String {
 
     let paused = if c.perks_paused {
         format!(
-            "<g transform=\"rotate(-16 256 262)\"><rect x=\"40\" y=\"236\" width=\"432\" height=\"50\" rx=\"10\" fill=\"#E63946\" fill-opacity=\"0.92\"/><text x=\"256\" y=\"269\" text-anchor=\"middle\" font-family=\"{f}\" font-size=\"20\" font-weight=\"700\" letter-spacing=\"2\" fill=\"#FFFFFF\">OVERDUE - PERKS PAUSED</text></g>",
+            "<g transform=\"rotate(-16 256 276)\"><rect x=\"40\" y=\"250\" width=\"432\" height=\"50\" rx=\"10\" fill=\"#E63946\" fill-opacity=\"0.92\"/><text x=\"256\" y=\"283\" text-anchor=\"middle\" font-family=\"{f}\" font-size=\"20\" font-weight=\"700\" letter-spacing=\"2\" fill=\"#FFFFFF\">OVERDUE - PERKS PAUSED</text></g>",
             f = FONT
         )
     } else {
@@ -231,7 +231,7 @@ pub fn render_card_svg(c: &CardInput) -> String {
 <defs>\
 <linearGradient id=\"bg\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\"><stop offset=\"0\" stop-color=\"{bg}\"/><stop offset=\"1\" stop-color=\"{bgd}\"/></linearGradient>\
 <radialGradient id=\"glow\" cx=\"0.5\" cy=\"0.5\" r=\"0.5\"><stop offset=\"0\" stop-color=\"{accent}\" stop-opacity=\"0.35\"/><stop offset=\"1\" stop-color=\"{accent}\" stop-opacity=\"0\"/></radialGradient>\
-<clipPath id=\"em\"><circle cx=\"256\" cy=\"262\" r=\"104\"/></clipPath>\
+<clipPath id=\"em\"><circle cx=\"256\" cy=\"276\" r=\"104\"/></clipPath>\
 <filter id=\"mono\"><feColorMatrix type=\"saturate\" values=\"0\"/></filter>\
 {patdefs}\
 </defs>\
@@ -242,12 +242,12 @@ pub fn render_card_svg(c: &CardInput) -> String {
 <rect x=\"64\" y=\"40\" width=\"384\" height=\"56\" rx=\"28\" fill=\"{bgd}\" fill-opacity=\"0.8\" stroke=\"{accent}\" stroke-width=\"2\"/>\
 <text x=\"256\" y=\"{ny}\" text-anchor=\"middle\" font-family=\"{f}\" font-size=\"{ns}\" font-weight=\"700\" fill=\"{text}\">{name}</text>\
 {tagline}\
-<circle cx=\"256\" cy=\"262\" r=\"150\" fill=\"url(#glow)\"/>\
-<circle cx=\"256\" cy=\"262\" r=\"104\" fill=\"{bgd}\"/>\
+<circle cx=\"256\" cy=\"276\" r=\"150\" fill=\"url(#glow)\"/>\
+<circle cx=\"256\" cy=\"276\" r=\"104\" fill=\"{bgd}\"/>\
 {emblem}\
 {frame}\
-<rect x=\"166\" y=\"372\" width=\"180\" height=\"40\" rx=\"20\" fill=\"{ribbon}\"/>\
-<text x=\"256\" y=\"399\" text-anchor=\"middle\" font-family=\"{f}\" font-size=\"19\" font-weight=\"800\" letter-spacing=\"3\" fill=\"{bgd}\">{tier}</text>\
+<rect x=\"166\" y=\"386\" width=\"180\" height=\"40\" rx=\"20\" fill=\"{ribbon}\"/>\
+<text x=\"256\" y=\"413\" text-anchor=\"middle\" font-family=\"{f}\" font-size=\"19\" font-weight=\"800\" letter-spacing=\"3\" fill=\"{bgd}\">{tier}</text>\
 <text x=\"56\" y=\"446\" font-family=\"{f}\" font-size=\"16\" font-weight=\"700\" fill=\"{text}\">ON TIME {on}</text>\
 <text x=\"56\" y=\"470\" font-family=\"{f}\" font-size=\"15\" fill=\"{text}\" fill-opacity=\"0.8\">LATE {late}</text>\
 <rect x=\"334\" y=\"432\" width=\"122\" height=\"32\" rx=\"16\" fill=\"{sc}\"/>\
