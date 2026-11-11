@@ -121,7 +121,8 @@ commoncircle-invite-v1
 The contract id and the fixed tag stop a signature being replayed on another
 deployment (deviation D-001). An invite is deleted when redeemed (single use). One
 passport per account per circle; an account that ever held one in a circle cannot
-redeem another there.
+redeem another there. At redeem time the inviter must still be the founder or
+hold an Active passport; otherwise the invite fails with `E34_NOT_INVITER`.
 
 ## 4. Loan rules the UI must reflect
 
@@ -248,7 +249,8 @@ type CircleView = {
   dao_attached: boolean;
   created_at: string;                       // ns
   params: CircleParams;                     // section 3.1, same field names
-  member_count: number; steward_count: number;  // Active passports only
+  member_count: number;                     // passports ever issued here (any status)
+  steward_count: number;                    // stewards whose passport is Active now
   loan_count: number;
   treasury_lending_enabled: boolean;        // dao_attached && steward_count >= 2
 };
@@ -366,6 +368,7 @@ The server indexes these events and nothing else.
 | `E33_INVITE_BAD_SIGNATURE` | The invite link is invalid. |
 | `E34_NOT_INVITER` | Only the founder or a Trusted member can invite. |
 | `E35_ALREADY_MEMBER` | You already have (or had) a passport in this circle. |
+| `E36_INVITE_EXISTS` | That invite key is already registered. |
 | `E40_NON_TRANSFERABLE` | Passports cannot be transferred or approved. |
 | `E50_RECOVERY_DISABLED` | Recovery is not available in this deployment. |
 | `E51_RECOVERY_LOCKED` | Recovery is still time-locked. |
