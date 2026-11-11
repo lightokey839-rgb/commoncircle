@@ -62,7 +62,9 @@ view() { # view <account> <method> <args-json> -> JSON text or "ERROR ..."
 jget() { node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{let v;try{v=JSON.parse(s)}catch{console.log("?");return}for(const k of process.argv[1].split("."))v=v==null?v:v[k];console.log(typeof v==="object"?JSON.stringify(v):String(v))})' "$1"; }
 account_json() { rpc query "{\"request_type\":\"view_account\",\"finality\":\"final\",\"account_id\":\"$1\"}"; }
 exists() { account_json "$1" | grep -q '"amount"'; }
-code_hash() { account_json "$1" | jget result.code_hash; }
+# An account deployed BY GLOBAL HASH may report the hash in global_contract_hash
+# (code_hash then reads 1111…); report whichever is set.
+code_hash() { account_json "$1" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{let r;try{r=JSON.parse(s).result}catch{}if(!r){console.log("none");return}const e="11111111111111111111111111111111";console.log(r.global_contract_hash||(r.code_hash!==e?r.code_hash:"none"))})'; }
 usdc_balance() { view "$USDC_ID" ft_balance_of "{\"account_id\":\"$1\"}" | tr -d '"'; }
 passport() { view "$CIRCLE" passport_for "{\"circle_id\":\"$CIRCLE_ID\",\"account_id\":\"$1\"}"; }
 circle() { view "$CIRCLE" get_circle "{\"circle_id\":\"$CIRCLE_ID\"}"; }

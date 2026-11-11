@@ -6,16 +6,33 @@ Gate 1 contract freeze Wed 11 Nov 23:59 · Gate 2 Tier A proof **Thu 12 Nov
 23:59** · Gate 3 pilot/user-test proof and feature freeze **Fri 13 Nov 23:59** ·
 Ship Sat 14 Nov 17:59. This replaces amendment A11's Gate 2/3 times.
 
-## Red team after Gate 1 (2026-11-11 ~18:45 UTC): one Critical bug found, fixed in code, NOT deployed
+## Gate 2 progress (lead, 2026-11-11 ~22:30 UTC)
 
-Report: `docs/REDTEAM_GATE1.md`. **The contract on testnet (1.1.0) never charged
-storage deposits** (F-01). The fix, plus two hardening changes, is built and
-green in CI as interface 1.1.1 (D-009): sha256 `fd7d7390…526b`, code hash
-`J4X6efoAqFoKVYxaSNtpDYUTyKrKDzrqa2vPZxvMLxGr`; the wasm is in the builder's
-`commoncircle-deploy/v1.1.1` folder. **It is not deployed**: the builder must
-approve and run the in-place redeploy, then rerun the refund proof.
-Other open findings: stale README (Critical for screening), no wallet in the
-web app, claims harness has no online mode, one failing relayer test.
+- **D-009 is deployed** (interface 1.1.1, code hash
+  `J4X6efoAqFoKVYxaSNtpDYUTyKrKDzrqa2vPZxvMLxGr`, redeploy tx
+  `HZMY2FpFjjAAzRJnc8we3tptUYJLH2FfVqYtWjbugUSB` at 16:51 UTC). The refund proof already reran on 1.1.1 in
+  circle 3 "The Dogs (DEMO)" with `borrower3` (16:56 UTC). **F-01 is fixed on
+  testnet**: every state-growing call kept at least the storage it added
+  (`docs/VERIFICATION.md`, "Interface 1.1.1 on testnet").
+- **README rewritten (F-02):** status box, keyless check
+  (`node contracts/scripts/check-testnet.mjs`), "do X, see Y" with tx links,
+  trust assumptions, pot-rotation comparison. Rows not yet proven say *not yet*.
+- **Social Money prep:** Sputnik `sputnikdao2` exists on testnet as a global
+  contract **by hash** `Ea8tHXFSQVszVwGASyzAfLq65DjcRDhkfab4FcPaRpgD`, so the
+  DAO deploys without the 6 NEAR factory deposit. Sandbox test
+  `tests/sandbox_sputnik.rs` runs that exact code; `contracts/scripts/testnet-dao.sh`
+  runs the flow on testnet (builder signs). Not yet run on testnet.
+- Still open: Tier A rows in `evidence/evidence.json`; F-16 low-gas on real
+  USDC (`testnet-dao.sh lowgas`); web lane F-03 to F-06 and F-04 relayer test.
+
+## Red team after Gate 1 (2026-11-11 ~18:45 UTC): one Critical bug found, fixed (deployed later, see above)
+
+Report: `docs/REDTEAM_GATE1.md`. The contract on testnet (1.0.0 and 1.1.0) did
+not charge the full storage deposit (F-01). The fix, plus two hardening
+changes, is interface 1.1.1 (D-009): sha256 `fd7d7390…526b`, code hash
+`J4X6efoAqFoKVYxaSNtpDYUTyKrKDzrqa2vPZxvMLxGr`.
+Other open findings: no wallet in the web app, claims harness has no online
+mode, one failing relayer test.
 
 ## Gate 1 result (contract freeze), closed by the lead 2026-11-11 ~17:00 UTC
 

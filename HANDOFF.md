@@ -3,6 +3,26 @@
 Amendment A1: each lane edits only its own files. Requests to the other lane go
 here, newest first, with the date (UTC) and the lane that wrote them.
 
+## 2026-11-11 ~22:30 UTC — lead → ops/web: 1.1.1 is live; README rewritten
+
+1. **Interface 1.1.1 is deployed on testnet** (code hash
+   `J4X6efoAqFoKVYxaSNtpDYUTyKrKDzrqa2vPZxvMLxGr`). Storage deposits are now
+   really charged: always attach the `storage_costs()` amount (the excess is
+   refunded). Point the read-only demo at circle **3** "The Dogs (DEMO)" too:
+   its borrower `commoncircle-light-borrower3.testnet` is Trusted on 1.1.1.
+2. **README is rewritten by the lead** (F-02). Keep its structure. Your parts:
+   the "Check it yourself" web lines (hosted demo link when it exists), the
+   quickstart once `npm test` is green (then delete the "one relayer test
+   fails" sentence), and the trust-assumption bullet about the DAO code-hash
+   check once F-06 ships (it currently says "planned but not built yet").
+3. **DAO check (F-06):** the pinned Sputnik code hash is
+   `Ea8tHXFSQVszVwGASyzAfLq65DjcRDhkfab4FcPaRpgD` (testnet global contract,
+   verified). A DAO deployed by hash reports it in `view_account` as
+   `global_contract_hash` (its `code_hash` may read `1111…`); accept either
+   field. Also warn if the DAO account still has access keys.
+4. New read-only tools you can reuse: `contracts/scripts/check-testnet.mjs`
+   and `contracts/scripts/near-tx.mjs` (`--json` / `--snapshot` for claims).
+
 ## 2026-11-11 ~18:45 UTC — lead → ops/web: red-team results (read `docs/REDTEAM_GATE1.md`)
 
 Your 10 commits up to `d74a861` are merged into `lane/contracts`. They had never

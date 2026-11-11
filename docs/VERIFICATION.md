@@ -16,11 +16,12 @@ the history is honest. The current state is:
 | --- | --- | --- |
 | Rust toolchain, Cargo.lock, clean `npm ci` | PASS (GitHub Actions, Ubuntu) | "Toolchain pins", phases 1B to 1E |
 | Contract tests | PASS: unit 49/49, sandbox 13/13, contract README rows 9/9 | "Interface 1.1.0" |
-| Testnet contract | `commoncircle-light.testnet`, interface 1.1.0, code hash `CCYR2EZ87by5MX65Ci1V49EVqhF93p8ymwFa6LeH9whm` | "Interface 1.1.0" |
-| F0 refund proof on testnet | PASS twice (1.0.0 and 1.1.0) | "F0 refund proof on testnet", "Interface 1.1.0" |
+| Testnet contract | `commoncircle-light.testnet`, interface **1.1.1**, code hash `J4X6efoAqFoKVYxaSNtpDYUTyKrKDzrqa2vPZxvMLxGr` (D-009 deployed 2026-11-11 16:51 UTC) | "Interface 1.1.1 on testnet" |
+| F0 refund proof on testnet | PASS three times (1.0.0, 1.1.0, 1.1.1) | "F0 refund proof on testnet", "Interface 1.1.0", "Interface 1.1.1 on testnet" |
+| F-01 storage charging on testnet | PASS on 1.1.1: every state-growing call kept at least the bytes it added; 1.0.0 and 1.1.0 calls shown subsidised for comparison | "Interface 1.1.1 on testnet" |
 | Card art in wallets | PASS: MyNearWallet and Meteor | "Interface 1.1.0" |
 | Both USDC ids | PASS (USDC, 6 decimals) | "USDC verification output" |
-| Red-team findings | see `docs/REDTEAM_GATE1.md`; a storage-charging fix (D-009, interface 1.1.1) is built and tested but **not deployed** | "Gate 1 red team and D-009" |
+| Red-team findings | see `docs/REDTEAM_GATE1.md`; the storage-charging fix (D-009, interface 1.1.1) is **deployed** | "Gate 1 red team and D-009", "Interface 1.1.1 on testnet" |
 | Still UNVERIFIED | NEP-366 relayer onboarding, Sputnik DAO proposal funding, event indexer, NEP-413 phone sign-in, any mainnet transaction | Gate 2 and later |
 
 Superseded rows below: "Annotated baseline tag in original checkout" (the tag
@@ -300,6 +301,34 @@ Full report: `docs/REDTEAM_GATE1.md`.
 | Secret patterns, all 88 commits on all branches | PASS (0 hits for 6 patterns) | pattern scan in the lead session; gitleaks job green |
 | Web lane tests on a real install | FAIL 24/25 | `tests/relayer.test.ts` cap test (test bug), run `43056988857` |
 | NFT enumeration, 50 circles with 12 KiB emblems | PASS | `redteam_enumeration.json`: both views answer, 2,378,633 bytes |
+
+## Interface 1.1.1 on testnet (D-009 deployed)
+
+Verified by the lead over `https://test.rpc.fastnear.com` on 2026-11-11 ~21:30 UTC,
+with `contracts/scripts/near-tx.mjs` (receipt-by-receipt read) and
+`contracts/scripts/check-testnet.mjs` (ALL CHECKS PASS). The builder ran the
+deploy and the proof; the times are UTC from `proof-hashes.txt` and block headers.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| In-place redeploy to 1.1.1 | PASS | tx `HZMY2FpFjjAAzRJnc8we3tptUYJLH2FfVqYtWjbugUSB` (DeployContract, FINAL, success). Block 277242271 (16:51:01 UTC) is the first whose `view_account` code hash is `J4X6efoAqFoKVYxaSNtpDYUTyKrKDzrqa2vPZxvMLxGr`; the block before shows `CCYR2EZ…whm` (1.1.0). `get_config().interface_version` = `1.1.1`. Circles 1 and 2 still readable; circle USDC `"0"` |
+| F0 refund proof on 1.1.1, themed circle 3 "The Dogs (DEMO)" | PASS | borrower `commoncircle-light-borrower3.testnet` created `GEWAPHEgNxzf27VCvwxpDpsU8faUMM6SVSNjBuCjKyWj`; `create_circle 3` `9bR1fvUPNYqvAgg18uuYhpiNSNt4akvcGygxVjuHAzr8`; `register_invite` `6GJk4WgoUA2K2TMv4SCiZh624nSDgkJ5h79rzKQDstA9`; `redeem_invite` `Hm2fBQ7SPcD2mEHgNAVhyqqWEaxUSqiKa2vduZRxiJUo`; `create_loan 3` `DWqosYmaxdyDbjpVPAdUSYpzs44VubiZn4Ev95DqaE22`; **failed forward refunded** `9eRRis9rGq1QFjYWdAr7E627HXvtHvEjmnQEwjJQ9B2K` (`ft_on_transfer` received 130.5 Tgas; the inner `ft_transfer` to the unregistered borrower failed; `loan_funding_failed`; USDC `ft_transfer` memo `refund`); register borrower `8CvQy3H16xTUZ6aTEC7di9YTtAs32epobvqCHLbYCQb6`; fund `CyYFrPZW2P8iaWKKzFEa3e6wrYfsJJT8HDzzjtRnDxKn` (`loan_funded`); repay `2d42VciE6yCvsXmZ4SPBkrGqnezaseEgv8eYHn8HJv1Q` (`loan_repaid`, `tier_changed`). All FINAL and successful. Views: loan 3 `Repaid`, `repaid_on_time: true`; passport `3:commoncircle-light-borrower3.testnet` Trusted, on time 1, Active, not a steward; `nft_token` title "The Dogs (DEMO) Passport", description "… Tier: Trusted. Status: active." |
+| F-01 on 1.1.1: NEAR kept from the deposit vs storage the contract actually added (account state before the receipt's block vs after) | PASS | `create_circle 3`: kept 0.034280 NEAR for 3,428 bytes (0.034280); `register_invite`: 0.001910 for 191 bytes (0.001910); `redeem_invite`: 0.005230 for 332 bytes (0.003320); `create_loan 3`: 0.007940 for 538 bytes (0.005380; the rest is the 256-byte growth reserve) |
+| F-01 before the fix, same methods (comparison) | SUBSIDISED, as the report said | 1.0.0 `create_circle 1` `6PwNu7…eU3`: kept 0 for 745 bytes. 1.1.0 `create_circle 2` `6HMswa…QtiN`: kept 0.027680 for 3,428 bytes (0.034280 needed); 1.1.0 `register_invite` `Bmp5JU…tw6w`: kept 0 for 191 bytes; 1.1.0 `create_loan 2` `3pgx79…DUJG`: kept 0.002560 for 538 bytes |
+
+Note: the Gate 2 handoff written that evening still said "not deployed". It
+was stale: the deploy and this proof had already run between 16:51 and 16:57 UTC.
+
+## Sputnik DAO by global contract hash (Gate 2 preparation)
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| A Sputnik global contract exists on testnet | PASS | `view_global_contract_code` for `Ea8tHXFSQVszVwGASyzAfLq65DjcRDhkfab4FcPaRpgD` returns 430,308 bytes whose sha256 (base58) is that hash; it exports `new`, `add_proposal`, `act_proposal`, `get_policy`, `on_proposal_callback` and contains "sputnikdao2". `view_global_contract_code_by_account_id` for `dao.globals.primitives.testnet` returns identical bytes; that one is account-based, so upgradeable. We deploy **by hash**, which is immutable |
+| Gas Sputnik attaches to a Transfer with `msg` | read from source, not yet measured | `sputnikdao2/src/types.rs`: `GAS_FOR_FT_TRANSFER = 10 Tgas` as static gas on `ft_transfer_call` (plus any share of unused gas). Measured by `sandbox_sputnik.rs` and on testnet by `testnet-dao.sh vote` |
+| Copy of that code for sandbox tests | committed | `contracts/circle/tests/fixtures/sputnikdao2_Ea8tHXFS.wasm`, sha256 `c9a502ef08a06cef04e2fce82da60b1fbc78db3066ff41416110f4292fca39ce`; the test asserts the deployed code hash equals the global hash |
+| Sandbox: Sputnik treasury loans (`tests/sandbox_sputnik.rs`) | PASS 2/2 | CI run `43108982043` (commit `873fcfb`). FunctionCall proposal (150 Tgas): steward's own request `E19`, one vote leaves it `InProgress`, second vote → `loan_funded`, `funded_via: Treasury`, proposal `Approved`, borrower +10 USDC, repayment returns 10 USDC to the DAO, circle 0. **Transfer with `msg` also funded** (`funded: true`, `Approved`, `Funded`, DAO 20 → 10 USDC, no refund) with the mock token; real USDC is measured on testnet |
+| Same run, other suites | PASS | unit 49/49, F0 sandbox 13/13, red-team 8/8, README rows 9 pass / 8 later-gate rows red as expected; npm job red only on F-04 (relayer test) |
+| Reproducible build at `873fcfb` | code hash `DTibM2HwAHHGw1kt6mbdKVZxSX8u7pZ1vtQWctmTRJaV`, differs from the deployed `J4X6…LxGr` | `contracts/circle/src` tree is identical (`c6daa1d066d041420597f932bf9dc51b404930a8` at `2e45eef` and at `873fcfb`); the difference is the commit id in the embedded NEP-330 metadata. The deployed `J4X6…LxGr` stays the tested artifact (run `43059776368`); no redeploy needed |
 
 ## Incident: testnet secret key exposed in chat (2026-11-11)
 
