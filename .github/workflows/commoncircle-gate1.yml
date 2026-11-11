@@ -27,9 +27,12 @@ jobs:
       # Toolchain comes from rust-toolchain.toml (1.99.1 + wasm32 target).
       - name: Install pinned Rust toolchain
         run: rustup show active-toolchain || rustup toolchain install
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-near@0.23.0
+      # Prebuilt release binary; building cargo-near from source needs libudev.
+      - name: Install cargo-near 0.23.0 (prebuilt release)
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/near/cargo-near/releases/download/cargo-near-v0.23.0/cargo-near-installer.sh | sh
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          "$HOME/.cargo/bin/cargo-near" near --version || true
       - name: Prepare log directory
         run: mkdir -p ../artifacts
       - name: Build wasm (cargo-near) and record sha256
