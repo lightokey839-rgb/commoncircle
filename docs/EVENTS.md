@@ -103,9 +103,9 @@ covering tests are listed after it.
    `create_loan` through `LOAN_GROWTH_RESERVE_BYTES` (256 bytes), so the storage
    staking check cannot fail inside a callback.
 
-Remaining assumption: the callback's measured gas use stays under 25 Tgas. The
-sandbox tests must record the real figure in `docs/VERIFICATION.md` before
-this argument is claimed.
+Measured (sandbox, `gas_measurements_fit_reserved_budgets`): the callbacks burn
+1.87 to 2.48 Tgas against the 25 Tgas reserve, and `ft_on_transfer` burns about
+2.9 Tgas against its 30 Tgas budget. Figures are in `docs/VERIFICATION.md`.
 
 Covering tests: unit tests `failed_forward_reverts_to_open_and_returns_everything`,
 `failed_repay_forward_returns_everything_and_stays_funded`,

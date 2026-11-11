@@ -31,8 +31,13 @@ Builder actions needed:
 3. Mainnet deploy kit (1G) is the ops/web lane; if mainnet is not deployed by
    Thu 12 Nov 11:59 UTC, the pilot becomes a labelled testnet user test.
 
-Open items: callback gas measurement for the no-stuck-state argument
-(`docs/EVENTS.md`), F0 refund proof on testnet, card art in two wallets.
+Pilot decision (2026-11-11): the builder's budget (about USD 4) cannot cover a
+mainnet deploy (contract storage alone is about 3.6 NEAR) plus participant USDC.
+The pilot is planned as a labelled TESTNET user test and the Real-World Money
+row is dropped, unless mainnet funding appears before Thu 12 Nov 11:59 UTC.
+
+Open items: F0 refund proof on testnet (faucet rate-limited until about
+14:15 UTC), card art in two wallets. Callback gas: measured, well inside budget.
 
 Updated: 2026-11-11 (Africa/Lagos)
 

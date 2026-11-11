@@ -196,8 +196,23 @@ Still to do on testnet: a real fund → repay loan and a failed-forward refund
 proof with transaction hashes (v3 F0: "Proven on testnet before it is
 claimed"), and the card art viewed in two wallets or explorers.
 
-Not yet evidenced: callback gas actually used (needed for the "cannot stay
-stuck" argument in `docs/EVENTS.md`), reproducible build hash, testnet deploy.
+### Callback gas (run on commit `1a0c3c4`, test-only change)
+
+`gas_measurements_fit_reserved_budgets` (sandbox) PASS; artifact
+`gas_measurements.json`. Gas burnt by each receipt:
+
+| Receipt | Gas burnt | Budget |
+| --- | --- | --- |
+| `ft_on_transfer` (fund) | 2.86 Tgas (2857640338538) | 30 Tgas own |
+| `ft_on_transfer` (repay) | 2.69 Tgas (2692011778277) | 30 Tgas own |
+| `on_fund_forwarded` success | 1.97 Tgas (1974356193295) | 25 Tgas reserved |
+| `on_fund_forwarded` failed forward | 1.87 Tgas (1871991141513) | 25 Tgas reserved |
+| `on_repay_forwarded` partial | 1.90 Tgas (1901690797942) | 25 Tgas reserved |
+| `on_repay_forwarded` full, with tier flip | 2.48 Tgas (2477151790457) | 25 Tgas reserved |
+
+Sandbox suite on that run: unit 40/40, F0 sandbox 12/12, contract README rows
+9/9. Gas is from the sandbox runtime; the testnet proof run will add on-chain
+figures.
 
 ## Evidence format
 
