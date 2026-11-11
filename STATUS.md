@@ -12,9 +12,10 @@ Status: CONTRACT FROZEN IN SANDBOX / TESTNET DEPLOY NOT RUN / NOT CLAIMABLE
 - Green in CI: unit 40/40, F0 sandbox 11/11 (refund proofs; circle holds zero
   USDC after every scenario), all 9 contract README rows, gitleaks full
   history, npm/claims, USDC metadata on both networks.
-- Frozen source `913998e`; reproducible wasm sha256 `6f1f054a…a858`, code hash
-  `8Umgymq4CW3h9HWYehaCh1LKvFk3254FRjDAFBetm7Sf` (full values in
-  `docs/VERIFICATION.md` and `docs/SPEC_DEVIATIONS.md`).
+- Frozen source tree `227e4b9d` (since `913998e`). Deploy artifact: reproducible
+  wasm from run `42984600861`, sha256 `2ad7e094…0e37`, code hash
+  `3tF3gbHWdjhoSfMe2KDHrP7TSCEPAXNZh8dm9q97JrB8`, refund proofs passed on that
+  exact file (details in `docs/VERIFICATION.md`).
 - Recovery (F1) is cut for Gate 1: methods exist and always fail
   (`features.recovery = false`).
 

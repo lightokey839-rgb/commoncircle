@@ -150,9 +150,27 @@ Toolchain: Rust 1.99.1, near-sdk 5.30.1, near-workspaces 0.24.0, cargo-near
 | --- | --- | --- |
 | Reproducible circle wasm (Docker) | PASS | `cargo near build reproducible-wasm`, image `sourcescan/cargo-near:0.23.0-rust-1.99.1@sha256:8013f039e8005627f10ae66b5519d1a6eeeed7d7aef4b5067d5e9a86c4302fcc`, git clean at HEAD `913998e`. sha256 `6f1f054ab5e20317a6875a34748d3de3b6177434d86b885a4fc2f70042e4a858` (362127 bytes); NEAR code hash (base58 of sha256) `8Umgymq4CW3h9HWYehaCh1LKvFk3254FRjDAFBetm7Sf`. Artifact `commoncircle-reproducible-wasm`. |
 | Same commit: unit, F0 sandbox, contract README rows | PASS | all jobs green on run `42983781151` (tests built from the same source with the non-reproducible build) |
-| F0 sandbox against the reproducible wasm itself | PENDING | CI step added after this run; recorded on the next run |
+| F0 sandbox against the reproducible wasm itself | PASS (run `42984600861`) | see "Deploy artifact" below |
 | Testnet deploy, code hash on chain = `8Umgymq4...` | NOT RUN | no testnet account on this machine; `contracts/scripts/deploy-testnet.sh` is ready for the builder to run |
 | evidence.json rows | none added | Gate 1: no track claims; Tier A rows are added in Gate 2 from testnet hashes |
+
+### Deploy artifact (run `42984600861`, commit `0c4b4f4`)
+
+cargo-near embeds the git commit in the wasm (NEP-330 build info), so every
+commit gives a new reproducible hash even when the contract is unchanged. The
+freeze is therefore identified by the **contract source tree**, and the deploy
+artifact is the reproducible wasm that the same CI job built **and** tested.
+
+| Check | Status | Evidence |
+| --- | --- | --- |
+| Contract source unchanged since `913998e` | PASS | `git rev-parse <commit>:contracts/circle/src` = `227e4b9dc155fc7a93dffc7df4f9e90e0e538d55` at both `913998e` and `0c4b4f4`; `git diff --stat` over `contracts/circle`, `contracts/Cargo.*`, `rust-toolchain.toml` is empty |
+| Reproducible wasm (deploy artifact) | PASS | sha256 `2ad7e0945070654fa46a88277527efcbd299632b47adebe05935f62d5aee0e37`; code hash `3tF3gbHWdjhoSfMe2KDHrP7TSCEPAXNZh8dm9q97JrB8`; artifact `commoncircle-reproducible-wasm` of run `42984600861` |
+| F0 sandbox on that exact wasm | PASS 11/11 | `reproducible-sandbox-f0.log` in the same artifact |
+| Contract README rows on that exact wasm | PASS 9/9 (8 later-gate rows red) | `reproducible-readme-checks.log` |
+
+Testnet and mainnet deploy this file (sha256 `2ad7e094…0e37`). The on-chain code
+hash must equal `3tF3gbHWdjhoSfMe2KDHrP7TSCEPAXNZh8dm9q97JrB8`. The `913998e`
+hash recorded above is superseded as the deploy artifact (same source).
 
 Not yet evidenced: callback gas actually used (needed for the "cannot stay
 stuck" argument in `docs/EVENTS.md`), reproducible build hash, testnet deploy.

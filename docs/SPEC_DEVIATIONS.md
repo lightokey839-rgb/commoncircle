@@ -80,11 +80,15 @@ corresponding behavior is shipped.
 
 ## Contract freeze notice (Gate 1 phase 1E)
 
-- Frozen source: commit `913998e` on `lane/contracts`.
-- Reproducible wasm (cargo-near 0.23.0, image
-  `sourcescan/cargo-near:0.23.0-rust-1.99.1@sha256:8013f039e8005627f10ae66b5519d1a6eeeed7d7aef4b5067d5e9a86c4302fcc`):
-  sha256 `6f1f054ab5e20317a6875a34748d3de3b6177434d86b885a4fc2f70042e4a858`,
-  code hash `8Umgymq4CW3h9HWYehaCh1LKvFk3254FRjDAFBetm7Sf`.
+- Frozen source: `contracts/circle/src` git tree `227e4b9dc155fc7a93dffc7df4f9e90e0e538d55`
+  (first at commit `913998e` on `lane/contracts`).
+- Deploy artifact: reproducible wasm from CI run `42984600861` (commit `0c4b4f4`,
+  cargo-near 0.23.0, image
+  `sourcescan/cargo-near:0.23.0-rust-1.99.1@sha256:8013f039e8005627f10ae66b5519d1a6eeeed7d7aef4b5067d5e9a86c4302fcc`),
+  sha256 `2ad7e0945070654fa46a88277527efcbd299632b47adebe05935f62d5aee0e37`,
+  code hash `3tF3gbHWdjhoSfMe2KDHrP7TSCEPAXNZh8dm9q97JrB8`, tested in the same CI job
+  (F0 sandbox 11/11, contract README rows 9/9). cargo-near embeds the commit,
+  so later commits give other hashes for the same source; deploy only this file.
 - From here on, any change under `contracts/circle/src` needs a new entry in
   this file (what, why, covering test), a full sandbox re-run, and a new
   reproducible hash recorded in `docs/VERIFICATION.md`.
