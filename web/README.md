@@ -12,6 +12,9 @@ This directory is the ops/web handoff surface for the frozen
   NEP-141 `ft_transfer_call` messages with 1 yoctoNEAR and 150 Tgas. Their
   result parser exposes unused amounts and the CommonCircle funding/refund/
   repayment events without treating a UI submission as proof of finality.
+- The client exposes circle/loan creation, cancellation, all core loan/passport
+  views, caller-controlled pagination, passport card SVG, and NEP-171 metadata
+  views. The visible creation forms use labelled testnet DEMO parameters only.
 - `nep413.ts` performs the nonce → wallet `signMessage` → server verification
   flow. The server receives the signed challenge, never an invite secret.
 - `index.html`, `app.ts`, and `styles.css` are the join-by-invite and “my

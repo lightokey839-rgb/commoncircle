@@ -1,4 +1,4 @@
-import { CircleClient, plainContractError, type NearWallet } from './circle-client'
+import { CircleClient, plainContractError, type CircleParams, type NearWallet } from './circle-client'
 import { signInWithNep413, type Nep413Wallet } from './nep413'
 import { buildInviteLink, generateInviteKeyPair, parseInviteLink, signInviteWithSecret } from './invite'
 
@@ -76,6 +76,47 @@ async function createInvite(): Promise<void> {
   show('Invite registered. Share the link; its secret exists only in the URL fragment.')
 }
 
+const testnetDemoParams: CircleParams = {
+  min_amount: '1000000',
+  member_max_amount: '10000000',
+  trusted_max_amount: '50000000',
+  max_duration_days: 14,
+  day_length_sec: '60',
+  funding_window_sec: '3600',
+  qualifying_min_amount: '1000000',
+  qualifying_min_days: 1,
+  trusted_threshold: 1,
+  min_distinct_lenders: 1,
+  recovery_lock_sec: '0',
+  writeoff_grace_sec: '2592000',
+}
+
+async function createCircle(): Promise<void> {
+  if (!window.commonCircleWallet) throw new Error('Connect a NEAR wallet adapter before creating a circle.')
+  if (!accountId) throw new Error('Sign in before creating a circle.')
+  const name = $<HTMLInputElement>('#new-circle-name').value.trim()
+  if (!name) throw new Error('Circle name is required.')
+  const storage = await readClient.storageCosts()
+  await client().createCircle({ name, params: testnetDemoParams, deposit: storage.create_circle })
+  show('Circle creation submitted with the testnet DEMO parameters.')
+}
+
+async function createLoan(): Promise<void> {
+  if (!window.commonCircleWallet) throw new Error('Connect a NEAR wallet adapter before creating a loan.')
+  if (!accountId) throw new Error('Sign in before creating a loan.')
+  const circleId = $<HTMLInputElement>('#loan-circle-id').value.trim()
+  const lenderId = $<HTMLInputElement>('#loan-lender-id').value.trim()
+  const amount = $<HTMLInputElement>('#loan-amount').value.trim()
+  const durationDaysText = $<HTMLInputElement>('#loan-duration-days').value.trim()
+  const durationDays = Number(durationDaysText)
+  if (!/^\d+$/.test(circleId) || !lenderId || !/^\d+$/.test(amount) || !Number.isInteger(durationDays) || durationDays < 1) {
+    throw new Error('Circle, lender, amount, and duration are required; amount stays in USDC base units.')
+  }
+  const storage = await readClient.storageCosts()
+  await client().createLoan({ circleId, lenderId, amount, durationDays, deposit: storage.create_loan })
+  show('Loan creation submitted. The lender must be named exactly as entered.')
+}
+
 async function loadPositions(): Promise<void> {
   if (!accountId) throw new Error('Sign in before loading positions.')
   const positions = await readClient.myPositions(accountId)
@@ -91,6 +132,8 @@ function wire(): void {
   $('#sign-in').addEventListener('click', () => void signIn().catch((error) => show(error instanceof Error ? error.message : String(error))))
   $('#join-invite').addEventListener('click', () => void joinInvite().catch((error) => show(plainContractError(error))))
   $('#create-invite').addEventListener('click', () => void createInvite().catch((error) => show(plainContractError(error))))
+  $('#create-circle').addEventListener('click', () => void createCircle().catch((error) => show(plainContractError(error))))
+  $('#create-loan').addEventListener('click', () => void createLoan().catch((error) => show(plainContractError(error))))
   $('#load-positions').addEventListener('click', () => void loadPositions().catch((error) => show(error instanceof Error ? error.message : String(error))))
 }
 

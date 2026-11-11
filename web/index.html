@@ -44,6 +44,27 @@
         <textarea id="invite-link" rows="3" readonly placeholder="The share link appears here"></textarea>
       </section>
 
+      <section class="card" aria-labelledby="create-circle-heading">
+        <h2 id="create-circle-heading">Create a testnet DEMO circle</h2>
+        <p class="muted">This attaches the frozen short-duration testnet parameters; it is not a mainnet pilot configuration.</p>
+        <label for="new-circle-name">Circle name</label>
+        <input id="new-circle-name" value="CommonCircle demo" maxlength="64" />
+        <button id="create-circle">Create circle</button>
+      </section>
+
+      <section class="card" aria-labelledby="create-loan-heading">
+        <h2 id="create-loan-heading">Create a loan request</h2>
+        <label for="loan-circle-id">Circle id</label>
+        <input id="loan-circle-id" inputmode="numeric" placeholder="1" />
+        <label for="loan-lender-id">Named lender account</label>
+        <input id="loan-lender-id" autocomplete="off" placeholder="lender.testnet" />
+        <label for="loan-amount">Principal (USDC base units)</label>
+        <input id="loan-amount" inputmode="numeric" placeholder="1000000" />
+        <label for="loan-duration-days">Duration days</label>
+        <input id="loan-duration-days" inputmode="numeric" value="1" />
+        <button id="create-loan">Create loan</button>
+      </section>
+
       <section class="card" aria-labelledby="positions-heading">
         <h2 id="positions-heading">3. My positions</h2>
         <button id="load-positions" class="secondary">Refresh positions</button>

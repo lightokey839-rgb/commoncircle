@@ -113,6 +113,35 @@ export type StorageCosts = {
   create_loan: U128
 }
 
+export type Pagination = { fromIndex?: number | null; limit?: number | null }
+export type NftToken = {
+  token_id: string
+  owner_id: string
+  metadata: {
+    title: string | null
+    description: string | null
+    media: string | null
+    media_hash: string | null
+    copies: number | null
+    issued_at: string | null
+    expires_at: string | null
+    starts_at: string | null
+    updated_at: string | null
+    extra: string | null
+    reference: string | null
+    reference_hash: string | null
+  } | null
+}
+export type NftContractMetadata = {
+  spec: string
+  name: string
+  symbol: string
+  icon?: string | null
+  base_uri?: string | null
+  reference?: string | null
+  reference_hash?: string | null
+}
+
 export type FundMessage = { action: 'fund'; loan_id: U64; lender_id?: string }
 export type RepayMessage = { action: 'repay'; loan_id: U64 }
 export type CommonCircleEvent = {
@@ -189,6 +218,20 @@ function assertBaseUnits(value: string, field: string): asserts value is U128 {
   if (!/^[0-9]+$/.test(value) || value === '0') throw new Error(`${field} must be a positive integer base-unit string.`)
 }
 
+function pagination(input: Pagination = {}): { from_index: number | null; limit: number | null } {
+  const limit = input.limit ?? 50
+  if (!Number.isInteger(limit) || limit < 0 || limit > 50) throw new Error('limit must be an integer from 0 through 50.')
+  if (input.fromIndex !== undefined && input.fromIndex !== null && (!Number.isInteger(input.fromIndex) || input.fromIndex < 0)) {
+    throw new Error('fromIndex must be a non-negative integer or null.')
+  }
+  return { from_index: input.fromIndex ?? null, limit }
+}
+
+function nftPagination(fromIndex: U128 | null | undefined, limit: number | null | undefined): { from_index: U128 | null; limit: number | null } {
+  if (fromIndex !== undefined && fromIndex !== null && !/^\d+$/.test(fromIndex)) throw new Error('NFT fromIndex must be a U128 string.')
+  return { from_index: fromIndex ?? null, limit: pagination({ limit }).limit }
+}
+
 function decodeSuccessValue(outcome: unknown): U128 | null {
   if (!outcome || typeof outcome !== 'object') return null
   const statuses: unknown[] = []
@@ -263,11 +306,26 @@ export class CircleClient {
 
   getConfig(): Promise<ConfigView> { return this.view('get_config') }
   getCircle(circleId: U64): Promise<CircleView | null> { return this.view('get_circle', { circle_id: circleId }) }
+  getLoan(loanId: U64): Promise<LoanView | null> { return this.view('get_loan', { loan_id: loanId }) }
   getInvite(invitePublicKey: string): Promise<InviteView | null> { return this.view('get_invite', { invite_public_key: invitePublicKey }) }
   passportFor(circleId: U64, accountId: string): Promise<PassportView | null> { return this.view('passport_for', { circle_id: circleId, account_id: accountId }) }
   checkAccess(circleId: U64, accountId: string): Promise<AccessView> { return this.view('check_access', { circle_id: circleId, account_id: accountId }) }
-  loansByBorrower(accountId: string): Promise<LoanView[]> { return this.view('loans_by_borrower', { account_id: accountId, from_index: null, limit: 50 }) }
-  loansByLender(accountId: string): Promise<LoanView[]> { return this.view('loans_by_lender', { account_id: accountId, from_index: null, limit: 50 }) }
+  loansByBorrower(accountId: string, page: Pagination = {}): Promise<LoanView[]> { return this.view('loans_by_borrower', { account_id: accountId, ...pagination(page) }) }
+  loansByLender(accountId: string, page: Pagination = {}): Promise<LoanView[]> { return this.view('loans_by_lender', { account_id: accountId, ...pagination(page) }) }
+  loansInCircle(circleId: U64, page: Pagination = {}): Promise<LoanView[]> { return this.view('loans_in_circle', { circle_id: circleId, ...pagination(page) }) }
+  passportsInCircle(circleId: U64, page: Pagination = {}): Promise<PassportView[]> { return this.view('passports_in_circle', { circle_id: circleId, ...pagination(page) }) }
+  cardSvg(tokenId: string): Promise<string | null> { return this.view('card_svg', { token_id: tokenId }) }
+  nftToken(tokenId: string): Promise<NftToken | null> { return this.view('nft_token', { token_id: tokenId }) }
+  nftMetadata(): Promise<NftContractMetadata> { return this.view('nft_metadata') }
+  nftTotalSupply(): Promise<U128> { return this.view('nft_total_supply') }
+  nftTokens(fromIndex?: U128 | null, limit?: number | null): Promise<NftToken[]> { return this.view('nft_tokens', nftPagination(fromIndex, limit)) }
+  nftSupplyForOwner(accountId: string): Promise<U128> { return this.view('nft_supply_for_owner', { account_id: accountId }) }
+  nftTokensForOwner(accountId: string, fromIndex?: U128 | null, limit?: number | null): Promise<NftToken[]> {
+    return this.view('nft_tokens_for_owner', { account_id: accountId, ...nftPagination(fromIndex, limit) })
+  }
+  nftIsApproved(tokenId: string, approvedAccountId: string, approvalId?: U128 | null): Promise<boolean> {
+    return this.view('nft_is_approved', { token_id: tokenId, approved_account_id: approvedAccountId, approval_id: approvalId ?? null })
+  }
   storageCosts(): Promise<StorageCosts> { return this.view('storage_costs') }
 
   async registerInvite(input: { circleId: U64; invitePublicKey: string; expiresAt: U64; inviteeId?: string | null; deposit: U128 }): Promise<unknown> {
@@ -277,6 +335,25 @@ export class CircleClient {
       expires_at: input.expiresAt,
       invitee_id: input.inviteeId ?? null,
     }, input.deposit, '30000000000000')
+  }
+
+  async createCircle(input: { name: string; params: CircleParams; deposit: U128 }): Promise<unknown> {
+    return this.call('create_circle', { name: input.name, params: input.params }, input.deposit, '30000000000000')
+  }
+
+  async createLoan(input: { circleId: U64; lenderId: string; amount: U128; durationDays: number; deposit: U128 }): Promise<unknown> {
+    assertBaseUnits(input.amount, 'amount')
+    if (!Number.isInteger(input.durationDays) || input.durationDays < 1) throw new Error('durationDays must be a positive integer.')
+    return this.call('create_loan', {
+      circle_id: input.circleId,
+      lender_id: input.lenderId,
+      amount: input.amount,
+      duration_days: input.durationDays,
+    }, input.deposit, '50000000000000')
+  }
+
+  cancelLoan(loanId: U64): Promise<unknown> {
+    return this.call('cancel_loan', { loan_id: loanId }, '1', '30000000000000')
   }
 
   async myPositions(accountId: string): Promise<{ borrowed: LoanView[]; lent: LoanView[] }> {
