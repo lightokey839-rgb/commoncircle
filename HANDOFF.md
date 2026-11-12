@@ -3,6 +3,29 @@
 Amendment A1: each lane edits only its own files. Requests to the other lane go
 here, newest first, with the date (UTC) and the lane that wrote them.
 
+## 2026-11-12 22:25 UTC — [web] lead: web polish P0 done on `lane/web-polish`
+
+[2026-11-12 22:25 UTC] [web] done: P0-1 toasts + wallet state (d7d35f5), P0-2 requests for you / cancel / repay / countdowns / check-before-you-sign dialog (cd07cad), P0-3 loan form with member picker and one limit source (558ddc4), P0-4 checklist + layout (4af7e02), P0-5 member labels + one badge (9311a21). Type check (temp tsconfig over `web/**`, lib ES2022) clean, `oxlint web tests` 0 warnings, `npm test` 84/84, `npm run build` OK. Every check is a row in `docs/VERIFICATION.md` "Web polish". | red: nothing failing; live wallet checks of P0-1/2/3/4 are UNVERIFIED (they need the builder's wallet); P1 and P2 not started. | needs from other lane: none (contracts untouched). | needs from human (exact commands): open `http://localhost:5173/?circle_id=3` in Chrome as `254edye5v.testnet` and follow the UNVERIFIED rows in `docs/VERIFICATION.md`; to fund your request run `./contracts/scripts/testnet-dao.sh fund <loan>` in `work/commoncircle-contracts`.
+
+Assumptions made without asking (brief: do not stop for questions):
+- The brief names `docs/COMMONCIRCLE_SPEC_v3.md`; `STATUS.md` says spec v4 is in force. Rules were taken from `docs/CIRCLE_INTERFACE.md` (the contract), which both specs defer to; no conflict found, so no `SPEC_DEVIATIONS.md` entry.
+- Member label: first 6 + last 6 of the account **without** the `.testnet` suffix (`common…lender`), because every account ends in `.testnet` and "…estnet" says nothing. Full account in the tooltip; click copies it.
+- Two or more finished steps at the top fold into one "Steps 1–N done" line (still a check plus one line), so the next step fits at 1366x768.
+- Default lender in the picker = the circle founder read on-chain (`get_circle().founder_id`), replacing a hardcoded account id.
+- The type check uses a temporary tsconfig (extends `tsconfig.json`, includes `web/**/*.ts`, lib ES2022) because `npm run typecheck` covers only `src`/`scripts`.
+
+Interface gaps (logged, worked around on the client):
+- No lender-side Decline: `CIRCLE_INTERFACE.md` has no method for it. The UI offers Fund only; an unfunded request lapses after `funding_window_sec`.
+- No member nickname or display name on `PassportView`, so labels are derived from the account.
+
+Audit of Treasury, Members and Tools (not in the recording):
+- Treasury: stewards now show as member labels with copy; the ask form now uses the same `borrowLimit()` validation as the loan form (it accepted any amount before). Open: the proposal bond is shown with `Number(BigInt(bond) / 10n ** 18n) / 1e6` (a float, display only, not a money path); propose a BigInt formatter. "Asked by" labels fixed.
+- Members: cards show avatar + label + badge + on-time/late counts (were long raw ids and the old pills).
+- Tools: "Invite someone", "Change a circle's card design" and "Look at another circle" still have a free-text "Circle number" (advanced tools; left as is). Propose: default the invite and design forms to the current circle and hide the number unless "Advanced" is open. The raw testnet data box prints lines of ids by design (not an error).
+- Chat: the People list used the old stretched pill (fixed by the badge); the composer and gate are unchanged.
+
+Proposed README fixes (README not edited): none required by this work. When the builder's live run passes, flip the "Join / sign-in" rows that still say *not yet*, citing the hashes recorded in `docs/VERIFICATION.md`.
+
 ## 2026-11-12 ~12:00 UTC — lead: web-lane Gate 2 items finished by the lead (Codex hit its usage limit)
 
 Codex did items 1 and 2 (`c5c55c4`, `dfcc567`) and most of item 3, then hit its
