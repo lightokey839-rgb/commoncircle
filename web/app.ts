@@ -141,7 +141,9 @@ function onAccountChange(nextAccountId: string): void {
   $('#wallet-account').textContent = nextAccountId
   $('#wallet-account').title = nextAccountId
   $('#profile-avatar').replaceWith(Object.assign(avatar(nextAccountId || '?'), { id: 'profile-avatar' }))
-  if (changed) { chatMessages.clear(); void refreshMe() }
+  // Re-render now so step 1 shows "Connected" at once; refreshMe() fills in the rest
+  // after its testnet reads, which can take a few seconds.
+  if (changed) { chatMessages.clear(); renderAll(); void refreshMe() }
 }
 
 function hasSavedWalletSession(): boolean {
@@ -231,6 +233,7 @@ async function joinInvite(): Promise<void> {
   const storage = await readClient.storageCosts()
   const signer = window.commonCircleInviteSigner ?? signInviteWithSecret
   await client().joinByInvite({ circleId: cid, callerId: accountId, invitePublicKey, inviteSecret, signInvite: signer, deposit: storage.redeem_invite })
+  forgetInvite()
   await afterTx('Welcome to the circle! Your card is being created.')
 }
 
@@ -879,8 +882,36 @@ function wire(): void {
   window.setInterval(tickDue, 1000)
 }
 
+// The invite link is kept in this browser until the join succeeds, so reopening the
+// app without the link (a new tab, a bookmark) does not lose it. The invite key is a
+// throwaway, single-use key that only the named invitee can redeem; it is never an
+// account key.
+const INVITE_KEY = 'commoncircle.pendingInvite'
+
+function rememberInvite(invite: ReturnType<typeof parseInviteLink>): void {
+  try { localStorage.setItem(INVITE_KEY, JSON.stringify(invite)) } catch { /* ignore */ }
+}
+
+function savedInvite(): ReturnType<typeof parseInviteLink> | null {
+  try {
+    const saved = JSON.parse(localStorage.getItem(INVITE_KEY) ?? 'null') as ReturnType<typeof parseInviteLink> | null
+    return saved?.inviteSecret && saved.invitePublicKey && saved.circleId ? saved : null
+  } catch {
+    return null
+  }
+}
+
+function forgetInvite(): void {
+  try { localStorage.removeItem(INVITE_KEY) } catch { /* ignore */ }
+}
+
 function hydrateInviteFields(): void {
-  const invite = parseInviteLink()
+  let invite = parseInviteLink()
+  if (invite.inviteSecret && invite.invitePublicKey && invite.circleId) rememberInvite(invite)
+  else {
+    const saved = savedInvite()
+    if (saved && (!invite.circleId || invite.circleId === saved.circleId)) invite = saved
+  }
   if (invite.circleId) {
     $<HTMLInputElement>('#circle-id').value = invite.circleId
     $<HTMLInputElement>('#demo-circle-id').value = invite.circleId
