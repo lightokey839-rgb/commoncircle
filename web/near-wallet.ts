@@ -11,7 +11,8 @@ import type { Nep413Wallet, SignedMessage, SignMessageParams } from './nep413'
 
 export type NearWalletController = NearWallet & Nep413Wallet & {
   accountId: string
-  connect(walletId: 'my-near-wallet' | 'meteor-wallet'): Promise<string>
+  /** signIn: false only restores an existing session and never opens the wallet. */
+  connect(walletId: 'my-near-wallet' | 'meteor-wallet', options?: { signIn?: boolean }): Promise<string>
   disconnect(): Promise<void>
 }
 
@@ -21,6 +22,20 @@ export function toWalletActions(actions: FunctionCallAction[]) {
     if (action.type !== 'FunctionCall') throw new Error(`Unsupported NEAR action: ${String((action as { type?: string }).type)}`)
     return actionCreators.functionCall(action.params.methodName, action.params.args, BigInt(action.params.gas), BigInt(action.params.deposit))
   })
+}
+
+/**
+ * Accounts the wallet is already signed in with, or [] when none.
+ * Meteor's getAccounts() throws "No current account connected to Meteor Wallet"
+ * instead of returning [] before the first sign-in, which used to stop Connect
+ * before the wallet pop-up opened.
+ */
+export async function currentAccounts(wallet: Pick<Wallet, 'getAccounts'>): Promise<Account[]> {
+  try {
+    return await wallet.getAccounts()
+  } catch {
+    return []
+  }
 }
 
 let selectorPromise: Promise<WalletSelector> | null = null
@@ -53,9 +68,10 @@ export async function createNearWallet(input: {
 
   return {
     get accountId() { return accountId },
-    async connect(walletId) {
+    async connect(walletId, options) {
       selected = await selector.wallet(walletId)
-      const current = await selected.getAccounts()
+      const current = await currentAccounts(selected)
+      if (!current.length && options?.signIn === false) { selected = null; return '' }
       // Sign in without a contractId: the wallet adds no limited-access key to the user's
       // account, so every CommonCircle action goes through an explicit wallet approval.
       const signIn = (selected as unknown as { signIn(p: SignInParams): Promise<Account[]> }).signIn.bind(selected)
@@ -97,6 +113,7 @@ export async function restoreNearWallet(input: { contractId: string; onAccountCh
   const active = selector.store.getState().selectedWalletId
   if (active !== 'my-near-wallet' && active !== 'meteor-wallet') return null
   const controller = await createNearWallet(input)
-  await controller.connect(active)
-  return controller
+  // Restore only: on page load a pop-up would be blocked, so never start a sign-in here.
+  const accountId = await controller.connect(active, { signIn: false })
+  return accountId ? controller : null
 }

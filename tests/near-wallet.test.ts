@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { najActionToInternal } from '@near-wallet-selector/core'
-import { toWalletActions } from '../web/near-wallet'
+import { currentAccounts, toWalletActions } from '../web/near-wallet'
 
 // Wallet Selector 10 wallets (MyNearWallet, Meteor) read @near-js Action objects and
 // convert them with najActionToInternal. The older { type: 'FunctionCall', params }
@@ -25,5 +25,20 @@ describe('NEAR Wallet Selector 10 action format', () => {
 
   it('refuses anything that is not a function call', () => {
     expect(() => toWalletActions([{ type: 'Transfer' } as never])).toThrow(/Unsupported/)
+  })
+})
+
+// Meteor (wallet-selector 10.1.4, @meteorwallet/sdk 1.0.24) throws from getAccounts()
+// before the first sign-in instead of returning []. Connect must treat that as
+// "not signed in yet" and go on to open the wallet.
+describe('currentAccounts', () => {
+  it('treats Meteor\'s "No current account connected" error as no accounts', async () => {
+    const meteorBeforeSignIn = { getAccounts: async () => { throw new Error('No current account connected to Meteor Wallet') } }
+    await expect(currentAccounts(meteorBeforeSignIn)).resolves.toEqual([])
+  })
+
+  it('returns the signed-in account when there is one', async () => {
+    const signedIn = { getAccounts: async () => [{ accountId: 'someone.testnet', publicKey: 'ed25519:x' }] }
+    await expect(currentAccounts(signedIn)).resolves.toEqual([{ accountId: 'someone.testnet', publicKey: 'ed25519:x' }])
   })
 })
