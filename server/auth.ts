@@ -13,15 +13,33 @@
  * Node strips the type annotations). NEAR_RPC_URL defaults to FastNEAR testnet.
  */
 
-import { createHmac, randomBytes } from 'node:crypto'
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { ChatError, ChatService, rpcAccessCheck } from './chat.ts'
 import { hasFullAccessKey, verifyNep413Signature } from './nep413.ts'
 
 const PORT = Number(process.env.AUTH_PORT ?? 3001)
 const APP_DOMAIN = process.env.APP_DOMAIN ?? 'localhost:5173'
 const AUTH_RECIPIENT = process.env.NEAR_AUTH_RECIPIENT ?? APP_DOMAIN
 const NEAR_RPC_URL = process.env.NEAR_RPC_URL ?? process.env.NEAR_TESTNET_RPC_URL ?? 'https://test.rpc.fastnear.com'
-const JWT_SECRET = process.env.AUTH_JWT_SECRET ?? randomBytes(32).toString('hex')
+const CONTRACT_ID = process.env.CIRCLE_CONTRACT_ID ?? 'commoncircle-light.testnet'
+// Local data (gitignored): the token-signing secret and chat history survive restarts.
+const DATA_DIR = process.env.COMMONCIRCLE_DATA_DIR ?? join(dirname(fileURLToPath(import.meta.url)), '.data')
+
+function localSecret(): string {
+  const path = join(DATA_DIR, 'jwt-secret')
+  try { return readFileSync(path, 'utf8').trim() } catch { /* first run */ }
+  const secret = randomBytes(32).toString('hex')
+  mkdirSync(DATA_DIR, { recursive: true })
+  writeFileSync(path, secret, { mode: 0o600 })
+  return secret
+}
+
+const JWT_SECRET = process.env.AUTH_JWT_SECRET ?? localSecret()
+const chat = new ChatService({ checkAccess: rpcAccessCheck(NEAR_RPC_URL, CONTRACT_ID), storePath: join(DATA_DIR, 'chat.json') })
 const challenges = new Map<string, {
   accountId: string
   message: string
@@ -69,6 +87,41 @@ function signJwt(accountId: string): string {
   const payload = Buffer.from(JSON.stringify({ sub: accountId, accountId, iat: now, exp: now + 86400 })).toString('base64url')
   const signature = createHmac('sha256', JWT_SECRET).update(`${header}.${payload}`).digest('base64url')
   return `${header}.${payload}.${signature}`
+}
+
+/** The account a sign-in token belongs to, or null if it is forged or expired. */
+function verifyJwt(token: string): string | null {
+  const [header, payload, signature] = token.split('.')
+  if (!header || !payload || !signature) return null
+  const expected = createHmac('sha256', JWT_SECRET).update(`${header}.${payload}`).digest()
+  const given = Buffer.from(signature, 'base64url')
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null
+  try {
+    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString()) as { accountId?: string; exp?: number }
+    if (!claims.accountId || !claims.exp || claims.exp * 1000 < Date.now()) return null
+    return claims.accountId
+  } catch {
+    return null
+  }
+}
+
+/** GET/POST /chat/<circleId>/messages: members of the circle only (NEP-413 token + on-chain check). */
+async function chatRoute(request: Request, circleId: string, origin: string | null): Promise<Response> {
+  const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ?? ''
+  const accountId = token ? verifyJwt(token) : null
+  if (!accountId) return json({ error: 'Sign in first to use the chat.' }, 401, origin)
+  try {
+    if (request.method === 'GET') {
+      const after = Number(new URL(request.url).searchParams.get('after') ?? 0) || 0
+      return json({ messages: await chat.list(accountId, circleId, after) }, 200, origin)
+    }
+    const input = await body(request)
+    return json({ message: await chat.post(accountId, circleId, input?.text) }, 201, origin)
+  } catch (error) {
+    if (error instanceof ChatError) return json({ error: error.message, code: error.code }, error.status, origin)
+    console.error('[chat] failed:', error instanceof Error ? error.message : String(error))
+    return json({ error: 'Chat is unavailable right now.' }, 503, origin)
+  }
 }
 
 async function body(request: Request): Promise<Record<string, unknown> | null> {
@@ -152,6 +205,8 @@ async function handle(request: Request): Promise<Response> {
   }
   if (url.pathname === '/nonce' && request.method === 'POST') return nonce(request, origin)
   if (url.pathname === '/verify' && request.method === 'POST') return verifyLogin(request, origin)
+  const room = url.pathname.match(/^\/chat\/(\d{1,19})\/messages$/)
+  if (room && (request.method === 'GET' || request.method === 'POST')) return chatRoute(request, room[1], origin)
   return json({ error: 'Not found' }, 404, origin)
 }
 

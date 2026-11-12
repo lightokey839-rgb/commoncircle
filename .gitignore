@@ -13,3 +13,6 @@ coverage/
 test-results/
 .tools/
 .npm-cache/
+
+# Local chat history and sign-in secret (server/auth.ts)
+server/.data/
