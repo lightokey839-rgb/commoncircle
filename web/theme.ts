@@ -1,4 +1,5 @@
 import type { CircleTheme, CircleThemePattern } from './circle-client'
+import { assertTagline } from './text-rules'
 
 export const THEME_MAX_EMBLEM_BYTES = 12 * 1024
 export const THEME_EMBLEM_SIZE = 128
@@ -74,7 +75,7 @@ export function readThemeForm(prefix: ThemeFormPrefix): CircleTheme {
   const emblemInput = input<HTMLInputElement>(prefix, 'emblem')
   const tagline = input<HTMLInputElement>(prefix, 'tagline').value.trim()
   const colors = ['background', 'accent', 'text'].map((field) => input<HTMLInputElement>(prefix, field).value)
-  if ([...tagline].length > 32) throw new Error('The tagline must be 32 characters or fewer.')
+  assertTagline(tagline)
   if (colors.some((color) => !/^#[0-9A-Fa-f]{6}$/.test(color))) throw new Error('Colours must use #RRGGBB.')
   const pattern = input<HTMLSelectElement>(prefix, 'pattern').value as CircleThemePattern
   if (!THEME_PATTERNS.includes(pattern)) throw new Error('Choose a supported passport pattern.')
