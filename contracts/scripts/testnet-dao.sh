@@ -74,7 +74,13 @@ LAST_HASH=""
 # SOFT=1: a failing transaction is expected (refusal proofs); keep going.
 tx() {
   local label="$1"; shift
-  local out rc=0; out=$(near "$@" 2>&1) || rc=$?
+  # A missing argument makes near-cli ask a question, which the captured output
+  # hides (on Windows it reads the console directly). Give up after 3 minutes.
+  local out rc=0; out=$(timeout 180 near "$@" 2>&1 </dev/null) || rc=$?
+  if [ "$rc" = 124 ]; then
+    echo "STOP: '$label' waited 3 minutes: near-cli is asking a question (a command argument is missing). Nothing was sent by this step; tell the lead."
+    exit 1
+  fi
   LAST_HASH=$(printf '%s\n' "$out" | grep -oE 'Transaction ID: [1-9A-HJ-NP-Za-km-z]+' | head -1 | cut -d' ' -f3 || true)
   if [ "$rc" != 0 ]; then
     if [ "${SOFT:-0}" = 1 ]; then echo "   (near-cli exit $rc: failure expected here)";
@@ -154,7 +160,7 @@ dao() {
   say "2 DAO account $DAO (created by $DAO_PARENT with 1 NEAR for its state)"
   if exists "$DAO"; then echo "exists"; else
     tx "create $DAO" account create-account fund-myself "$DAO" '1 NEAR' autogenerate-new-keypair \
-      save-to-keychain sign-as "$DAO_PARENT" network-config testnet sign-with-keychain send
+      --signature-scheme ed25519 save-to-keychain sign-as "$DAO_PARENT" network-config testnet sign-with-keychain send
   fi
 
   say "3 Deploy Sputnik by global hash and initialise: council = the two stewards, strict majority, 1-hour proposals, 0.1 NEAR bond"
