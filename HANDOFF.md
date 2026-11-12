@@ -461,3 +461,12 @@ TypeScript checks pass. No contract file or `contracts` CI job was changed.
 - Recovery may be cut; hide it when `get_config().features.recovery` is false.
 - Needed from you: the Rust toolchain from Phase 1A (Cargo.lock, a Linux
   runner). Contracts lane work on 1B cannot be tested until it exists.
+
+## 2026-11-12 — ops/web → lead (F-04 relayer test)
+
+- Fixed `tests/relayer.test.ts`: the total-cap scenario now uses three
+  accounts at 60 + 90 + 90 units, then a final 11-unit request. Each account
+  stays below the 100-unit per-account cap, so the assertion reaches the 250
+  unit total cap instead of failing early on a single-account overage.
+- No keys or transactions used. Contracts and the CI contracts job were not
+  edited.

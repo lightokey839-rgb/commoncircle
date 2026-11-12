@@ -107,8 +107,10 @@ describe('relayer allowlist and daily caps', () => {
     await guard.authorize(request(proof, { estimatedCost: '60' }), reader)
     await expect(guard.authorize(request(proof, { estimatedCost: '41' }), reader)).rejects.toMatchObject({ code: 'RELAYER_ACCOUNT_CAP' })
     const other = inviteProof('carol.testnet')
-    await guard.authorize(request(other, { accountId: 'carol.testnet', invitePublicKey: other.invitePublicKey, inviteSignature: other.inviteSignature, estimatedCost: '150' }), readerFor(other.invite))
-    await expect(guard.authorize(request(other, { accountId: 'carol.testnet', invitePublicKey: other.invitePublicKey, inviteSignature: other.inviteSignature, estimatedCost: '41' }), readerFor(other.invite))).rejects.toMatchObject({ code: 'RELAYER_TOTAL_CAP' })
+    await guard.authorize(request(other, { accountId: 'carol.testnet', invitePublicKey: other.invitePublicKey, inviteSignature: other.inviteSignature, estimatedCost: '90' }), readerFor(other.invite))
+    const third = inviteProof('dave.testnet')
+    await guard.authorize(request(third, { accountId: 'dave.testnet', invitePublicKey: third.invitePublicKey, inviteSignature: third.inviteSignature, estimatedCost: '90' }), readerFor(third.invite))
+    await expect(guard.authorize(request(proof, { estimatedCost: '11' }), reader)).rejects.toMatchObject({ code: 'RELAYER_TOTAL_CAP' })
     clock += 86_400_000
     const reset = await guard.authorize(request(proof, { estimatedCost: '100' }), reader)
     expect(reset.accountRemaining).toBe('0')
