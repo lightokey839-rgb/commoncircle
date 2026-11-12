@@ -13,7 +13,9 @@
 #   ./contracts/scripts/testnet-dao.sh propose    # the member files the Transfer-with-msg proposal (KIND=call for the FunctionCall form)
 #   ./contracts/scripts/testnet-dao.sh vote       # both stewards approve; the DAO pays; the loan must be Funded
 #   ./contracts/scripts/testnet-dao.sh lowgas     # F-16: fund with 40 Tgas against real USDC -> refused, lender unchanged
-#   ./contracts/scripts/testnet-dao.sh repay      # the member repays the treasury loan to the DAO
+#   ./contracts/scripts/testnet-dao.sh repay [id] # the member repays (default: the last treasury loan) to the DAO
+#   ./contracts/scripts/testnet-dao.sh clearflag <id>  # stewards vote; the DAO clears a late/overdue flag (F-09)
+#   Treasury loans default to LOAN_DAYS=7: DEMO "days" are 60 s, so repay within 7 minutes of funding.
 #   ./contracts/scripts/testnet-dao.sh status     # read-only summary
 #
 # Keys stay in the OS keychain (near-cli-rs). This script never prints or stores
@@ -230,13 +232,42 @@ refuse() {
 }
 
 loan() {
-  say "The Trusted, non-steward member asks the treasury for 1 USDC for 1 day"
-  echo "borrower tier $(passport "$BORROWER" | jget tier), steward $(passport "$BORROWER" | jget steward)"
+  # DEMO circles use 60-second "days": a 1-day loan is due one MINUTE after funding.
+  # Default to 7 days (7 minutes) so there is time to repay after the vote.
+  local days="${LOAN_DAYS:-7}"
+  say "The Trusted, non-steward member asks the treasury for 1 USDC for $days demo days ($days minutes after funding)"
+  echo "borrower effective tier $(passport "$BORROWER" | jget effective_tier), steward $(passport "$BORROWER" | jget steward), overdue loans $(passport "$BORROWER" | jget overdue_loans)"
   local lid; lid=$(next_loan_id)
   call "treasury create_loan $lid" "$BORROWER" "$CIRCLE" create_loan \
-    "{\"circle_id\":\"$CIRCLE_ID\",\"lender_id\":\"$DAO\",\"amount\":\"$AMOUNT\",\"duration_days\":1}" "$(cost_of create_loan) yoctoNEAR"
+    "{\"circle_id\":\"$CIRCLE_ID\",\"lender_id\":\"$DAO\",\"amount\":\"$AMOUNT\",\"duration_days\":$days}" "$(cost_of create_loan) yoctoNEAR"
   save LOAN_ID "$lid"; save LOAN_TX "$LAST_HASH"
-  echo "loan $lid: $(view "$CIRCLE" get_loan "{\"loan_id\":\"$lid\"}" | jget state); fund it within the circle's funding window (1 hour)"
+  echo "loan $lid: $(view "$CIRCLE" get_loan "{\"loan_id\":\"$lid\"}" | jget state); fund it within 1 hour, then repay within $days minutes of funding"
+}
+
+# clearflag <loan_id>: the stewards vote to forgive a late/overdue flag. The DAO is the
+# circle admin, so it calls clear_flag itself through a FunctionCall proposal (F-09).
+clearflag() {
+  local lid="${1:?usage: clearflag <loan_id>}"
+  local proposal; proposal=$(node -e '
+    const [circle,lid]=process.argv.slice(1);
+    process.stdout.write(JSON.stringify({proposal:{description:`CommonCircle: forgive the late flag on loan ${lid}`,
+      kind:{FunctionCall:{receiver_id:circle,actions:[{method_name:"clear_flag",
+        args:Buffer.from(JSON.stringify({loan_id:lid})).toString("base64"),deposit:"1",gas:"30000000000000"}]}}}}));' "$CIRCLE" "$lid")
+  local pid; pid=$(view "$DAO" get_last_proposal_id '{}')
+  say "A steward files proposal $pid: the DAO clears the flag on loan $lid"
+  call "add_proposal $pid (clear_flag loan $lid)" "$FOUNDER" "$DAO" add_proposal "$proposal" "$BOND_YOCTO yoctoNEAR" '50.0 Tgas'
+  save CLEARFLAG_PROPOSAL_ID "$pid"
+  local kind; kind=$(view "$DAO" get_proposal "{\"id\":$pid}" | jget kind)
+  local n=0
+  for s in "$FOUNDER" "$STEWARD"; do
+    n=$((n+1))
+    [ "$(view "$DAO" get_proposal "{\"id\":$pid}" | jget status)" = "InProgress" ] || break
+    call "clear_flag vote $n proposal $pid" "$s" "$DAO" act_proposal \
+      "{\"id\":$pid,\"action\":\"VoteApprove\",\"proposal\":$kind}" '0 NEAR' '300.0 Tgas'
+    save "CLEARFLAG_VOTE${n}_TX" "$LAST_HASH"
+  done
+  echo "proposal $pid: $(view "$DAO" get_proposal "{\"id\":$pid}" | jget status); loan $lid flag_cleared: $(view "$CIRCLE" get_loan "{\"loan_id\":\"$lid\"}" | jget flag_cleared)"
+  passport "$BORROWER" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);console.log("borrower passport:",JSON.stringify({tier:p.tier,effective_tier:p.effective_tier,on_time:p.on_time_count,late:p.late_count,overdue_loans:p.overdue_loans,perks_paused:p.perks_paused}))})'
 }
 
 propose() {
@@ -296,12 +327,16 @@ lowgas() {
   [ "$before" = "$after" ] && echo "LOW-GAS REFUSAL OK" || echo "STOP: founder balance changed"
 }
 
-repay() {
-  [ -n "${LOAN_ID:-}" ] || { echo "STOP: no treasury loan"; exit 1; }
-  say "The member repays treasury loan $LOAN_ID (the money goes to the DAO)"
-  call "repay treasury loan $LOAN_ID" "$BORROWER" "$USDC_ID" ft_transfer_call \
-    "{\"receiver_id\":\"$CIRCLE\",\"amount\":\"$AMOUNT\",\"msg\":\"{\\\"action\\\":\\\"repay\\\",\\\"loan_id\\\":\\\"$LOAN_ID\\\"}\"}" '1 yoctoNEAR'
-  echo "loan $LOAN_ID $(view "$CIRCLE" get_loan "{\"loan_id\":\"$LOAN_ID\"}" | jget state); DAO USDC $(usdc_balance "$DAO"); circle USDC $(usdc_balance "$CIRCLE")"
+repay() { # repay [loan_id]  (default: the last treasury loan)
+  local lid="${1:-${LOAN_ID:-}}"
+  [ -n "$lid" ] || { echo "STOP: no treasury loan"; exit 1; }
+  say "The member repays loan $lid (the money goes to its lender: the DAO for a treasury loan)"
+  echo "borrower USDC $(usdc_balance "$BORROWER"); loan $lid $(view "$CIRCLE" get_loan "{\"loan_id\":\"$lid\"}" | jget state)"
+  call "repay loan $lid" "$BORROWER" "$USDC_ID" ft_transfer_call \
+    "{\"receiver_id\":\"$CIRCLE\",\"amount\":\"$AMOUNT\",\"msg\":\"{\\\"action\\\":\\\"repay\\\",\\\"loan_id\\\":\\\"$lid\\\"}\"}" '1 yoctoNEAR'
+  save "REPAY_${lid}_TX" "$LAST_HASH"
+  view "$CIRCLE" get_loan "{\"loan_id\":\"$lid\"}" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const l=JSON.parse(s);console.log("loan",l.loan_id,l.state,"on time:",l.repaid_on_time,"flag_cleared:",l.flag_cleared)})'
+  echo "DAO USDC $(usdc_balance "$DAO"); circle USDC $(usdc_balance "$CIRCLE")"
 }
 
 status() {
@@ -313,6 +348,6 @@ status() {
 }
 
 case "${1:-}" in
-  stewards|dao|lock|attach|refuse|loan|propose|vote|lowgas|repay|status) "$1" ;;
+  stewards|dao|lock|attach|refuse|loan|propose|vote|lowgas|repay|clearflag|status) "$1" "${2:-}" ;;
   *) sed -n '2,20p' "$0"; exit 2 ;;
 esac

@@ -330,6 +330,23 @@ was stale: the deploy and this proof had already run between 16:51 and 16:57 UTC
 | Same run, other suites | PASS | unit 49/49, F0 sandbox 13/13, red-team 8/8, README rows 9 pass / 8 later-gate rows red as expected; npm job red only on F-04 (relayer test) |
 | Reproducible build at `873fcfb` | code hash `DTibM2HwAHHGw1kt6mbdKVZxSX8u7pZ1vtQWctmTRJaV`, differs from the deployed `J4X6…LxGr` | `contracts/circle/src` tree is identical (`c6daa1d066d041420597f932bf9dc51b404930a8` at `2e45eef` and at `873fcfb`); the difference is the commit id in the embedded NEP-330 metadata. The deployed `J4X6…LxGr` stays the tested artifact (run `43059776368`); no redeploy needed |
 
+## Gate 2: Sputnik DAO treasury on testnet (2026-11-12)
+
+The builder ran `contracts/scripts/testnet-dao.sh`; the lead read every
+transaction back over FastNEAR with `near-tx.mjs` and views.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Steward account joins circle 3; two stewards appointed by the founder | PASS | create steward `9wnbtVNoCH21zohKScNdtdqfTQvCYVYFE5pc1LiNpK4A`; invite `PNCkYDRLo2DPxQ66sxqaDPYpwbpLzfmLNQD4dq2UkeH` / redeem `Aw8kVbNd5bsqR6DB4uBbv3mGiUaTxTdEGRs3KraRojge`; `set_steward` lender `4xp8pKjcwS6oQ74Fjc5HnR1LXKuCgYP87jsH6FT11X6`, steward `7xgrKu56odgE4h5gsWLdDSQByhLS3WXaMbQjtmp3P3LM`; `steward_count` 2 |
+| DAO deployed **by global hash** | PASS | account `dogs-dao.commoncircle-light.testnet` created `Cc3nS56x8rmXmCddqCN9M3kt4eVzpYaKwkMgfa6uuSbC` (1 NEAR); deploy + `new` `6gy2rBQbZ9CKA3HdoKBqMnPRQacceaobsXTQS7uDbLiF`. `view_account`: `global_contract_hash` = `Ea8tHXFSQVszVwGASyzAfLq65DjcRDhkfab4FcPaRpgD`, `code_hash` `1111…` (no local code), storage 1,000 bytes. `version` "2.3.1". Policy: role `stewards` = Group [lender, steward], `*:*`; role `members-may-ask` = Everyone, `transfer:AddProposal`, `call:AddProposal`; threshold [1,2] (both must approve), quorum 0, bond 0.1 NEAR, period 1 hour |
+| DAO registered with USDC and seeded | PASS | `storage_deposit` `91aJwq6pQ84fWQjcSU8fwv5v9aBzgqe5zmcojAb3LgWd`; `ft_transfer` 2 USDC `6GXadLGYAnke3DQyDfyPdVt6zPcJhbddkpnK8Zcn9P1w` |
+| DAO locked (no keys) | PASS | delete-keys `6nXfe4grVpHEhAHwe35hMrmDPoc13PNFmnoCXE8Ub6Qc` (08:49 UTC, removed `ed25519:EuMsXtHmNnWjDepzVmhPauTSCyyiDFPdS7FRyPmzb4TM`); `view_access_key_list` → `[]` |
+| `attach_dao(3, dogs-dao…)` | PASS | `2zYZ7zxQw8S9w121k1hHvYjcG3vLaz68iipNv4M5iduR`; circle 3 admin and treasury = the DAO, `treasury_lending_enabled: true` |
+| A steward asks the treasury → refused | PASS (3 times) | `BP5xD6BKPfPsSue9ExWArrVdKdZkWTE3E4ReK5hRHCfs`, `CwXUg4eWy6swJ7L3sHfeTzL6NX5FxPc2A7k9ZdTLpwKw`, `J7XZHt17De96uBniiMWwHdzoA8tSc2X7cDJ8PxdRmuMd`: `create_loan` FAILED `E19_TREASURY_RULES` |
+| **A Transfer-with-msg proposal funds a treasury loan** | PASS | loan 4 by `borrower3` (Trusted, not a steward) `Bs65Bi7ZBaki8RGZiPKQ3XRA8TztgZ4jVCAQ1ZpvfaC6`; proposal 0 filed by the borrower `6g4WarjaaiKC8MLrHBDC1mXSeB6AKfCitN9i2ovmG9vK`; votes `2rXRsRM6TBoZmjbvBkeMjosrPSLsR91GTqfZUiA7uQdG` and `Gmm9nWXrfBsQunBzxP7emKK5whgfu5s5EPuh58aBTfvg`. Executing vote: Sputnik's `ft_transfer_call` got **148.02 Tgas**, the circle's `ft_on_transfer` got **128.5 Tgas** (minimum 70), `loan_funding_started` `funded_via: Treasury`, `ft_transfer` 1 USDC to the borrower, `loan_funded`, proposal `Approved` (votes 2/0/0), bond 0.1 NEAR returned. So the Transfer form works with real USDC; the FunctionCall fallback is not needed |
+| An approved proposal is still refused when the borrower is no longer Trusted | PASS | loan 5 `5PCGmtrNJ6iSTD55ewqK1iSoPH7wAuSvWJRBpqUgLUcM`, proposal 1 `8ZuMVqPPnQ64iS4DoFADtS74ySr84TuDqkosw3obw4PH`, executing vote `AmBADVeLJJqM66KSP1eRjGhqH8cHQD5zRNz5WPv3qpvQ`: `ft_on_transfer` got 128.49 Tgas, `transfer_refunded` reason `E19_TREASURY_RULES`, USDC `ft_transfer` memo `refund` back to the DAO. Cause: loan 4 had become overdue (see below), so the borrower's effective tier was Member |
+| Script fault found | fixed | DEMO circle "days" are 60 s, so the 1-day loan 4 was due 60 s after funding and went overdue (`perks_paused: true`, effective tier Member), which also refused loan 6 at `create_loan` (`HDcRsXYN64Vej4sNnV1ExpsjNHjdRDxG7Y2BgXpN9q2e`, E19). `testnet-dao.sh` now defaults treasury loans to 7 demo days and adds `repay <id>` and `clearflag <id>` (the DAO forgives a flag by proposal) |
+
 ## Incident: testnet secret key exposed in chat (2026-11-11)
 
 `near account export-account <id> using-web-wallet` prints a MyNearWallet
