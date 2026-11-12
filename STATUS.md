@@ -9,6 +9,7 @@ Ship Sat 14 Nov 17:59. This replaces amendment A11's Gate 2/3 times.
 ## Web polish (branch `lane/web-polish`, started 2026-11-12 ~21:20 UTC)
 
 - P0-1 toasts and wallet state: PASS. Toasts auto-dismiss (6 s, errors 10 s), have a close button, do not repeat; wallet/RPC errors become one plain sentence plus Retry (`web/notify.ts`, `tests/notify.test.ts`); step 1 shows Switch/Disconnect once connected. Checked in the browser pane: clean load has no toast and no console error; a blocked wallet pop-up shows "Allow pop-ups…" with Retry and clears after 10 s.
+- P0-2 close the loop: PASS in unit tests, live run UNVERIFIED (steps in `docs/VERIFICATION.md`). "Requests for you" (Home and Loans) with Fund; waiting requests show an expiry countdown and Cancel request (`cancel_loan`); funded loans show a due countdown and Repay; after repaying, on-time/late counters and progress toward the circle's `trusted_threshold`. Every money action opens a "check before you sign" dialog: summary, pending, success or failure, explorer link (`web/money.ts`, `web/loan-rules.ts`, `tests/money.test.ts`). No Decline: the interface has no lender-side refusal.
 
 ## Gate 2 progress (lead, 2026-11-11 ~22:30 UTC)
 

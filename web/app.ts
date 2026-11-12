@@ -1,6 +1,8 @@
 import { CircleClient, passportTokenTitle, type CircleParams, type LoanView, type PassportView } from './circle-client'
 import { friendlyError, isRepeat, TOAST_MS, type NextAction, type ToastKind } from './notify'
 import { badgeFor, memberLabel, type Tier } from './labels'
+import { canCancel, countdown, isWaiting, loanLengthText, requestsForLender, trustedProgress } from './loan-rules'
+import { explorerTxUrl, moneySummary, runMoney, type MoneyDeps, type MoneyKind } from './money'
 import { signInWithNep413 } from './nep413'
 import { buildInviteLink, generateInviteKeyPair, parseInviteLink, signInviteWithSecret } from './invite'
 import { loadReadOnlyDemo, type ReadOnlyDemoSnapshot } from './demo'
@@ -18,15 +20,17 @@ declare global {
   interface Window {
     commonCircleWallet?: NearWalletController
     commonCircleInviteSigner?: (input: { message: string; secret: string }) => Promise<string>
-    COMMONCIRCLE_CONFIG?: { rpcUrl: string; contractId: string; authUrl: string; recipient: string }
+    COMMONCIRCLE_CONFIG?: { rpcUrl: string; contractId: string; authUrl: string; recipient: string; explorerUrl?: string }
   }
 }
 
-const config = window.COMMONCIRCLE_CONFIG ?? {
+const config = {
   rpcUrl: 'https://test.rpc.fastnear.com',
   contractId: 'commoncircle-light.testnet',
   authUrl: 'http://localhost:3001',
   recipient: window.location.host,
+  explorerUrl: 'https://testnet.nearblocks.io',
+  ...window.COMMONCIRCLE_CONFIG,
 }
 const readClient = new CircleClient(config.rpcUrl, config.contractId)
 const client = () => new CircleClient(config.rpcUrl, config.contractId, window.commonCircleWallet)
@@ -34,7 +38,8 @@ const TOKEN_KEY = 'commoncircle.session'
 const VIEWS = ['home', 'chat', 'loans', 'treasury', 'members', 'tools'] as const
 type View = (typeof VIEWS)[number]
 
-type Me = { passport: PassportView | null; registered: boolean; loans: LoanView[]; signedIn: boolean; circles: Array<{ id: string; name: string }> }
+/** loans: as borrower in this circle; lent: as lender in this circle. */
+type Me = { passport: PassportView | null; registered: boolean; loans: LoanView[]; lent: LoanView[]; signedIn: boolean; circles: Array<{ id: string; name: string }> }
 
 let accountId = ''
 let circleId = '3'
@@ -320,23 +325,69 @@ async function requestLoan(lenderId: string, amountText: string, daysText: strin
   await afterTx(`Request sent. ${short(lenderId)} can fund it within 1 hour.`)
 }
 
-async function repay(loan: LoanView): Promise<void> {
-  requireWallet()
-  const outcome = await client().repayLoan({ usdcId: await getUsdcId(), loanId: loan.loan_id, amount: loan.outstanding })
-  const notice = repaymentNotice(outcome, await readClient.getLoan(loan.loan_id))
-  if (notice) { await refreshAll(); show(notice, 'bad'); return }
-  await afterTx(`Repaid loan #${loan.loan_id}. The money went straight back to ${short(loan.lender_id)}.`)
+/* ---------- money actions: summary -> pending -> success / failure ---------- */
+
+function moneyDeps(): MoneyDeps {
+  const c = client()
+  return {
+    fundLoan: (input) => c.fundLoan(input),
+    repayLoan: (input) => c.repayLoan(input),
+    cancelLoan: (loanId) => c.cancelLoan(loanId),
+    getLoan: (loanId) => readClient.getLoan(loanId),
+    isRegistered: async (account) => !!(await new CircleClient(config.rpcUrl, await getUsdcId()).view<unknown>('storage_balance_of', { account_id: account })),
+  }
 }
 
-async function fund(loan: LoanView): Promise<void> {
+/** Opens the "check before you sign" dialog; the action runs only on Confirm. */
+async function money(kind: MoneyKind, loan: LoanView): Promise<void> {
   requireWallet()
-  const outcome = await client().fundLoan({ usdcId: await getUsdcId(), loanId: loan.loan_id, amount: loan.principal })
-  if (outcome.fundingFailed.length || outcome.refunded.length) {
-    await refreshAll()
-    show('Funding did not go through, and your USDC came straight back. Is the borrower set up for USDC?', 'bad')
-    return
+  const dialog = $<HTMLDialogElement>('#money-dialog')
+  const summary = moneySummary(kind, loan, memberLabel, demo?.circle?.params.day_length_sec ?? '86400')
+  const state = $('#money-state')
+  const confirm = $<HTMLButtonElement>('#money-confirm')
+  const back = $<HTMLButtonElement>('#money-back')
+  $('#money-title').textContent = summary.title
+  $('#money-lines').replaceChildren(...summary.lines.map((line) => el('li', { textContent: line })))
+  state.hidden = true
+  state.className = 'money-state'
+  confirm.textContent = summary.confirm
+  confirm.disabled = false
+  back.hidden = false
+  back.disabled = false
+  let finished = false
+  confirm.onclick = async () => {
+    if (finished) { dialog.close(); return }
+    confirm.disabled = true
+    back.disabled = true
+    confirm.classList.add('busy')
+    state.hidden = false
+    state.textContent = 'Waiting for you to approve it in your wallet window…'
+    const result = await runMoney(kind, loan, moneyDeps(), await getUsdcId().catch(() => ''), memberLabel)
+    confirm.classList.remove('busy')
+    state.className = `money-state ${result.ok ? 'ok' : 'bad'}`
+    state.replaceChildren(result.text, ...(result.txHash ? [' ', el('a', { href: explorerTxUrl(config.explorerUrl, result.txHash), target: '_blank', rel: 'noopener', textContent: 'View the transaction' })] : []))
+    finished = true
+    confirm.textContent = 'Done'
+    confirm.disabled = false
+    back.hidden = true
+    if (result.ok) show(result.text, 'ok')
+    void refreshAll().catch(() => {})
   }
-  await afterTx(`Funded loan #${loan.loan_id}: ${formatUsdc(loan.principal)} USDC went straight to ${short(loan.borrower_id)}.`)
+  back.onclick = () => dialog.close()
+  dialog.showModal()
+}
+
+const fund = (loan: LoanView) => money('fund', loan)
+const repay = (loan: LoanView) => money('repay', loan)
+const cancelRequest = (loan: LoanView) => money('cancel', loan)
+
+/** A live countdown: tick() fills it in every second. */
+function untilSpan(targetNs: string | null, prefix: string, after: string): HTMLElement {
+  const node = el('strong', { className: 'until' })
+  node.dataset.until = targetNs ?? ''
+  node.dataset.prefix = prefix
+  node.dataset.after = after
+  return node
 }
 
 async function askToForgive(loan: LoanView): Promise<void> {
@@ -573,17 +624,22 @@ async function refreshMe(): Promise<void> {
   if (!accountId) { me = null; renderAll(); return }
   try {
     const usdc = new CircleClient(config.rpcUrl, await getUsdcId())
-    const [passport, registration, loans, tokens] = await Promise.all([
+    const [passport, registration, loans, lent, tokens] = await Promise.all([
       readClient.passportFor(circleId, accountId),
       usdc.view<unknown>('storage_balance_of', { account_id: accountId }),
       readClient.loansByBorrower(accountId),
+      readClient.loansByLender(accountId),
       readClient.nftTokensForOwner(accountId, null, 50).catch(() => []),
     ])
     const ids = [...new Set(tokens.map((t) => t.token_id.split(':')[0]))]
     const circles = await Promise.all(ids.map(async (id) => ({ id, name: (await readClient.getCircle(id).catch(() => null))?.name ?? `Circle ${id}` })))
-    me = { passport, registered: !!registration, loans: loans.filter((l) => l.circle_id === circleId), signedIn: session()?.accountId === accountId, circles }
+    me = {
+      passport, registered: !!registration, signedIn: session()?.accountId === accountId, circles,
+      loans: loans.filter((l) => l.circle_id === circleId),
+      lent: lent.filter((l) => l.circle_id === circleId),
+    }
   } catch (error) {
-    show(`Could not read your account: ${errorText(error)}`, 'bad')
+    show(`Could not read your account. ${errorText(error)}`, 'bad', 'retry', refreshMe)
   }
   renderAll()
   await Promise.all([
@@ -603,6 +659,7 @@ async function refreshAll(): Promise<void> {
 /* ---------- rendering ---------- */
 
 function renderAll(): void {
+  renderForYou()
   renderJourney()
   renderMembers()
   renderSidebar()
@@ -649,10 +706,32 @@ function step(n: number, state: StepState, title: string, desc: string | Node, a
   return li
 }
 
-function dueSpan(loan: LoanView): HTMLElement {
-  const node = el('strong', { className: 'due' })
-  node.dataset.due = loan.due_at ?? ''
-  return node
+const dueSpan = (loan: LoanView): HTMLElement => untilSpan(loan.due_at, 'Due in ', 'Past due: repay now (it will count as late)')
+const windowSpan = (loan: LoanView): HTMLElement => untilSpan(loan.funding_deadline, 'Expires in ', 'Expired')
+
+/** P0-2 a: "Requests for you" for the connected lender, built from loans_by_lender. */
+function renderForYou(): void {
+  const requests = accountId && me ? requestsForLender(me.lent, accountId, Date.now()) : []
+  $('#for-you').hidden = !requests.length
+  $('#for-you-list').replaceChildren(...requests.map((loan) => el('li', {},
+    el('span', {}, accountChip(loan.borrower_id), ` asks you for ${formatUsdc(loan.principal)} USDC for ${loanLengthText(loan.duration_days, demo?.circle?.params.day_length_sec ?? '86400')}. `, windowSpan(loan)),
+    button(`Fund ${formatUsdc(loan.principal)} USDC`, () => fund(loan)))))
+  tickDue()
+}
+
+/** P0-2 d: on-time / late counters and, from the circle's trusted_threshold, progress toward Trusted. */
+function progressNode(passport: PassportView): HTMLElement | null {
+  const params = demo?.circle?.params
+  if (!params) return null
+  const p = trustedProgress(passport, params)
+  const counters = `On time ${p.onTime} · late ${p.late}`
+  if (p.trusted) return el('span', { className: 'progress' }, el('span', { className: 'small muted', textContent: `${counters} · Trusted` }))
+  const pct = Math.min(100, Math.round((p.qualifying / Math.max(1, p.threshold)) * 100))
+  const bar = el('span', { className: 'progress-bar', role: 'progressbar', ariaValueMin: '0', ariaValueMax: String(p.threshold), ariaValueNow: String(p.qualifying) }, el('span'))
+  ;(bar.firstChild as HTMLElement).style.width = `${pct}%`
+  const lenders = p.minLenders > 1 ? `, from ${p.minLenders} different lenders (${p.lenders} so far)` : ''
+  return el('span', { className: 'progress' },
+    el('span', { className: 'small muted', textContent: `${counters} · ${p.qualifying} of ${p.threshold} on-time repayments toward Trusted${lenders}` }), bar)
 }
 
 function loanRequestForm(): HTMLElement {
@@ -674,8 +753,8 @@ function renderJourney(): void {
   const passport = me?.passport ?? null
   const isMember = !!passport && passport.status === 'Active'
   const loans = (me?.loans ?? []).slice().sort((a, b) => Number(b.loan_id) - Number(a.loan_id))
-  const funded = loans.find((l) => l.state === 'Funded' || l.state === 'Repaying')
-  const open = loans.find((l) => l.state === 'Open')
+  const funded = loans.find((l) => l.state === 'Funded' || l.state === 'Repaying' || l.state === 'Funding')
+  const open = loans.find((l) => isWaiting(l, Date.now()))
   const repaid = loans.find((l) => l.state === 'Repaid')
   const done = [!!accountId, isMember, !!me?.signedIn, !!me?.registered, !!(funded || repaid), !!repaid && !funded]
   const current = done.findIndex((d) => !d)
@@ -700,23 +779,25 @@ function renderJourney(): void {
     [button('Set up USDC', registerForUsdc)]))
   const trustedHint = passport?.effective_tier === 'Trusted' && !passport.steward ? ' As a Trusted member you can also ask the treasury.' : ''
   const got = funded ?? repaid
+  const lenderName = (l: LoanView) => (l.lender_is_treasury ? 'the treasury' : memberLabel(l.lender_id))
   steps.push(step(5, stateOf(4), 'Ask a member for a loan',
-    got ? `Loan #${got.loan_id}: ${formatUsdc(got.principal)} USDC from ${short(got.lender_id)}.`
-      : open ? `Request #${open.loan_id} for ${formatUsdc(open.principal)} USDC is waiting for ${short(open.lender_id)} to fund it (they have 1 hour).`
-        : `Choose who to ask, how much, and for how long. Demo days are 60 seconds, so 7 days means 7 minutes to repay.${trustedHint}`,
-    [], open ? undefined : loanRequestForm()))
-  let repayDesc: string | Node = 'Once your loan arrives, pay it back before the due time. Your card turns Trusted.'
+    got ? `Loan #${got.loan_id}: ${formatUsdc(got.principal)} USDC from ${lenderName(got)}.`
+      : open ? el('span', {}, `Request #${open.loan_id} for ${formatUsdc(open.principal)} USDC is waiting for `, open.lender_is_treasury ? 'the stewards' : accountChip(open.lender_id), ' to fund it. ', windowSpan(open))
+        : `Choose who to ask, how much, and for how long.${trustedHint}`,
+    open ? [button('Cancel request', () => cancelRequest(open), 'ghost')] : [], open ? undefined : loanRequestForm()))
+  let repayDesc: string | Node = 'Once your loan arrives, pay it back before the due time to earn your next on-time mark.'
   const repayActions: HTMLElement[] = []
   if (funded) {
-    repayDesc = el('span', {}, `You owe ${formatUsdc(funded.outstanding)} USDC to ${short(funded.lender_id)}. `, dueSpan(funded))
-    repayActions.push(button('Repay now', () => repay(funded)))
+    repayDesc = el('span', {}, `You owe ${formatUsdc(funded.outstanding)} USDC to ${lenderName(funded)}. `, dueSpan(funded))
+    if (funded.state === 'Funded') repayActions.push(button(`Repay ${formatUsdc(funded.outstanding)} USDC`, () => repay(funded)))
   } else if (repaid) {
     const late = repaid.repaid_on_time === false && !repaid.flag_cleared
-    repayDesc = late ? 'Repaid, but late. You can ask the stewards to forgive the late mark.'
-      : `Repaid on time. Your card is ${passport?.effective_tier ?? 'updated'}${passport?.effective_tier === 'Trusted' ? '. Well done!' : '.'}`
+    const progress = passport ? progressNode(passport) : null
+    repayDesc = el('span', {}, late ? 'Repaid, but late. You can ask the stewards to forgive the late mark.'
+      : `Repaid on time. Your card is ${passport?.effective_tier ?? 'updated'}${passport?.effective_tier === 'Trusted' ? '. Well done!' : '.'}`, ...(progress ? [progress] : []))
     if (late) repayActions.push(button('Ask stewards to forgive', () => askToForgive(repaid), 'soft'))
   }
-  steps.push(step(6, funded ? 'current' : stateOf(5), 'Pay it back on time', repayDesc, repayActions))
+  steps.push(step(6, funded ? 'current' : stateOf(5), 'Pay it back on time', repayDesc, repayActions, undefined, repayActions))
   $('#steps').replaceChildren(...steps)
   $('#journey-sub').textContent = current === -1 ? 'All done: you joined, borrowed and repaid. Your card is on the right.' : 'Follow these in order. Each one updates from the blockchain by itself.'
   tickDue()
@@ -750,11 +831,9 @@ function renderLoansTable(): void {
 }
 
 function tickDue(): void {
-  for (const node of document.querySelectorAll<HTMLElement>('[data-due]')) {
-    const due = node.dataset.due
-    if (!due) { node.textContent = ''; continue }
-    const ms = Number(BigInt(due) / 1_000_000n) - Date.now()
-    node.textContent = ms > 0 ? `Due in ${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}` : 'Past due: repay now'
+  for (const node of document.querySelectorAll<HTMLElement>('[data-until]')) {
+    const left = countdown(node.dataset.until || null, Date.now())
+    node.textContent = left ? `${node.dataset.prefix ?? ''}${left}` : (node.dataset.after ?? '')
   }
 }
 
@@ -779,21 +858,29 @@ async function loadPositions(): Promise<void> {
   const positions = await readClient.myPositions(accountId)
   const items: HTMLLIElement[] = []
   if (me && !me.registered) items.push(el('li', {}, el('span', { textContent: 'Not set up for USDC yet, so nobody can send you a loan.' }), button('Set up USDC', registerForUsdc)))
+  const now = Date.now()
+  const stateLabel = (loan: LoanView) => (loan.state === 'Open' && !isWaiting(loan, now) ? 'Expired' : loan.state)
+  // Requests for you first (P0-2 a), then your own loans, then what you lent.
+  for (const loan of requestsForLender(positions.lent, accountId, now).reverse()) {
+    items.push(el('li', { className: 'request' }, el('span', {}, el('strong', { textContent: `Request #${loan.loan_id} for you` }), ' · ', accountChip(loan.borrower_id),
+      ` asks for ${formatUsdc(loan.principal)} USDC · `, windowSpan(loan)), button(`Fund ${formatUsdc(loan.principal)} USDC`, () => fund(loan))))
+  }
   for (const loan of positions.borrowed.slice().reverse()) {
-    const li = el('li', {}, el('span', {}, el('strong', { textContent: `Borrowed #${loan.loan_id}` }), ` · ${formatUsdc(loan.principal)} USDC from ${short(loan.lender_id)} `,
-      el('span', { className: `state state-${loan.state}`, textContent: loan.state }), ' ', loan.state === 'Funded' ? dueSpan(loan) : ''))
-    if (loan.state === 'Funded') li.append(button('Repay', () => repay(loan)))
+    const lender = loan.lender_is_treasury ? el('span', { textContent: 'the treasury' }) : accountChip(loan.lender_id)
+    const li = el('li', {}, el('span', {}, el('strong', { textContent: `Borrowed #${loan.loan_id}` }), ` · ${formatUsdc(loan.principal)} USDC from `, lender, ' ',
+      el('span', { className: `state state-${stateLabel(loan)}`, textContent: stateLabel(loan) }), ' ',
+      loan.state === 'Funded' ? dueSpan(loan) : isWaiting(loan, now) ? windowSpan(loan) : ''))
+    if (loan.state === 'Funded') li.append(button(`Repay ${formatUsdc(loan.outstanding)} USDC`, () => repay(loan)))
+    if (canCancel(loan, accountId, now)) li.append(button('Cancel request', () => cancelRequest(loan), 'ghost'))
     const late = (loan.overdue || (loan.state === 'Repaid' && loan.repaid_on_time === false)) && !loan.flag_cleared
     if (late) li.append(button('Ask stewards to forgive', () => askToForgive(loan), 'soft'))
     const note = repaymentNotice(null, loan)
     if (note) li.append(el('p', { className: 'notice', textContent: note }))
     items.push(li)
   }
-  for (const loan of positions.lent.slice().reverse()) {
-    const li = el('li', {}, el('span', {}, el('strong', { textContent: `Lent #${loan.loan_id}` }), ` · ${formatUsdc(loan.principal)} USDC to ${short(loan.borrower_id)} `,
-      el('span', { className: `state state-${loan.state}`, textContent: loan.state })))
-    if (loan.state === 'Open') li.append(button('Fund it', () => fund(loan)))
-    items.push(li)
+  for (const loan of positions.lent.filter((l) => !isWaiting(l, now)).reverse()) {
+    items.push(el('li', {}, el('span', {}, el('strong', { textContent: `Lent #${loan.loan_id}` }), ` · ${formatUsdc(loan.principal)} USDC to `, accountChip(loan.borrower_id), ' ',
+      el('span', { className: `state state-${stateLabel(loan)}`, textContent: stateLabel(loan) }))))
   }
   if (!items.length) items.push(el('li', { className: 'empty', textContent: 'No loans yet. Ask a member on the right, or follow step 5 on Home.' }))
   list.replaceChildren(...items)

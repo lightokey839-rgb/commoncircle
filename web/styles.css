@@ -286,6 +286,27 @@ textarea { resize: vertical; }
 .toast-close { display: grid; flex: 0 0 auto; width: 30px; height: 30px; place-items: center; border: 0; border-radius: 50%; color: var(--muted); background: transparent; font-size: 1.2rem; line-height: 1; cursor: pointer; }
 .toast-close:hover { color: var(--text); background: rgba(0, 0, 0, .06); }
 
+/* money dialog */
+.dialog { width: min(480px, calc(100% - 32px)); padding: 0; border: 0; border-radius: 20px; color: var(--text); background: var(--panel); box-shadow: 0 30px 80px rgba(0, 0, 0, .45); }
+.dialog::backdrop { background: rgba(20, 11, 8, .6); }
+.dialog-body { display: grid; gap: 10px; padding: 22px; }
+.dialog-body h2 { font-size: 1.25rem; }
+.dialog-lines { display: grid; gap: 6px; margin: 4px 0 0; padding-left: 18px; }
+.money-state { padding: 10px 12px; border-radius: 12px; background: var(--soft); font-size: .9rem; }
+.money-state.ok { color: #1f6a41; background: var(--good-soft); }
+.money-state.bad { color: #8f2a1b; background: var(--bad-soft); }
+.money-state a { color: inherit; font-weight: 700; }
+.dialog-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 6px; }
+
+/* requests, countdowns, progress */
+.requests { display: grid; gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; }
+.requests li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 14px; border: 1px solid #f3d2b8; border-radius: 14px; background: #fff8f2; }
+.requests li > span { flex: 1 1 220px; min-width: 0; }
+.until { color: var(--accent-text); font-weight: 700; font-variant-numeric: tabular-nums; }
+.progress { display: grid; gap: 4px; margin-top: 6px; }
+.progress-bar { height: 8px; overflow: hidden; border-radius: 999px; background: var(--soft-2); }
+.progress-bar span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent-2), var(--accent)); }
+
 /* account chip and badges */
 .acct { display: inline; padding: 0; border: 0; border-bottom: 1px dotted currentColor; color: inherit; background: none; font: inherit; font-weight: 650; cursor: copy; }
 .badge { display: inline-flex; flex: none; align-items: center; justify-content: center; align-self: center; height: 22px; padding: 0 9px; border-radius: 999px; font-size: .72rem; font-weight: 700; line-height: 1; letter-spacing: .01em; white-space: nowrap; }

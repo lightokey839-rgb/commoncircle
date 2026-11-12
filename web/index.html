@@ -102,6 +102,12 @@
               </div>
             </div>
 
+            <div id="for-you" class="box for-you" hidden>
+              <h2>Requests for you</h2>
+              <p class="muted">Members asked you for a loan. Funding sends the money straight to them.</p>
+              <ul id="for-you-list" class="requests"></ul>
+            </div>
+
             <div class="home-grid">
               <div class="box">
                 <div class="box-head">
@@ -338,6 +344,19 @@
         <p class="legal">Testnet demo, no real money. Loans are unsecured; repayment cannot be forced. Loan terms, account names and card history are public on the blockchain. Contract <code>commoncircle-light.testnet</code>.</p>
       </section>
     </div>
+
+    <dialog id="money-dialog" class="dialog" aria-labelledby="money-title">
+      <div class="dialog-body">
+        <p class="eyebrow">Check before you sign</p>
+        <h2 id="money-title"></h2>
+        <ul id="money-lines" class="dialog-lines"></ul>
+        <p id="money-state" class="money-state" role="status" aria-live="polite" hidden></p>
+        <div class="dialog-actions">
+          <button id="money-back" type="button" class="btn btn-ghost">Not now</button>
+          <button id="money-confirm" type="button" class="btn btn-accent"></button>
+        </div>
+      </div>
+    </dialog>
 
     <div id="status" class="toast" role="status" aria-live="polite" hidden>
       <span id="status-text" class="toast-text"></span>

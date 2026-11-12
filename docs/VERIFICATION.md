@@ -393,3 +393,16 @@ array. Each claim must include `id`, `track`, `feature`, `network`, `kind`
 (`tx`, `view`, or `test`), `reference` (with a committed JSON `snapshot` or
 `report` path), and the `expected` JSON subset. A track is not a README claim
 until every row for that track passes.
+
+## Web polish (branch `lane/web-polish`, 2026-11-12/13)
+
+Checks run by the lead on `lane/web-polish`. Type check: `tsc -p <temp config extending tsconfig.json, include web/**/*.ts, lib ES2022>` (the repo's `npm run typecheck` covers `src`/`scripts` only and is broken under TypeScript 7). Lint: `npx oxlint web tests`.
+
+| Check | Result | How |
+| --- | --- | --- |
+| P0-1 wallet and RPC errors become one plain sentence plus a next action; toasts 6 s / errors 10 s; repeats de-duplicated | PASS | `tests/notify.test.ts` (14 tests) |
+| P0-1 clean load shows no toast and no console error | PASS | browser pane, production build (`npm run build` + `npm run preview`), circle 3, 2026-11-12 ~21:52 UTC |
+| P0-1 blocked wallet pop-up shows "Allow pop-ups…" with Retry and a close button, and clears after 10 s | PASS | browser pane: pressed Connect Meteor (the pane blocks pop-ups), read the toast DOM at 3 s and 13.5 s |
+| P0-1 once connected, step 1 shows the account with Switch / Disconnect and no connect buttons | UNVERIFIED | needs a real wallet. Builder: connect Meteor on Home and check step 1 |
+| P0-2 fund, repay and cancel: summary, then success or failure with the tx hash; failure states (borrower not set up for USDC, funding refunded, window lapsed, wallet closed, repayment bounced, repaid late, RPC down, wrong state) | PASS | `tests/money.test.ts` (21 tests, mocked contract calls) |
+| P0-2 live: "Requests for you", countdowns, Cancel request, Repay, explorer link, counters and progress toward Trusted | UNVERIFIED | Builder, in Chrome on `http://localhost:5173/?circle_id=3` with `254edye5v.testnet`: (1) step 5, ask `commoncircle-light-lender.testnet` for 1 USDC, 7 days: the step shows "Expires in m:ss" and Cancel request; (2) press Cancel request: the dialog shows the summary, then "cancelled" with "View the transaction"; (3) ask again, then run `./contracts/scripts/testnet-dao.sh fund <loan>`; (4) step 6 shows "Due in m:ss" and "Repay 1 USDC": confirm in the dialog; (5) step 6 shows "On time 1 · late 0" and the card turns Trusted. Send the lead the hashes from the "View the transaction" links |

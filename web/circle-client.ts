@@ -179,6 +179,8 @@ export type CommonCircleEvent = {
   data: Array<Record<string, unknown>>
 }
 export type FtTransferCallOutcome = {
+  /** The transaction hash, when the wallet returned the outcome (for the explorer link). */
+  txHash: string | null
   unusedAmount: U128 | null
   events: CommonCircleEvent[]
   refunded: CommonCircleEvent[]
@@ -316,10 +318,19 @@ function collectEvents(outcome: unknown): CommonCircleEvent[] {
   return events
 }
 
+/** The transaction hash from a wallet's FinalExecutionOutcome, or null. */
+export function txHashOf(outcome: unknown): string | null {
+  if (!outcome || typeof outcome !== 'object') return null
+  const o = outcome as { transaction?: { hash?: unknown }; transaction_outcome?: { id?: unknown } }
+  const hash = o.transaction?.hash ?? o.transaction_outcome?.id
+  return typeof hash === 'string' && /^[1-9A-HJ-NP-Za-km-z]{43,44}$/.test(hash) ? hash : null
+}
+
 export function parseFtTransferCallOutcome(outcome: unknown): FtTransferCallOutcome {
   const events = collectEvents(outcome)
   const byName = (name: string) => events.filter((event) => event.event === name)
   return {
+    txHash: txHashOf(outcome),
     unusedAmount: decodeSuccessValue(outcome),
     events,
     refunded: byName('transfer_refunded'),
