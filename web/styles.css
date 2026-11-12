@@ -185,7 +185,8 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .room:hover { background: var(--soft); }
 .room.active { background: var(--soft-2); }
 .room-main { flex: 1; min-width: 0; }
-.room-name { display: flex; justify-content: space-between; gap: 8px; font-weight: 650; }
+.room-name { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 650; }
+.room-name .acct { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .room-name time { color: var(--muted); font-size: .74rem; font-weight: 500; }
 .room-last { overflow: hidden; color: var(--muted); font-size: .84rem; text-overflow: ellipsis; white-space: nowrap; }
 .room-new { color: var(--good); font-size: .76rem; font-weight: 650; }
@@ -200,7 +201,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .msg { display: flex; flex-direction: column; max-width: min(560px, 78%); }
 .msg-meta { display: flex; align-items: center; gap: 8px; margin: 8px 0 5px; color: var(--muted); font-size: .76rem; }
 .msg-meta strong { color: var(--text); font-weight: 650; }
-.msg .tier { padding: 0 6px; }
+.msg-meta .badge { height: 18px; padding: 0 7px; font-size: .66rem; }
 .bubble { padding: 10px 14px; border: 1px solid var(--line); border-radius: 16px 16px 16px 6px; background: #fff; box-shadow: 0 1px 2px rgba(60, 30, 10, .05); white-space: pre-wrap; overflow-wrap: anywhere; }
 .msg.mine { align-self: flex-end; align-items: flex-end; }
 .msg.mine .msg-meta { flex-direction: row-reverse; }
@@ -231,21 +232,19 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .loans td { padding: 11px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .who { display: inline-flex; align-items: center; gap: 8px; max-width: 240px; }
 .who span:last-child { overflow: hidden; text-overflow: ellipsis; }
-.state, .tier { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: .74rem; font-weight: 700; white-space: nowrap; }
+.state { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: .74rem; font-weight: 700; white-space: nowrap; }
 .state-Repaid, .state-Approved { color: var(--good); background: var(--good-soft); }
 .state-Funded, .state-Funding, .state-Repaying, .state-Voting { color: #9a4a12; background: #fde3cf; }
 .state-Open { color: var(--accent-text); background: var(--accent-soft); }
 .state-Cancelled, .state-WrittenOff, .state-Other { color: var(--muted); background: var(--soft-2); }
-.tier-Trusted { color: #7a4d00; background: #fbe1a6; }
-.tier-Member { color: var(--muted); background: var(--soft-2); }
-.tier-Steward { color: #fff; background: var(--accent); }
 
 /* members */
 .member-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; margin-top: 16px; }
 .member { margin: 0; padding: 10px; border: 1px solid var(--line); border-radius: 16px; background: var(--soft); }
 .member img { display: block; width: 100%; border-radius: 12px; }
 .member figcaption { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 8px; font-size: .82rem; }
-.member figcaption > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.member figcaption .who { min-width: 0; }
+.member-counts { margin-top: 4px; color: var(--muted); font-size: .76rem; }
 .member.me { outline: 2px solid var(--accent); }
 
 /* treasury */

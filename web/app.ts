@@ -62,7 +62,6 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLEl
   node.append(...children)
   return node
 }
-const short = (id: string) => (id.length > 24 ? `${id.slice(0, 11)}…${id.slice(-10)}` : id)
 /** "The Dogs (DEMO)" -> "TD" */
 const roomInitials = (name: string) => {
   const words = name.replace(/\(.*?\)/g, '').split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w))
@@ -435,7 +434,7 @@ async function saveDesign(): Promise<void> {
   if (!/^\d+$/.test(cid)) throw new Error('Enter a circle number.')
   const circle = await readClient.getCircle(cid)
   if (!circle) throw new Error('That circle does not exist.')
-  if (circle.admin_id !== accountId) throw new Error(`Only the circle admin (${short(circle.admin_id)}) can change the design. In a DAO circle that is done by vote.`)
+  if (circle.admin_id !== accountId) throw new Error(`Only the circle admin (${memberLabel(circle.admin_id)}) can change the design. In a DAO circle that is done by vote.`)
   const storage = await readClient.storageCosts()
   await client().setCircleTheme({ circleId: cid, theme: readThemeForm('design'), deposit: storage.set_circle_theme })
   show('Design saved. Cards update after the transaction is final.', 'ok')
@@ -447,7 +446,7 @@ function roomName(id: string): string {
   return me?.circles.find((c) => c.id === id)?.name ?? (demo?.circle?.circle_id === id ? demo.circle.name : `Circle ${id}`)
 }
 
-function tierOf(account: string): string | null {
+function tierOf(account: string): Tier | null {
   return demo?.passports.find((p) => p.owner_id === account)?.display_tier ?? null
 }
 
@@ -463,7 +462,7 @@ function renderRooms(): void {
     const icon = el('span', { className: 'avatar avatar-room', textContent: roomInitials(roomName(id)) })
     item.append(icon, el('span', { className: 'room-main' },
       el('span', { className: 'room-name' }, el('span', { textContent: roomName(id) }), last ? el('time', { textContent: timeLabel(last.at) }) : ''),
-      el('span', { className: 'room-last', textContent: last ? `${last.account_id === accountId ? 'You' : short(last.account_id)}: ${last.text}` : chatAllowed || id !== chatRoom ? 'No messages yet' : 'Members only' }),
+      el('span', { className: 'room-last', textContent: last ? `${last.account_id === accountId ? 'You' : memberLabel(last.account_id)}: ${last.text}` : chatAllowed || id !== chatRoom ? 'No messages yet' : 'Members only' }),
       unread && id !== chatRoom ? el('span', { className: 'room-new', textContent: `${unread} new message${unread > 1 ? 's' : ''}` }) : ''))
     item.addEventListener('click', () => void openRoom(id))
     return el('li', {}, item)
@@ -473,7 +472,7 @@ function renderRooms(): void {
   $('#people-list').replaceChildren(...(people.length ? people.map((p) => el('li', {}, el('div', { className: 'room' },
     avatar(p.owner_id),
     el('span', { className: 'room-main' },
-      el('span', { className: 'room-name' }, el('span', { textContent: p.owner_id === accountId ? 'You' : short(p.owner_id) }), el('span', { className: `tier tier-${p.display_tier}`, textContent: p.display_tier })),
+      el('span', { className: 'room-name' }, accountChip(p.owner_id), badge(p.display_tier)),
       el('span', { className: 'room-last', textContent: `On time ${p.on_time_count} · late ${p.late_count}` }))))) : [el('li', { className: 'muted small', textContent: 'Open the circle in Home to see its people.' })]))
   updateChatBadge()
 }
@@ -499,8 +498,8 @@ function renderMessages(): void {
     const mine = m.account_id === accountId
     const cont = !!prev && prev.account_id === m.account_id && m.at - prev.at < 5 * 60_000
     const tier = tierOf(m.account_id)
-    const meta = el('div', { className: 'msg-meta' }, avatar(m.account_id, 'sm'), el('strong', { textContent: mine ? 'You' : short(m.account_id) }),
-      tier ? el('span', { className: `tier tier-${tier}`, textContent: tier }) : '', el('span', { textContent: timeLabel(m.at) }))
+    const meta = el('div', { className: 'msg-meta' }, avatar(m.account_id, 'sm'), el('strong', { title: m.account_id, textContent: mine ? 'You' : memberLabel(m.account_id) }),
+      tier ? badge(tier) : '', el('span', { textContent: timeLabel(m.at) }))
     box.append(el('div', { className: `msg${mine ? ' mine' : ''}${cont ? ' cont' : ''}` }, meta, el('div', { className: 'bubble', textContent: m.text })))
     prev = m
   }
@@ -877,8 +876,8 @@ function renderMembers(): void {
     const fig = el('figure', { className: `member${card.passport.owner_id === accountId ? ' me' : ''}` })
     if (card.svg) fig.append(el('img', { alt: `${card.passport.owner_id} passport card`, src: URL.createObjectURL(new Blob([card.svg], { type: 'image/svg+xml' })) }))
     fig.append(el('figcaption', {},
-      el('span', { title: card.passport.owner_id, textContent: card.passport.owner_id === accountId ? 'You' : short(card.passport.owner_id) }),
-      el('span', { className: `tier tier-${card.passport.display_tier}`, textContent: card.passport.display_tier })))
+      el('span', { className: 'who' }, avatar(card.passport.owner_id, 'sm'), accountChip(card.passport.owner_id)), badge(card.passport.display_tier)),
+      el('p', { className: 'member-counts', textContent: `On time ${card.passport.on_time_count} · late ${card.passport.late_count}` }))
     grid.append(fig)
   }
   if (!grid.children.length) grid.append(el('p', { className: 'muted', textContent: 'No members yet.' }))
@@ -889,8 +888,8 @@ function renderLoansTable(): void {
   const loans = (demo?.loans ?? []).slice().sort((a, b) => Number(b.loan_id) - Number(a.loan_id))
   $('#circle-loans').replaceChildren(...(loans.length ? loans.map((l) => el('tr', {},
     el('td', { textContent: l.loan_id }),
-    el('td', {}, who(l.borrower_id, l.borrower_id === accountId ? 'You' : short(l.borrower_id))),
-    el('td', {}, l.lender_is_treasury ? who(l.lender_id, 'Treasury (DAO)') : who(l.lender_id, l.lender_id === accountId ? 'You' : short(l.lender_id))),
+    el('td', {}, who(l.borrower_id, l.borrower_id === accountId ? 'You' : memberLabel(l.borrower_id))),
+    el('td', {}, l.lender_is_treasury ? who(l.lender_id, 'Treasury (DAO)') : who(l.lender_id, l.lender_id === accountId ? 'You' : memberLabel(l.lender_id))),
     el('td', { textContent: `${formatUsdc(l.principal)} USDC` }),
     el('td', {}, el('span', { className: `state state-${l.state}`, textContent: l.state === 'Repaid' && l.repaid_on_time === false ? (l.flag_cleared ? 'Repaid (late, forgiven)' : 'Repaid late') : l.state })),
   )) : [el('tr', {}, el('td', { colSpan: 5, className: 'muted', textContent: 'No loans yet.' }))]))
@@ -969,7 +968,7 @@ async function renderTreasury(): Promise<void> {
   $('#stat-treasury').textContent = `${formatUsdc(balance)} USDC`
   $('#treasury-summary').replaceChildren(
     el('span', { className: 'muted small', textContent: 'Holds' }), el('b', { textContent: `${formatUsdc(balance)} USDC` }),
-    el('span', { textContent: `Stewards: ${stewards.map(short).join(' and ')}` }),
+    el('span', {}, 'Stewards: ', ...stewards.flatMap((s, i) => (i ? [' and ', accountChip(s)] : [accountChip(s)]))),
     el('span', { className: 'muted small', textContent: `Asking costs a ${bondNear} NEAR deposit, returned when the vote passes.` }))
   const isSteward = !!accountId && stewards.includes(accountId)
   const passport = accountId ? await readClient.passportFor(cid, accountId) : null
@@ -999,7 +998,7 @@ async function renderTreasury(): Promise<void> {
     const label = p.status === 'InProgress' ? 'Voting' : p.status === 'Approved' ? 'Approved' : 'Other'
     const li = el('li', {}, avatar(p.proposer, 'sm'), el('span', {},
       el('strong', { textContent: `#${p.id} ${what}` }), el('br'),
-      el('span', { className: 'muted small', textContent: `Asked by ${short(p.proposer)} · ${approvals} of ${stewards.length} approvals` })),
+      el('span', { className: 'muted small', textContent: `Asked by ${memberLabel(p.proposer)} · ${approvals} of ${stewards.length} approvals` })),
       el('span', { className: `state state-${label}`, textContent: label === 'Other' ? p.status : label }))
     if (canVote) li.append(button('Approve', async () => { await dao.approve(p); await afterTx(`You approved proposal #${p.id}.`) }))
     return li
@@ -1095,6 +1094,7 @@ function wire(): void {
       $('#seg-people').setAttribute('aria-selected', String(btn === '#seg-people'))
       $(show_).hidden = false
       $(hide).hidden = true
+      $('#list-label').textContent = btn === '#seg-rooms' ? 'Circle rooms' : `People in ${roomName(chatRoom)}`
     })
   }
   bindThemeForm('new-circle', () => $<HTMLInputElement>('#new-circle-name').value.trim() || 'New circle', (error) => show(errorText(error), 'bad'))
