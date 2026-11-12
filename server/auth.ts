@@ -8,15 +8,19 @@
  * Nonces are in-memory for this scaffold. Production deployment must replace
  * the map with an atomic durable store before running more than one instance.
  * The server never receives invite secrets or signs transactions for members.
+ *
+ * Run with Bun (`bun server/auth.ts`) or Node 24+ (`node server/auth.ts`;
+ * Node strips the type annotations). NEAR_RPC_URL defaults to FastNEAR testnet.
  */
 
 import { createHmac, randomBytes } from 'node:crypto'
-import { hasFullAccessKey, verifyNep413Signature } from './nep413'
+import { createServer } from 'node:http'
+import { hasFullAccessKey, verifyNep413Signature } from './nep413.ts'
 
 const PORT = Number(process.env.AUTH_PORT ?? 3001)
 const APP_DOMAIN = process.env.APP_DOMAIN ?? 'localhost:5173'
 const AUTH_RECIPIENT = process.env.NEAR_AUTH_RECIPIENT ?? APP_DOMAIN
-const NEAR_RPC_URL = process.env.NEAR_RPC_URL ?? process.env.NEAR_TESTNET_RPC_URL ?? ''
+const NEAR_RPC_URL = process.env.NEAR_RPC_URL ?? process.env.NEAR_TESTNET_RPC_URL ?? 'https://test.rpc.fastnear.com'
 const JWT_SECRET = process.env.AUTH_JWT_SECRET ?? randomBytes(32).toString('hex')
 const challenges = new Map<string, {
   accountId: string
@@ -139,19 +143,48 @@ async function verifyLogin(request: Request, origin: string | null): Promise<Res
   return json({ accountId, token: signJwt(accountId) }, 200, origin)
 }
 
-const server = Bun.serve({
-  port: PORT,
-  async fetch(request) {
-    const url = new URL(request.url)
-    const origin = request.headers.get('origin')
-    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(origin) })
-    if (url.pathname === '/health' && request.method === 'GET') {
-      return json({ ok: true, auth: 'NEP-413', fullAccessKeyLookup: Boolean(NEAR_RPC_URL) }, 200, origin)
-    }
-    if (url.pathname === '/nonce' && request.method === 'POST') return nonce(request, origin)
-    if (url.pathname === '/verify' && request.method === 'POST') return verifyLogin(request, origin)
-    return json({ error: 'Not found' }, 404, origin)
-  },
-})
+async function handle(request: Request): Promise<Response> {
+  const url = new URL(request.url)
+  const origin = request.headers.get('origin')
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(origin) })
+  if (url.pathname === '/health' && request.method === 'GET') {
+    return json({ ok: true, auth: 'NEP-413', fullAccessKeyLookup: Boolean(NEAR_RPC_URL) }, 200, origin)
+  }
+  if (url.pathname === '/nonce' && request.method === 'POST') return nonce(request, origin)
+  if (url.pathname === '/verify' && request.method === 'POST') return verifyLogin(request, origin)
+  return json({ error: 'Not found' }, 404, origin)
+}
 
-console.log(`[auth] CommonCircle NEP-413 server listening on http://localhost:${server.port}`)
+const bun = (globalThis as { Bun?: { serve(options: { port: number; fetch(request: Request): Promise<Response> }): { port: number } } }).Bun
+if (bun) {
+  const server = bun.serve({ port: PORT, fetch: handle })
+  console.log(`[auth] CommonCircle NEP-413 server (Bun) listening on http://localhost:${server.port}`)
+} else {
+  // Node: adapt node:http to the same fetch-style handler. Bodies are capped at 16 KiB.
+  createServer(async (req, res) => {
+    try {
+      const chunks: Buffer[] = []
+      let size = 0
+      for await (const chunk of req) {
+        size += (chunk as Buffer).length
+        if (size > 16 * 1024) { res.writeHead(413).end(); return }
+        chunks.push(chunk as Buffer)
+      }
+      const method = req.method ?? 'GET'
+      const request = new Request(`http://localhost:${PORT}${req.url ?? '/'}`, {
+        method,
+        headers: req.headers as Record<string, string>,
+        body: method === 'GET' || method === 'HEAD' || method === 'OPTIONS' ? undefined : Buffer.concat(chunks),
+      })
+      const response = await handle(request)
+      res.writeHead(response.status, Object.fromEntries(response.headers))
+      res.end(Buffer.from(await response.arrayBuffer()))
+    } catch (error) {
+      console.error('[auth] request failed:', error instanceof Error ? error.message : String(error))
+      if (!res.headersSent) res.writeHead(500)
+      res.end()
+    }
+  }).listen(PORT, '127.0.0.1', () => {
+    console.log(`[auth] CommonCircle NEP-413 server (Node) listening on http://localhost:${PORT}, RPC ${NEAR_RPC_URL}`)
+  })
+}

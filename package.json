@@ -20,7 +20,8 @@
     "claims": "node scripts/claims.mjs",
     "claims:test": "node scripts/claims-self-test.mjs",
     "verify:usdc": "node scripts/verify-usdc.mjs",
-    "preview": "vite preview --configLoader runner --host localhost --port 5173"
+    "preview": "vite preview --configLoader runner --host localhost --port 5173",
+    "auth": "node server/auth.ts"
   },
   "dependencies": {
     "@circle-fin/adapter-viem-v2": "^1.19.2",

@@ -244,7 +244,9 @@ const PLAIN_ERRORS: Record<string, string> = {
 export function plainContractError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)
   const code = message.match(/E\d+_[A-Z_]+/)?.[0]
-  return (code && PLAIN_ERRORS[code]) || 'The CommonCircle contract rejected that action.'
+  if (code) return PLAIN_ERRORS[code] ?? `The CommonCircle contract rejected that action (${code}).`
+  // Not a contract error (wallet closed, popup blocked, network): show what actually happened.
+  return message || 'Something went wrong. Try again.'
 }
 
 function encodeBase64(bytes: Uint8Array): string {
@@ -454,6 +456,11 @@ export class CircleClient {
 
   fundLoanFromVault(input: { usdcId: string; loanId: U64; lenderId: string; amount: U128 }): Promise<FtTransferCallOutcome> {
     return this.transferCall(input.usdcId, input.amount, { action: 'fund', loan_id: input.loanId, lender_id: input.lenderId })
+  }
+
+  /** NEP-145: an account must be registered with USDC before it can receive a loan. 0.00125 NEAR, once. */
+  registerWithToken(input: { tokenId: string; accountId: string }): Promise<unknown> {
+    return this.sendFunctionCall(input.tokenId, 'storage_deposit', { account_id: input.accountId, registration_only: true }, '1250000000000000000000', '30000000000000')
   }
 
   repayLoan(input: { usdcId: string; loanId: U64; amount: U128 }): Promise<FtTransferCallOutcome> {

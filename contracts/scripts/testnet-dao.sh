@@ -18,6 +18,11 @@
 #   Treasury loans default to LOAN_DAYS=7: DEMO "days" are 60 s, so repay within 7 minutes of funding.
 #   ./contracts/scripts/testnet-dao.sh status     # read-only summary
 #
+# Web-app member test (Gate 2):
+#   ./contracts/scripts/testnet-dao.sh invite <new.testnet>   # a Trusted member registers a NAMED invite; prints the join link
+#   ./contracts/scripts/testnet-dao.sh fund <loan_id>         # the founder funds a request that names them (1 USDC)
+#   ./contracts/scripts/testnet-dao.sh member <new.testnet>   # read-only: passport, loans, USDC registration
+#
 # Keys stay in the OS keychain (near-cli-rs). This script never prints or stores
 # keys. Every tx hash goes to ~/commoncircle-deploy/proof-hashes.txt; step state
 # (loan and proposal ids) goes to ~/commoncircle-deploy/dao-state.env.
@@ -339,6 +344,60 @@ repay() { # repay [loan_id]  (default: the last treasury loan)
   echo "DAO USDC $(usdc_balance "$DAO"); circle USDC $(usdc_balance "$CIRCLE")"
 }
 
+# invite <account>: the Trusted member ($BORROWER) registers a named invite for <account>
+# in circle $CIRCLE_ID (after attach_dao only Trusted members can invite). The link's
+# fragment holds a throwaway invite key that only <account> can redeem. It is not an
+# account key; still, open it yourself and do not post it.
+invite() {
+  local who="${1:?usage: invite <new-account.testnet>}"
+  exists "$who" || { echo "STOP: $who does not exist on testnet yet (create it in the wallet first)"; exit 1; }
+  [ "$(passport "$who")" = "null" ] || { echo "$who already has a passport in circle $CIRCLE_ID"; return; }
+  [ "$(passport "$BORROWER" | jget effective_tier)" = "Trusted" ] || { echo "STOP: $BORROWER is not effectively Trusted, so cannot invite"; exit 1; }
+  local inv; inv=$(node -e '
+    const crypto=require("crypto");
+    const A="123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    const b58=b=>{let n=BigInt("0x"+Buffer.from(b).toString("hex")),s="";while(n>0n){s=A[Number(n%58n)]+s;n/=58n}for(const x of b){if(x===0)s="1"+s;else break}return s};
+    const {privateKey}=crypto.generateKeyPairSync("ed25519");
+    const jwk=privateKey.export({format:"jwk"});
+    const pk="ed25519:"+b58(Buffer.from(jwk.x,"base64url"));
+    const secret=Buffer.from(JSON.stringify({kty:jwk.kty,crv:jwk.crv,d:jwk.d,x:jwk.x})).toString("base64url");
+    process.stdout.write(pk+" "+secret);')
+  local pk="${inv%% *}" secret="${inv##* }"
+  local exp; exp=$(node -e 'process.stdout.write(String(BigInt(Date.now()+86400000)*1000000n))')
+  say "$BORROWER (Trusted) invites $who into circle $CIRCLE_ID (named invite, expires in 24 hours)"
+  call "register_invite $who" "$BORROWER" "$CIRCLE" register_invite \
+    "{\"circle_id\":\"$CIRCLE_ID\",\"invite_public_key\":\"$pk\",\"expires_at\":\"$exp\",\"invitee_id\":\"$who\"}" "$(cost_of register_invite) yoctoNEAR"
+  local base="${APP_URL:-http://localhost:5173/}"
+  echo
+  echo "Open this link in the browser where $who's wallet is (keep it to yourself; only $who can use it):"
+  echo "${base}?circle_id=${CIRCLE_ID}&invite_public_key=${pk}#invite_secret=${secret}"
+}
+
+# fund <loan_id>: the founder funds a request that names them.
+fund() {
+  local lid="${1:?usage: fund <loan_id>}"
+  local l; l=$(view "$CIRCLE" get_loan "{\"loan_id\":\"$lid\"}")
+  [ "$l" != "null" ] || { echo "STOP: loan $lid does not exist"; exit 1; }
+  [ "$(printf '%s' "$l" | jget lender_id)" = "$FOUNDER" ] || { echo "STOP: loan $lid names $(printf '%s' "$l" | jget lender_id), not $FOUNDER"; exit 1; }
+  [ "$(printf '%s' "$l" | jget state)" = "Open" ] || { echo "STOP: loan $lid is $(printf '%s' "$l" | jget state), not Open"; exit 1; }
+  local amt borrower; amt=$(printf '%s' "$l" | jget principal); borrower=$(printf '%s' "$l" | jget borrower_id)
+  [ "$(view "$USDC_ID" storage_balance_of "{\"account_id\":\"$borrower\"}")" != "null" ] ||
+    echo "WARNING: $borrower is not registered for USDC, so this funding will be refunded (press 'Register for USDC' in the app first)"
+  say "$FOUNDER funds loan $lid: $amt base units to $borrower"
+  SOFT=1 call "fund loan $lid" "$FOUNDER" "$USDC_ID" ft_transfer_call \
+    "{\"receiver_id\":\"$CIRCLE\",\"amount\":\"$amt\",\"msg\":\"{\\\"action\\\":\\\"fund\\\",\\\"loan_id\\\":\\\"$lid\\\"}\"}" '1 yoctoNEAR'
+  save "FUND_${lid}_TX" "$LAST_HASH"
+  view "$CIRCLE" get_loan "{\"loan_id\":\"$lid\"}" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const l=JSON.parse(s);const due=l.due_at?Math.round((Number(BigInt(l.due_at)/1000000n)-Date.now())/1000):null;console.log("loan",l.loan_id,l.state,due!==null?"due in "+due+" s: repay from the web app before then":"")})'
+}
+
+# member <account>: read-only summary for the web-app test.
+member() {
+  local who="${1:?usage: member <account.testnet>}"
+  echo "passport: $(passport "$who" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);console.log(p?JSON.stringify({token:p.token_id,tier:p.tier,effective:p.effective_tier,status:p.status,on_time:p.on_time_count,late:p.late_count}):"none")})')"
+  echo "USDC registered: $([ "$(view "$USDC_ID" storage_balance_of "{\"account_id\":\"$who\"}")" = "null" ] && echo no || echo yes); USDC balance: $(usdc_balance "$who")"
+  view "$CIRCLE" loans_by_borrower "{\"account_id\":\"$who\"}" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{for(const l of JSON.parse(s))console.log("loan",l.loan_id,"lender",l.lender_id,l.state,"on_time",l.repaid_on_time)})'
+}
+
 status() {
   echo "circle: $(circle | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const c=JSON.parse(s);console.log(JSON.stringify({name:c.name,admin:c.admin_id,treasury:c.treasury_id,dao_attached:c.dao_attached,stewards:c.steward_count,members:c.member_count,treasury_lending_enabled:c.treasury_lending_enabled}))})')"
   echo "DAO $DAO code hash: $(code_hash "$DAO" 2>/dev/null) (Sputnik $SPUTNIK_HASH)"
@@ -348,6 +407,6 @@ status() {
 }
 
 case "${1:-}" in
-  stewards|dao|lock|attach|refuse|loan|propose|vote|lowgas|repay|clearflag|status) "$1" "${2:-}" ;;
+  stewards|dao|lock|attach|refuse|loan|propose|vote|lowgas|repay|clearflag|invite|fund|member|status) "$1" "${2:-}" ;;
   *) sed -n '2,20p' "$0"; exit 2 ;;
 esac

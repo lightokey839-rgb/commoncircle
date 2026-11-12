@@ -265,7 +265,16 @@ async function loadPositions(): Promise<void> {
       : []
     return actionRow(`Lent #${loan.loan_id} · ${formatUsdc(loan.principal)} USDC to ${loan.borrower_id} · ${loan.state}`, buttons)
   })
-  list.replaceChildren(...borrowed, ...lent)
+  const usdc = new CircleClient(config.rpcUrl, cfg.usdc_id)
+  const registered = await usdc.view<unknown>('storage_balance_of', { account_id: accountId })
+  const registration = registered
+    ? []
+    : [actionRow('Not registered for USDC yet, so a lender cannot send you a loan.', [{ label: 'Register for USDC (0.00125 NEAR)', run: async () => {
+        await client().registerWithToken({ tokenId: cfg.usdc_id, accountId })
+        show('Registered for USDC. Lenders can now fund your requests.')
+        await loadPositions()
+      } }])]
+  list.replaceChildren(...registration, ...borrowed, ...lent)
   show(`Loaded ${positions.borrowed.length + positions.lent.length} positions.`)
 }
 
