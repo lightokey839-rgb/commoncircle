@@ -1,24 +1,13 @@
-import type { NearWallet } from './circle-client'
+import { setupWalletSelector, type Account, type SignInParams, type Wallet, type WalletSelector } from '@near-wallet-selector/core'
+import { Buffer } from 'buffer'
+import { setupMeteorWallet } from '@near-wallet-selector/meteor-wallet'
+import { setupMyNearWallet } from '@near-wallet-selector/my-near-wallet'
+import { actionCreators } from '@near-js/transactions'
+import type { FunctionCallAction, NearWallet } from './circle-client'
 import type { Nep413Wallet, SignedMessage, SignMessageParams } from './nep413'
 
-const WALLET_SELECTOR_VERSION = '10.1.4'
-const WALLET_SELECTOR_CDN = 'https://esm.sh'
-
-type SelectorAccount = { accountId: string; publicKey?: string }
-type SelectorAction = {
-  type: 'FunctionCall'
-  params: { methodName: string; args: Record<string, unknown>; gas: bigint; deposit: bigint }
-}
-type SelectorWallet = {
-  getAccounts(): Promise<SelectorAccount[]>
-  signIn(input: { contractId: string }): Promise<SelectorAccount[]>
-  signOut(): Promise<void>
-  signAndSendTransaction(input: { receiverId: string; actions: SelectorAction[] }): Promise<unknown>
-  signMessage(input: { message: string; recipient: string; nonce: Uint8Array; state?: string; callbackUrl?: string }): Promise<SignedMessage | void>
-}
-type Selector = {
-  wallet(id?: string): Promise<SelectorWallet>
-}
+// NEAR Wallet Selector 10.1.4, installed from npm and pinned in package-lock.json
+// (no runtime CDN). Testnet only. CommonCircle never sees a key: the wallet signs.
 
 export type NearWalletController = NearWallet & Nep413Wallet & {
   accountId: string
@@ -26,24 +15,26 @@ export type NearWalletController = NearWallet & Nep413Wallet & {
   disconnect(): Promise<void>
 }
 
-async function loadSelector(): Promise<Selector> {
-  const [core, myNear, meteor] = await Promise.all([
-    import(/* @vite-ignore */ `${WALLET_SELECTOR_CDN}/@near-wallet-selector/core@${WALLET_SELECTOR_VERSION}?bundle`),
-    import(/* @vite-ignore */ `${WALLET_SELECTOR_CDN}/@near-wallet-selector/my-near-wallet@${WALLET_SELECTOR_VERSION}?bundle`),
-    import(/* @vite-ignore */ `${WALLET_SELECTOR_CDN}/@near-wallet-selector/meteor-wallet@${WALLET_SELECTOR_VERSION}?bundle`),
-  ]) as Array<Record<string, unknown>>
-  const setupWalletSelector = core.setupWalletSelector as (input: { network: string; modules: unknown[] }) => Promise<Selector>
-  const setupMyNearWallet = myNear.setupMyNearWallet as () => unknown
-  const setupMeteorWallet = meteor.setupMeteorWallet as () => unknown
-  return setupWalletSelector({ network: 'testnet', modules: [setupMyNearWallet(), setupMeteorWallet()] })
+/** v10 wallets take @near-js/transactions Action objects, not the older { type, params } shape. */
+export function toWalletActions(actions: FunctionCallAction[]) {
+  return actions.map((action) => {
+    if (action.type !== 'FunctionCall') throw new Error(`Unsupported NEAR action: ${String((action as { type?: string }).type)}`)
+    return actionCreators.functionCall(action.params.methodName, action.params.args, BigInt(action.params.gas), BigInt(action.params.deposit))
+  })
+}
+
+let selectorPromise: Promise<WalletSelector> | null = null
+function getSelector(): Promise<WalletSelector> {
+  selectorPromise ??= setupWalletSelector({ network: 'testnet', modules: [setupMyNearWallet(), setupMeteorWallet()] })
+  return selectorPromise
 }
 
 export async function createNearWallet(input: {
   contractId: string
   onAccountChange?: (accountId: string) => void
 }): Promise<NearWalletController> {
-  const selector = await loadSelector()
-  let selected: SelectorWallet | null = null
+  const selector = await getSelector()
+  let selected: Wallet | null = null
   let accountId = ''
 
   const syncAccount = async (): Promise<string> => {
@@ -54,8 +45,8 @@ export async function createNearWallet(input: {
     return accountId
   }
 
-  const requireWallet = async (): Promise<SelectorWallet> => {
-    if (!selected || !accountId) throw new Error('Connect MyNearWallet or Meteor before signing in.')
+  const requireWallet = async (): Promise<Wallet> => {
+    if (!selected || !accountId) throw new Error('Connect MyNearWallet or Meteor first.')
     await syncAccount()
     return selected
   }
@@ -64,8 +55,11 @@ export async function createNearWallet(input: {
     get accountId() { return accountId },
     async connect(walletId) {
       selected = await selector.wallet(walletId)
-      const currentAccounts = await selected.getAccounts()
-      const accounts = currentAccounts.length ? currentAccounts : await selected.signIn({ contractId: input.contractId })
+      const current = await selected.getAccounts()
+      // Sign in without a contractId: the wallet adds no limited-access key to the user's
+      // account, so every CommonCircle action goes through an explicit wallet approval.
+      const signIn = (selected as unknown as { signIn(p: SignInParams): Promise<Account[]> }).signIn.bind(selected)
+      const accounts = current.length ? current : await signIn({})
       accountId = accounts[0]?.accountId ?? ''
       if (!accountId) throw new Error('The wallet did not return a testnet account.')
       input.onAccountChange?.(accountId)
@@ -79,33 +73,30 @@ export async function createNearWallet(input: {
     },
     async signMessage(params: SignMessageParams): Promise<SignedMessage> {
       const wallet = await requireWallet()
+      if (!wallet.signMessage) throw new Error('This wallet cannot sign NEP-413 messages.')
       const signed = await wallet.signMessage({
         message: params.message,
         recipient: params.recipient,
-        nonce: params.nonce,
+        nonce: Buffer.from(params.nonce),
         state: params.state,
         callbackUrl: params.callbackUrl,
       })
       if (!signed) throw new Error('The wallet did not return the NEP-413 signature yet. Complete the wallet approval and try again.')
-      return signed
+      return signed as SignedMessage
     },
     async signAndSendTransaction(transaction) {
       const wallet = await requireWallet()
-      return wallet.signAndSendTransaction({
-        receiverId: transaction.receiverId,
-        actions: transaction.actions.map((action) => {
-          if (action.type !== 'FunctionCall') throw new Error(`Unsupported NEAR action: ${action.type}`)
-          return {
-            type: 'FunctionCall',
-            params: {
-              methodName: action.params.methodName,
-              args: action.params.args,
-              gas: BigInt(action.params.gas),
-              deposit: BigInt(action.params.deposit),
-            },
-          }
-        }),
-      })
+      return wallet.signAndSendTransaction({ receiverId: transaction.receiverId, actions: toWalletActions(transaction.actions) })
     },
   }
+}
+
+/** Restore a wallet the user already connected (e.g. after MyNearWallet's redirect back). */
+export async function restoreNearWallet(input: { contractId: string; onAccountChange?: (accountId: string) => void }): Promise<NearWalletController | null> {
+  const selector = await getSelector()
+  const active = selector.store.getState().selectedWalletId
+  if (active !== 'my-near-wallet' && active !== 'meteor-wallet') return null
+  const controller = await createNearWallet(input)
+  await controller.connect(active)
+  return controller
 }
