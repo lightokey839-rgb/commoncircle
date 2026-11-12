@@ -3,6 +3,41 @@
 Amendment A1: each lane edits only its own files. Requests to the other lane go
 here, newest first, with the date (UTC) and the lane that wrote them.
 
+## 2026-11-12 ~12:00 UTC — lead: web-lane Gate 2 items finished by the lead (Codex hit its usage limit)
+
+Codex did items 1 and 2 (`c5c55c4`, `dfcc567`) and most of item 3, then hit its
+usage limit. The lead finished the list on `lane/web` (`4c0c61d`..`005736e`,
+merged into `lane/contracts`, CI run `43212325902` all four jobs green):
+
+- **F-04:** `c5c55c4` got past the cap step for the first time and then failed at
+  the day rollover, because the 60-second test invite had expired (the guard was
+  right). The test now checks the reset as a passport holder. `npm test` 42/42.
+- **F-03, wallet fix (important):** Wallet Selector was loaded from esm.sh at run
+  time, and the adapter sent `{ type: 'FunctionCall', params }` actions. v10
+  wallets convert with `najActionToInternal`, which throws "Unsupported NAJ
+  action" on that shape, so every signature would have failed. Now the packages
+  are pinned from npm (`@near-wallet-selector/*@10.1.4`,
+  `@near-js/transactions@2.5.1`); actions use `actionCreators.functionCall`;
+  `tests/near-wallet.test.ts` round-trips them through the wallet's own converter.
+  Sign-in uses no `contractId`, so no limited-access key is added; a saved
+  session is restored after MyNearWallet's redirect.
+- **F-06:** `web/dao.ts` (Codex's), wired and tested: green only for the pinned
+  hash **and** zero keys.
+- **Treasury UI, request-to-fund, F-09, 1.1.1 forms:** `web/treasury.ts`,
+  `web/text-rules.ts`, the panel in `web/index.html`, Fund and Repay buttons,
+  bounce and late notices, the "Ask stewards to forgive" proposal. 7-day demo
+  default. `tests/treasury.test.ts` 14 tests.
+- **F-05:** CI job "Online claims" re-reads all 25 rows from testnet: 25/25 PASS.
+- **Pages:** the workflow is manual until the repo is public (Pages cannot serve
+  a private repo on this plan), and it uploads `web/dist` (it pointed at `dist`,
+  so it would have published an empty site).
+- Verified in a browser on the production build: circle 3, the green DAO check,
+  the treasury panel and proposals 0–3, and no horizontal scroll at 375 px.
+  **Not verified:** a real wallet connection and signing (needs the builder's
+  wallet), the NEP-413 sign-in server, and the chat transport (still local-only).
+
+If Codex resumes: start from `005736e`. Do not reintroduce the CDN loader.
+
 ## 2026-11-12 ~10:15 UTC — lead → ops/web: contracts lane Gate 2 is done; your Gate 2 list (deadline TODAY 23:59 UTC)
 
 **State.** Interface 1.1.1 is live. Circle 3 "The Dogs (DEMO)" now has a real

@@ -28,9 +28,25 @@ Ship Sat 14 Nov 17:59. This replaces amendment A11's Gate 2/3 times.
 - **F-16 confirmed on real USDC:** 40 Tgas → the circle got 20.5 Tgas → `E60_LOW_GAS`, refunded.
 - **Tier A evidence: `npm run claims` 25/25 PASS, all three tracks PASS.**
   Re-check online: `node contracts/scripts/build-evidence.mjs && npm run claims`.
-- **Gate 2 contracts lane: complete.** Still open for Gate 2 (web lane):
-  F-04 relayer test, F-03 wallet + root app + hosted demo, F-05 claims online
-  mode in CI, F-06 DAO hash check, sign-in, chat gate, request-to-fund, card.
+- **Gate 2 contracts lane: complete.**
+- **Gate 2 web lane (2026-11-12 ~12:00 UTC, finished by the lead):**
+  - CommonCircle is the root app;
+  - real MyNearWallet and Meteor connection, pinned from npm (the v10 action-format
+    bug is fixed and tested);
+  - F-06 DAO check;
+  - treasury panel (ask, file proposal, steward approve);
+  - Fund and Repay buttons;
+  - F-09 notices and the "forgive" proposal;
+  - 1.1.1 form rules;
+  - F-04 fixed;
+  - F-05 online claims in CI.
+
+  CI run `43212325902`: all four jobs green, `npm test` 42/42, online claims 25/25.
+- **Not yet done or verified:**
+  - a real wallet signing from the web app (needs the builder's testnet wallet);
+  - hosted demo: GitHub Pages needs the repo public (ship day);
+  - NEP-413 sign-in needs `server/auth.ts` running;
+  - the chat transport is local-only.
 
 ## Red team after Gate 1 (2026-11-11 ~18:45 UTC): one Critical bug found, fixed (deployed later, see above)
 
