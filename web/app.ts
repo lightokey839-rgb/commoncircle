@@ -1,7 +1,7 @@
 import { CircleClient, passportTokenTitle, type CircleParams, type LoanView, type PassportView } from './circle-client'
 import { friendlyError, isRepeat, TOAST_MS, type NextAction, type ToastKind } from './notify'
 import { badgeFor, memberLabel, type Tier } from './labels'
-import { canCancel, countdown, isWaiting, loanLengthText, requestsForLender, trustedProgress } from './loan-rules'
+import { borrowLimit, canCancel, countdown, formatDuration, isWaiting, loanLengthText, requestsForLender, trustedProgress, validateLoanInput } from './loan-rules'
 import { explorerTxUrl, moneySummary, runMoney, type MoneyDeps, type MoneyKind } from './money'
 import { signInWithNep413 } from './nep413'
 import { buildInviteLink, generateInviteKeyPair, parseInviteLink, signInviteWithSecret } from './invite'
@@ -13,7 +13,7 @@ import { assertCircleName } from './text-rules'
 import { avatarFor, ChatApiError, ChatClient, dayLabel, timeLabel, type ChatMessage } from './chat'
 import {
   clearFlagProposal, DEMO_TREASURY_LOAN_DAYS, formatUsdc, loansNeedingProposal, proposalLoanId, repaymentNotice,
-  SputnikDaoClient, stewardsOf, treasuryFundProposal, usdcToBaseUnits, type SputnikProposal,
+  SputnikDaoClient, stewardsOf, treasuryFundProposal, type SputnikProposal,
 } from './treasury'
 
 declare global {
@@ -314,15 +314,15 @@ async function registerForUsdc(): Promise<void> {
   await afterTx('Ready: lenders can now send you USDC.')
 }
 
-async function requestLoan(lenderId: string, amountText: string, daysText: string, cid = circleId): Promise<void> {
+/** create_loan in the current circle. `amount` is base units, already validated by the form. */
+async function requestLoan(lenderId: string, amount: string, durationDays: number): Promise<void> {
   requireWallet()
-  const amount = usdcToBaseUnits(amountText)
-  const durationDays = Number(daysText)
   if (!lenderId) throw new Error('Choose who you are asking.')
-  if (!Number.isInteger(durationDays) || durationDays < 1) throw new Error('Days must be a whole number.')
   const storage = await readClient.storageCosts()
-  await client().createLoan({ circleId: cid, lenderId, amount, durationDays, deposit: storage.create_loan })
-  await afterTx(`Request sent. ${short(lenderId)} can fund it within 1 hour.`)
+  await client().createLoan({ circleId, lenderId, amount, durationDays, deposit: storage.create_loan })
+  const treasury = lenderId === demo?.circle?.treasury_id
+  const fundingWindow = demo?.circle ? formatDuration(BigInt(demo.circle.params.funding_window_sec)) : 'the funding window'
+  await afterTx(treasury ? 'Request recorded. Now open Treasury and press "2. Send to stewards".' : `Request sent. ${memberLabel(lenderId)} has ${fundingWindow} to fund it.`)
 }
 
 /* ---------- money actions: summary -> pending -> success / failure ---------- */
@@ -734,17 +734,71 @@ function progressNode(passport: PassportView): HTMLElement | null {
     el('span', { className: 'small muted', textContent: `${counters} · ${p.qualifying} of ${p.threshold} on-time repayments toward Trusted${lenders}` }), bar)
 }
 
+let formSeq = 0
+
+/**
+ * P0-3: the one loan form (Home step 5 and Loans). Lender = a member picker
+ * (label, badge, on-time/late) plus "Ask the treasury" when the spec allows it;
+ * limits come from borrowLimit() only; amount and days are validated inline.
+ */
 function loanRequestForm(): HTMLElement {
-  const lenders = (demo?.passports ?? []).filter((p) => p.owner_id !== accountId && p.status === 'Active')
-  const select = el('select', { id: 'step-lender' })
-  for (const p of lenders) select.append(el('option', { value: p.owner_id, textContent: `${short(p.owner_id)} · ${p.display_tier}` }))
-  const preferred = lenders.find((p) => p.owner_id === 'commoncircle-light-lender.testnet')
-  if (preferred) select.value = preferred.owner_id
-  const amount = el('input', { inputMode: 'decimal', value: '1' })
-  const days = el('input', { inputMode: 'numeric', value: '7' })
-  return el('div', { className: 'step-form' },
-    el('label', {}, 'Ask', select), el('label', {}, 'USDC', amount), el('label', {}, 'Days', days),
-    button('Send request', () => requestLoan(select.value, amount.value, days.value)))
+  const id = `lf${++formSeq}`
+  const circle = demo?.circle
+  const passport = me?.passport ?? null
+  if (!circle || !demo) return el('p', { className: 'muted', textContent: 'Loading the circle…' })
+  if (!accountId) return el('p', { className: 'muted', textContent: 'Connect your wallet first (step 1).' })
+  if (!passport || passport.status !== 'Active') return el('p', { className: 'muted', textContent: 'Join the circle first (step 2).' })
+  const limit = borrowLimit(circle.params, passport, demo.config.hard_loan_cap)
+  const lenders = demo.passports.filter((p) => p.owner_id !== accountId && p.status === 'Active')
+  // Treasury loans: DAO attached and verified, at least 2 stewards, borrower effective Trusted and not a steward (interface section 4).
+  const treasuryOk = !!circle.treasury_id && circle.treasury_lending_enabled && !!demo.dao?.verified && passport.effective_tier === 'Trusted' && !passport.steward
+
+  const picker = el('div', { className: 'picker', role: 'radiogroup', ariaLabel: 'Who to ask' })
+  const option = (value: string, main: Node[], sub: string, checked: boolean) => {
+    const input = el('input', { type: 'radio', name: `${id}-lender`, value, checked })
+    return el('label', { className: 'pick' }, input, el('span', { className: 'pick-main' }, ...main), el('span', { className: 'pick-sub', textContent: sub }))
+  }
+  const preferred = lenders.find((p) => p.owner_id === circle.founder_id)?.owner_id ?? lenders[0]?.owner_id
+  for (const p of lenders) {
+    picker.append(option(p.owner_id, [avatar(p.owner_id, 'sm'), el('span', { className: 'pick-name', title: p.owner_id, textContent: memberLabel(p.owner_id) }), badge(p.display_tier)],
+      `On time ${p.on_time_count} · late ${p.late_count}`, p.owner_id === preferred))
+  }
+  if (treasuryOk) picker.append(option(circle.treasury_id!, [el('span', { className: 'avatar avatar-sm avatar-room', textContent: 'DAO' }), el('span', { className: 'pick-name', textContent: 'Ask the treasury (DAO)' })], 'Both stewards vote', !preferred))
+  if (!picker.children.length) return el('p', { className: 'muted', textContent: 'There is nobody else in this circle to ask yet.' })
+
+  const amount = el('input', { id: `${id}-amount`, inputMode: 'decimal', value: formatUsdc(limit.min) })
+  const days = el('input', { id: `${id}-days`, inputMode: 'numeric', value: String(Math.min(7, limit.maxDays)) })
+  amount.setAttribute('aria-describedby', `${id}-amount-hint`)
+  days.setAttribute('aria-describedby', `${id}-days-hint`)
+  const amountHint = el('p', { id: `${id}-amount-hint`, className: 'hint' })
+  const daysHint = el('p', { id: `${id}-days-hint`, className: 'hint' })
+  const send = el('button', { className: 'btn btn-accent', type: 'button', textContent: 'Send request' })
+  const check = () => {
+    const v = validateLoanInput(amount.value, days.value, limit, formatUsdc)
+    amountHint.textContent = v.errors.amount ?? `Your limit as a ${limit.tier}: ${formatUsdc(limit.min)} to ${formatUsdc(limit.max)} USDC.`
+    amountHint.classList.toggle('bad', !!v.errors.amount)
+    amount.ariaInvalid = v.errors.amount ? 'true' : 'false'
+    daysHint.textContent = v.errors.days ?? `${loanLengthText(v.days!, circle.params.day_length_sec)} to repay, counted from when the money arrives.`
+    daysHint.classList.toggle('bad', !!v.errors.days)
+    days.ariaInvalid = v.errors.days ? 'true' : 'false'
+    send.disabled = !v.amount || !v.days
+    return v
+  }
+  amount.addEventListener('input', check)
+  days.addEventListener('input', check)
+  send.addEventListener('click', () => void run(send, async () => {
+    const v = check()
+    const lender = picker.querySelector<HTMLInputElement>('input:checked')?.value ?? ''
+    if (!v.amount || !v.days) throw new Error('Fix the highlighted fields first.')
+    await requestLoan(lender, v.amount, v.days)
+  }))
+  check()
+  return el('div', { className: 'loan-form' },
+    el('p', { className: 'field-label', textContent: 'Who to ask' }), picker,
+    el('div', { className: 'field-row' },
+      el('div', {}, el('label', { htmlFor: amount.id, textContent: 'Amount (USDC)' }), amount, amountHint),
+      el('div', {}, el('label', { htmlFor: days.id, textContent: 'Days' }), days, daysHint)),
+    send)
 }
 
 function renderJourney(): void {
@@ -815,8 +869,7 @@ function renderMembers(): void {
     grid.append(fig)
   }
   if (!grid.children.length) grid.append(el('p', { className: 'muted', textContent: 'No members yet.' }))
-  const lenders = $('#lender-options')
-  lenders.replaceChildren(...(demo?.passports ?? []).filter((p) => p.owner_id !== accountId).map((p) => el('option', { value: p.owner_id })))
+  $('#loan-form-slot').replaceChildren(loanRequestForm())
 }
 
 function renderLoansTable(): void {
@@ -943,11 +996,12 @@ async function renderTreasury(): Promise<void> {
 async function requestFromTreasury(): Promise<void> {
   requireWallet()
   if (!demo?.circle?.treasury_id || !demo.dao?.verified) throw new Error('This circle has no verified DAO treasury.')
-  const amount = usdcToBaseUnits($<HTMLInputElement>('#treasury-amount').value)
-  const days = Number($<HTMLInputElement>('#treasury-days').value || DEMO_TREASURY_LOAN_DAYS)
-  if (!Number.isInteger(days) || days < 1) throw new Error('Days must be a whole number.')
+  // Same limits as the loan form: one source (borrowLimit).
+  const limit = borrowLimit(demo.circle.params, me?.passport ?? null, demo.config.hard_loan_cap)
+  const v = validateLoanInput($<HTMLInputElement>('#treasury-amount').value, $<HTMLInputElement>('#treasury-days').value || String(DEMO_TREASURY_LOAN_DAYS), limit, formatUsdc)
+  if (!v.amount || !v.days) throw new Error(v.errors.amount ?? v.errors.days ?? 'Check the amount and days.')
   const storage = await readClient.storageCosts()
-  await client().createLoan({ circleId: demo.circle.circle_id, lenderId: demo.circle.treasury_id, amount, durationDays: days, deposit: storage.create_loan })
+  await client().createLoan({ circleId: demo.circle.circle_id, lenderId: demo.circle.treasury_id, amount: v.amount, durationDays: v.days, deposit: storage.create_loan })
   await afterTx('Request recorded. Now press "2. Send to stewards".')
 }
 
@@ -1009,7 +1063,6 @@ function wire(): void {
   on('#join-invite', joinInvite)
   on('#create-invite', createInvite)
   on('#create-circle', createCircle)
-  on('#create-loan', () => requestLoan($<HTMLInputElement>('#loan-lender-id').value.trim(), $<HTMLInputElement>('#loan-amount').value, $<HTMLInputElement>('#loan-duration-days').value, $<HTMLInputElement>('#loan-circle-id').value.trim()))
   on('#save-design', saveDesign)
   on('#load-positions', refreshMe)
   on('#check-chat-access', () => checkChatAccess(false))

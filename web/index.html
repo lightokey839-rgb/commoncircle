@@ -193,18 +193,9 @@
                 <ul id="positions" class="list" aria-live="polite"><li class="empty">Connect a wallet to see your loans.</li></ul>
               </div>
               <div class="box">
-                <h2>Ask a member for a loan</h2>
-                <p class="muted">Name the member you are asking. Nothing moves until they fund it. Demo days are 60 seconds.</p>
-                <label for="loan-circle-id">Circle number</label>
-                <input id="loan-circle-id" inputmode="numeric" value="3" />
-                <label for="loan-lender-id">Lender</label>
-                <input id="loan-lender-id" list="lender-options" autocomplete="off" placeholder="lender.testnet" />
-                <datalist id="lender-options"></datalist>
-                <div class="field-row">
-                  <label>Amount (USDC)<input id="loan-amount" inputmode="decimal" value="1" /></label>
-                  <label>Days<input id="loan-duration-days" inputmode="numeric" value="7" /></label>
-                </div>
-                <button id="create-loan" class="btn btn-accent">Send request</button>
+                <h2>Ask for a loan</h2>
+                <p class="muted">Pick who to ask. Nothing moves until they fund it.</p>
+                <div id="loan-form-slot"></div>
               </div>
             </div>
             <div class="box">
