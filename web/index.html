@@ -4,171 +4,256 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>CommonCircle · The Dogs (DEMO)</title>
+    <meta name="description" content="Zero-interest loans between people who already trust each other, on NEAR testnet." />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="./" aria-label="CommonCircle home">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span>CommonCircle</span>
+        </a>
+        <span class="chip chip-testnet" title="Everything here uses NEAR testnet: no real money.">Testnet demo</span>
+        <div class="wallet">
+          <span id="wallet-account" class="wallet-account" hidden></span>
+          <button id="connect-meteor" class="btn btn-primary btn-sm">Connect Meteor</button>
+          <button id="connect-wallet" class="btn btn-ghost btn-sm">MyNearWallet</button>
+          <button id="disconnect-wallet" class="btn btn-ghost btn-sm" hidden>Disconnect</button>
+        </div>
+      </div>
+    </header>
+
     <main class="shell">
-      <p class="eyebrow">COMMONCIRCLE · NEAR TESTNET DEMO</p>
-      <h1>Ajo pays you in turn. CommonCircle is for when it isn't your turn.</h1>
-      <p class="lede">Zero-interest USDC loans between people who already trust each other. Your passport card turns Trusted when you repay on time, and Trusted members can ask the circle's DAO treasury.</p>
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-text">
+          <p class="eyebrow">Lending circles on NEAR</p>
+          <h1 id="hero-title">Ajo pays you in turn. CommonCircle is for when it isn't your turn.</h1>
+          <p class="lede">Borrow from people who already trust you, with no interest. Pay back on time and your membership card turns <strong>Trusted</strong>, which unlocks bigger loans and the circle's shared treasury.</p>
+        </div>
+        <div class="hero-panel" aria-live="polite">
+          <p class="hero-panel-label">Live from testnet</p>
+          <p id="circle-name" class="circle-name">Loading circle…</p>
+          <dl class="stats">
+            <div><dt>Members</dt><dd id="stat-members">–</dd></div>
+            <div><dt>Loans</dt><dd id="stat-loans">–</dd></div>
+            <div><dt>Treasury</dt><dd id="stat-treasury">–</dd></div>
+          </dl>
+          <p id="dao-status" class="dao-status">Checking the circle's DAO…</p>
+        </div>
+      </section>
 
-      <section class="card demo-card" aria-labelledby="demo-heading">
-        <h2 id="demo-heading">Read-only testnet demo</h2>
-        <p class="muted">No wallet is needed. This queries <code>commoncircle-light.testnet</code> through FastNEAR and never submits a transaction. The default is circle 3, <strong>The Dogs (DEMO)</strong>.</p>
-        <label for="demo-circle-id">Circle id to inspect</label>
-        <input id="demo-circle-id" inputmode="numeric" value="3" />
-        <button id="load-demo" class="secondary">Load testnet data</button>
-        <pre id="demo-output" class="demo-output" aria-live="polite">Not loaded.</pre>
-        <p id="dao-status" class="dao-status" aria-live="polite">DAO trust check pending.</p>
-        <div id="treasury-actions" class="treasury" hidden>
-          <h3>Circle treasury (Sputnik DAO)</h3>
-          <p id="treasury-summary" class="muted">Loading the treasury…</p>
-          <div id="treasury-ask" class="treasury-ask" hidden>
-            <h4>Ask the treasury</h4>
-            <p class="muted">For Trusted members who are not stewards. Step 1 records your request on-chain; step 2 files it as a DAO proposal for the stewards to approve. Demo days are 60 seconds, so a 7-day loan is due 7 minutes after it is funded.</p>
-            <div class="inline-fields">
-              <label>Amount (USDC) <input id="treasury-amount" inputmode="decimal" value="1" /></label>
-              <label>Days <input id="treasury-days" inputmode="numeric" value="7" /></label>
-            </div>
-            <button id="treasury-request">1. Create my request</button>
-            <ul id="treasury-pending" class="positions" aria-live="polite"></ul>
+      <section class="card journey" aria-labelledby="journey-title">
+        <div class="card-head">
+          <div>
+            <h2 id="journey-title">Your steps</h2>
+            <p class="muted" id="journey-sub">Follow these in order. Each one updates from the blockchain by itself.</p>
           </div>
-          <p id="treasury-eligibility" class="muted"></p>
-          <h4>Proposals</h4>
-          <ul id="treasury-proposals" class="positions" aria-live="polite"></ul>
+          <button id="journey-refresh" class="btn btn-ghost btn-sm" title="Re-read everything from testnet">Refresh</button>
         </div>
-        <div id="demo-cards" class="demo-cards" aria-label="Circle passport cards"></div>
+        <ol id="steps" class="steps"></ol>
+
+        <details class="invite-fields" id="invite-details">
+          <summary>Invite details (filled in from your invite link)</summary>
+          <label for="circle-id">Circle number</label>
+          <input id="circle-id" inputmode="numeric" placeholder="3" />
+          <label for="invite-public-key">Invite key</label>
+          <input id="invite-public-key" placeholder="ed25519:…" autocomplete="off" />
+          <label for="invite-secret">Invite secret</label>
+          <input id="invite-secret" type="password" autocomplete="off" placeholder="from the invite link" />
+          <p class="muted small">The secret stays in this browser. It is never sent to a server.</p>
+        </details>
       </section>
 
-      <section class="card" aria-labelledby="wallet-heading">
-        <h2 id="wallet-heading">Connect a NEAR wallet</h2>
-        <p class="muted">Testnet only. Choose MyNearWallet or Meteor from the real NEAR Wallet Selector; CommonCircle never receives keys.</p>
-        <div class="wallet-actions">
-          <button id="connect-wallet">Connect MyNearWallet</button>
-          <button id="connect-meteor" class="secondary">Connect Meteor</button>
-          <button id="disconnect-wallet" class="secondary" hidden>Disconnect</button>
+      <nav class="tabs" role="tablist" aria-label="Sections">
+        <button role="tab" class="tab" id="tab-btn-circle" aria-controls="tab-circle" aria-selected="true">Circle</button>
+        <button role="tab" class="tab" id="tab-btn-treasury" aria-controls="tab-treasury" aria-selected="false">Treasury</button>
+        <button role="tab" class="tab" id="tab-btn-me" aria-controls="tab-me" aria-selected="false">Me</button>
+        <button role="tab" class="tab" id="tab-btn-tools" aria-controls="tab-tools" aria-selected="false">Tools</button>
+      </nav>
+
+      <!-- CIRCLE -->
+      <section id="tab-circle" role="tabpanel" class="tabpanel" aria-labelledby="tab-btn-circle">
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2>Members</h2>
+              <p class="muted">Every member holds a passport card. It cannot be sold or sent, and it changes when they repay.</p>
+            </div>
+          </div>
+          <div id="demo-cards" class="member-grid" aria-label="Member passport cards"></div>
         </div>
-        <p id="wallet-account" class="status" role="status">No wallet connected.</p>
-      </section>
 
-      <section class="card" aria-labelledby="sign-in-heading">
-        <h2 id="sign-in-heading">1. Sign in</h2>
-        <label for="account-id">NEAR account</label>
-        <input id="account-id" autocomplete="username" readonly placeholder="Connect a testnet wallet first" />
-        <button id="sign-in">Sign in with NEP-413</button>
-      </section>
-
-      <section class="card" aria-labelledby="invite-heading">
-        <h2 id="invite-heading">2. Join by invite</h2>
-        <p class="muted">The invite secret stays in this browser and is never sent to the server.</p>
-        <label for="circle-id">Circle id</label>
-        <input id="circle-id" inputmode="numeric" placeholder="1" />
-        <label for="invite-public-key">Registered invite public key</label>
-        <input id="invite-public-key" placeholder="ed25519:..." />
-        <label for="invite-secret">Invite secret</label>
-        <input id="invite-secret" type="password" autocomplete="off" placeholder="from the invite link" />
-        <button id="join-invite">Join circle</button>
-      </section>
-
-      <section class="card" aria-labelledby="create-invite-heading">
-        <h2 id="create-invite-heading">Invite someone</h2>
-        <p class="muted">The generated Ed25519 secret is placed in the link fragment and never sent to the server.</p>
-        <label for="invite-circle-id">Circle id</label>
-        <input id="invite-circle-id" inputmode="numeric" placeholder="1" />
-        <label for="invitee-account-id">Named invitee account (optional)</label>
-        <input id="invitee-account-id" autocomplete="off" placeholder="bob.testnet" />
-        <label for="invite-expiry-hours">Expires in hours</label>
-        <input id="invite-expiry-hours" inputmode="numeric" value="72" />
-        <button id="create-invite">Register invite</button>
-        <textarea id="invite-link" rows="3" readonly placeholder="The share link appears here"></textarea>
-      </section>
-
-      <section class="card" aria-labelledby="create-circle-heading">
-        <h2 id="create-circle-heading">Create a testnet DEMO circle</h2>
-        <p class="muted">This attaches the frozen short-duration testnet parameters; it is not a mainnet pilot configuration.</p>
-        <label for="new-circle-name">Circle name</label>
-        <input id="new-circle-name" value="CommonCircle demo" maxlength="64" />
-        <label for="new-circle-tagline">Passport tagline (optional, 32 characters)</label>
-        <input id="new-circle-tagline" maxlength="32" placeholder="Small turns, stronger ties" />
-        <div class="theme-grid">
-          <label>Background <input id="new-circle-background" type="color" value="#1D3557" /></label>
-          <label>Accent <input id="new-circle-accent" type="color" value="#A8DADC" /></label>
-          <label>Text <input id="new-circle-text" type="color" value="#FFFFFF" /></label>
+        <div class="card">
+          <h2>Loans in this circle</h2>
+          <p class="muted">Money goes straight from the lender to the borrower. The circle itself never holds it.</p>
+          <div class="table-wrap">
+            <table class="loans">
+              <thead><tr><th>#</th><th>Borrower</th><th>Lender</th><th>Amount</th><th>Status</th></tr></thead>
+              <tbody id="circle-loans"><tr><td colspan="5" class="muted">Loading…</td></tr></tbody>
+            </table>
+          </div>
         </div>
-        <label for="new-circle-pattern">Pattern</label>
-        <select id="new-circle-pattern">
-          <option>None</option><option selected>Dots</option><option>Grid</option><option>Waves</option><option>Rays</option>
-        </select>
-        <label for="new-circle-emblem">Emblem (PNG, WebP, JPEG or GIF; resized to 128×128 and capped at 12 KiB)</label>
-        <input id="new-circle-emblem" type="file" accept="image/png,image/webp,image/jpeg,image/gif" />
-        <div id="new-circle-preview" class="theme-preview" aria-label="New circle passport preview"></div>
-        <button id="create-circle">Create circle</button>
+
+        <details class="card details-card">
+          <summary>Look at another circle, or see the raw testnet data</summary>
+          <div class="inline-form">
+            <label for="demo-circle-id">Circle number</label>
+            <input id="demo-circle-id" inputmode="numeric" value="3" />
+            <button id="load-demo" class="btn btn-secondary">Load</button>
+          </div>
+          <pre id="demo-output" class="raw">Not loaded.</pre>
+        </details>
       </section>
 
-      <section class="card" aria-labelledby="design-heading">
-        <h2 id="design-heading">Edit passport design</h2>
-        <p class="muted">Only the circle admin can save a design. SVG uploads are rejected; the browser submits only a small raster emblem.</p>
-        <label for="design-circle-id">Circle id</label>
-        <input id="design-circle-id" inputmode="numeric" value="3" />
-        <label for="design-tagline">Passport tagline (optional, 32 characters)</label>
-        <input id="design-tagline" maxlength="32" placeholder="Small turns, stronger ties" />
-        <div class="theme-grid">
-          <label>Background <input id="design-background" type="color" value="#1D3557" /></label>
-          <label>Accent <input id="design-accent" type="color" value="#A8DADC" /></label>
-          <label>Text <input id="design-text" type="color" value="#FFFFFF" /></label>
+      <!-- TREASURY -->
+      <section id="tab-treasury" role="tabpanel" class="tabpanel" aria-labelledby="tab-btn-treasury" hidden>
+        <div id="treasury-none" class="card">
+          <h2>No verified treasury</h2>
+          <p class="muted">This circle has no DAO attached, or its DAO did not pass the safety check, so treasury buttons stay hidden.</p>
         </div>
-        <label for="design-pattern">Pattern</label>
-        <select id="design-pattern">
-          <option>None</option><option selected>Dots</option><option>Grid</option><option>Waves</option><option>Rays</option>
-        </select>
-        <label for="design-emblem">Emblem (PNG, WebP, JPEG or GIF; resized to 128×128 and capped at 12 KiB)</label>
-        <input id="design-emblem" type="file" accept="image/png,image/webp,image/jpeg,image/gif" />
-        <div id="design-preview" class="theme-preview" aria-label="Edited passport preview"></div>
-        <button id="save-design">Save design</button>
-        <img id="design-card-preview" class="card-svg-preview" alt="Saved passport card preview" hidden />
+        <div id="treasury-actions" class="card treasury" hidden>
+          <h2>The circle's treasury</h2>
+          <p class="muted">A Sputnik DAO holds shared money for the circle. It only pays out when <strong>both stewards</strong> vote yes, and only to Trusted members who are not stewards.</p>
+          <p id="treasury-summary" class="summary">Loading the treasury…</p>
+          <p id="treasury-eligibility" class="callout"></p>
+
+          <div id="treasury-ask" class="sub-card" hidden>
+            <h3>Ask the treasury for a loan</h3>
+            <p class="muted">Step 1 records your request. Step 2 sends it to the stewards as a proposal. Demo days are 60 seconds, so 7 days means you repay within 7 minutes of getting the money.</p>
+            <div class="field-row">
+              <label>Amount (USDC)<input id="treasury-amount" inputmode="decimal" value="1" /></label>
+              <label>Days<input id="treasury-days" inputmode="numeric" value="7" /></label>
+            </div>
+            <button id="treasury-request" class="btn btn-primary">1. Create my request</button>
+            <ul id="treasury-pending" class="list"></ul>
+          </div>
+
+          <h3>Proposals</h3>
+          <ul id="treasury-proposals" class="list"></ul>
+        </div>
       </section>
 
-      <section class="card" aria-labelledby="create-loan-heading">
-        <h2 id="create-loan-heading">Request to fund</h2>
-        <p class="muted">This creates an on-chain request naming the member who may fund it with USDC. It does not move funds. The named lender sees it under "My positions" with a Fund button.</p>
-        <label for="loan-circle-id">Circle id</label>
-        <input id="loan-circle-id" inputmode="numeric" value="3" />
-        <label for="loan-lender-id">Named lender account</label>
-        <input id="loan-lender-id" autocomplete="off" placeholder="lender.testnet" />
-        <label for="loan-amount">Amount (USDC)</label>
-        <input id="loan-amount" inputmode="decimal" value="1" />
-        <label for="loan-duration-days">Duration (days; in DEMO circles a day is 60 seconds)</label>
-        <input id="loan-duration-days" inputmode="numeric" value="7" />
-        <button id="create-loan">Submit request to fund</button>
+      <!-- ME -->
+      <section id="tab-me" role="tabpanel" class="tabpanel" aria-labelledby="tab-btn-me" hidden>
+        <div class="card me-grid">
+          <div>
+            <h2>My card</h2>
+            <p id="my-card-title" class="muted">Connect a wallet and join to see your card.</p>
+            <img id="my-card-image" class="my-card" alt="My CommonCircle passport card" hidden />
+            <input id="my-card-circle-id" type="hidden" value="3" />
+            <button id="load-my-card" class="btn btn-ghost btn-sm" hidden>Reload card</button>
+          </div>
+          <div>
+            <div class="card-head">
+              <h2>My loans</h2>
+              <button id="load-positions" class="btn btn-ghost btn-sm">Refresh</button>
+            </div>
+            <ul id="positions" class="list" aria-live="polite"><li class="muted">Connect a wallet to see your loans.</li></ul>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Circle chat</h2>
+          <p class="muted">Only members with an active card can write. The blockchain is checked before the box unlocks. Chat is not end-to-end encrypted, and in this demo messages stay in your browser.</p>
+          <input id="chat-circle-id" type="hidden" value="3" />
+          <p id="chat-access" class="callout">Locked until your membership is checked.</p>
+          <button id="check-chat-access" class="btn btn-secondary btn-sm">Check my access</button>
+          <textarea id="chat-message" rows="3" disabled placeholder="Write to your circle"></textarea>
+          <button id="send-chat" class="btn btn-primary btn-sm" disabled>Post</button>
+          <ul id="chat-log" class="list chat-log" aria-live="polite"></ul>
+        </div>
       </section>
 
-      <section class="card" aria-labelledby="chat-heading">
-        <h2 id="chat-heading">Circle chat gate</h2>
-        <p class="muted">Chat is available only to an account with an Active passport. The gate is checked on-chain before the composer unlocks.</p>
-        <label for="chat-circle-id">Circle id</label>
-        <input id="chat-circle-id" inputmode="numeric" value="3" />
-        <button id="check-chat-access" class="secondary">Check chat access</button>
-        <p id="chat-access" class="status" role="status">Locked until access is checked.</p>
-        <textarea id="chat-message" rows="3" disabled placeholder="Write to your circle"></textarea>
-        <button id="send-chat" disabled>Post local demo message</button>
-        <ul id="chat-log" class="positions" aria-live="polite"></ul>
+      <!-- TOOLS -->
+      <section id="tab-tools" role="tabpanel" class="tabpanel" aria-labelledby="tab-btn-tools" hidden>
+        <details class="card details-card" open>
+          <summary>Invite someone</summary>
+          <p class="muted">Trusted members can invite. You get a link to send privately. Its secret part never reaches a server.</p>
+          <label for="invite-circle-id">Circle number</label>
+          <input id="invite-circle-id" inputmode="numeric" value="3" />
+          <label for="invitee-account-id">Their NEAR account (optional, recommended)</label>
+          <input id="invitee-account-id" autocomplete="off" placeholder="friend.testnet" />
+          <label for="invite-expiry-hours">Expires after (hours)</label>
+          <input id="invite-expiry-hours" inputmode="numeric" value="72" />
+          <button id="create-invite" class="btn btn-primary">Create invite link</button>
+          <textarea id="invite-link" rows="3" readonly placeholder="The link to share appears here"></textarea>
+        </details>
+
+        <details class="card details-card">
+          <summary>Ask a specific member for a loan</summary>
+          <p class="muted">The same as step 5, for any circle and lender.</p>
+          <label for="loan-circle-id">Circle number</label>
+          <input id="loan-circle-id" inputmode="numeric" value="3" />
+          <label for="loan-lender-id">Lender's NEAR account</label>
+          <input id="loan-lender-id" autocomplete="off" placeholder="lender.testnet" />
+          <div class="field-row">
+            <label>Amount (USDC)<input id="loan-amount" inputmode="decimal" value="1" /></label>
+            <label>Days (demo day = 60 s)<input id="loan-duration-days" inputmode="numeric" value="7" /></label>
+          </div>
+          <button id="create-loan" class="btn btn-primary">Send request</button>
+        </details>
+
+        <details class="card details-card">
+          <summary>Start a new demo circle</summary>
+          <p class="muted">Uses short testnet settings (a day is 60 seconds). You become its founder.</p>
+          <label for="new-circle-name">Circle name</label>
+          <input id="new-circle-name" value="CommonCircle demo" maxlength="64" />
+          <label for="new-circle-tagline">Card tagline (optional, up to 32 characters)</label>
+          <input id="new-circle-tagline" maxlength="32" placeholder="Small turns, stronger ties" />
+          <div class="theme-grid">
+            <label>Background <input id="new-circle-background" type="color" value="#1D3557" /></label>
+            <label>Accent <input id="new-circle-accent" type="color" value="#A8DADC" /></label>
+            <label>Text <input id="new-circle-text" type="color" value="#FFFFFF" /></label>
+          </div>
+          <label for="new-circle-pattern">Pattern</label>
+          <select id="new-circle-pattern">
+            <option>None</option><option selected>Dots</option><option>Grid</option><option>Waves</option><option>Rays</option>
+          </select>
+          <label for="new-circle-emblem">Emblem image (PNG, WebP, JPEG or GIF; shrunk to 12 KiB)</label>
+          <input id="new-circle-emblem" type="file" accept="image/png,image/webp,image/jpeg,image/gif" />
+          <div id="new-circle-preview" class="theme-preview" aria-label="New circle card preview"></div>
+          <button id="create-circle" class="btn btn-primary">Create circle</button>
+        </details>
+
+        <details class="card details-card">
+          <summary>Change a circle's card design (circle admin only)</summary>
+          <label for="design-circle-id">Circle number</label>
+          <input id="design-circle-id" inputmode="numeric" value="3" />
+          <label for="design-tagline">Card tagline (optional, up to 32 characters)</label>
+          <input id="design-tagline" maxlength="32" placeholder="Small turns, stronger ties" />
+          <div class="theme-grid">
+            <label>Background <input id="design-background" type="color" value="#1D3557" /></label>
+            <label>Accent <input id="design-accent" type="color" value="#A8DADC" /></label>
+            <label>Text <input id="design-text" type="color" value="#FFFFFF" /></label>
+          </div>
+          <label for="design-pattern">Pattern</label>
+          <select id="design-pattern">
+            <option>None</option><option selected>Dots</option><option>Grid</option><option>Waves</option><option>Rays</option>
+          </select>
+          <label for="design-emblem">Emblem image</label>
+          <input id="design-emblem" type="file" accept="image/png,image/webp,image/jpeg,image/gif" />
+          <div id="design-preview" class="theme-preview" aria-label="Edited card preview"></div>
+          <button id="save-design" class="btn btn-primary">Save design</button>
+          <img id="design-card-preview" class="my-card" alt="Saved card preview" hidden />
+        </details>
+
+        <details class="card details-card">
+          <summary>Advanced: sign in with a typed account</summary>
+          <label for="account-id">NEAR account</label>
+          <input id="account-id" autocomplete="username" readonly placeholder="Filled in when you connect a wallet" />
+          <button id="sign-in" class="btn btn-secondary">Sign in (NEP-413)</button>
+          <button id="join-invite" class="btn btn-secondary">Join with the invite details</button>
+        </details>
       </section>
 
-      <section class="card" aria-labelledby="positions-heading">
-        <h2 id="positions-heading">3. My positions</h2>
-        <button id="load-positions" class="secondary">Refresh positions</button>
-        <ul id="positions" class="positions" aria-live="polite"></ul>
-        <h3>My passport card</h3>
-        <label for="my-card-circle-id">Circle id</label>
-        <input id="my-card-circle-id" inputmode="numeric" value="3" />
-        <button id="load-my-card" class="secondary">Load my card</button>
-        <p id="my-card-title" class="muted">No passport card loaded.</p>
-        <img id="my-card-image" class="card-svg-preview" alt="My CommonCircle passport card" hidden />
-      </section>
-
-      <p id="status" class="status" role="status">Connect a wallet adapter to begin.</p>
-      <p class="risk">Testnet DEMO: no real money. Loans are unsecured; repayment cannot be forced. Chat is access-controlled, not end-to-end encrypted. Terms, account ids, and passport history are public on-chain.</p>
+      <footer class="footer">
+        <p><strong>Testnet demo:</strong> no real money. Loans are unsecured; repayment cannot be forced. Loan terms, account names and card history are public on the blockchain.</p>
+        <p class="muted small">Contract <code>commoncircle-light.testnet</code> · DAO by Sputnik · Wallets by NEAR Wallet Selector</p>
+      </footer>
     </main>
+
+    <div id="status" class="toast" role="status" aria-live="polite" hidden></div>
     <script type="module" src="./app.ts"></script>
   </body>
 </html>
