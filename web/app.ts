@@ -3,10 +3,10 @@ import { signInWithNep413 } from './nep413'
 import { buildInviteLink, generateInviteKeyPair, parseInviteLink, signInviteWithSecret } from './invite'
 import { loadReadOnlyDemo, type ReadOnlyDemoSnapshot } from './demo'
 import { bindThemeForm, readThemeForm, renderThemePreview } from './theme'
-// The wallet library (~1.5 MB) loads only on Connect or when a session exists, so the
-// read-only page paints first.
+// The wallet library (~1.5 MB) loads only on Connect or when a session exists.
 import type { NearWalletController } from './near-wallet'
 import { assertCircleName } from './text-rules'
+import { avatarFor, ChatApiError, ChatClient, dayLabel, timeLabel, type ChatMessage } from './chat'
 import {
   clearFlagProposal, DEMO_TREASURY_LOAN_DAYS, formatUsdc, loansNeedingProposal, proposalLoanId, repaymentNotice,
   SputnikDaoClient, stewardsOf, treasuryFundProposal, usdcToBaseUnits, type SputnikProposal,
@@ -29,16 +29,25 @@ const config = window.COMMONCIRCLE_CONFIG ?? {
 const readClient = new CircleClient(config.rpcUrl, config.contractId)
 const client = () => new CircleClient(config.rpcUrl, config.contractId, window.commonCircleWallet)
 const TOKEN_KEY = 'commoncircle.session'
+const VIEWS = ['home', 'chat', 'loans', 'treasury', 'members', 'tools'] as const
+type View = (typeof VIEWS)[number]
 
-type Me = { passport: PassportView | null; registered: boolean; loans: LoanView[]; signedIn: boolean }
+type Me = { passport: PassportView | null; registered: boolean; loans: LoanView[]; signedIn: boolean; circles: Array<{ id: string; name: string }> }
 
 let accountId = ''
 let circleId = '3'
-let chatUnlocked = false
 let walletController: NearWalletController | null = null
 let demo: ReadOnlyDemoSnapshot | null = null
 let me: Me | null = null
 let usdcId = ''
+let view: View = 'home'
+
+// chat state
+let chatRoom = '3'
+let chatAllowed = false
+const chatMessages = new Map<string, ChatMessage[]>()
+const chatSeen = new Map<string, number>()
+let chatTimer = 0
 
 const $ = <T extends HTMLElement>(selector: string): T => document.querySelector(selector) as T
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> = {}, ...children: Array<Node | string>): HTMLElementTagNameMap[K] => {
@@ -46,9 +55,25 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLEl
   node.append(...children)
   return node
 }
-const short = (id: string) => (id.length > 26 ? `${id.slice(0, 12)}…${id.slice(-11)}` : id)
+const short = (id: string) => (id.length > 24 ? `${id.slice(0, 11)}…${id.slice(-10)}` : id)
+/** "The Dogs (DEMO)" -> "TD" */
+const roomInitials = (name: string) => {
+  const words = name.replace(/\(.*?\)/g, '').split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w))
+  return ((words[0]?.[0] ?? '') + (words[1]?.[0] ?? words[0]?.[1] ?? '')).toUpperCase() || '#'
+}
 
-/* ---------- messages ---------- */
+function avatar(account: string, size = ''): HTMLSpanElement {
+  const { initials, hue } = avatarFor(account)
+  const node = el('span', { className: `avatar${size ? ` avatar-${size}` : ''}`, textContent: initials, title: account })
+  node.style.setProperty('--h', String(hue))
+  return node
+}
+
+function who(account: string, label = short(account)): HTMLSpanElement {
+  return el('span', { className: 'who', title: account }, avatar(account, 'sm'), el('span', { textContent: label }))
+}
+
+/* ---------- messages to the user ---------- */
 
 let toastTimer = 0
 function show(message: string, kind: 'info' | 'ok' | 'bad' = 'info'): void {
@@ -57,42 +82,52 @@ function show(message: string, kind: 'info' | 'ok' | 'bad' = 'info'): void {
   toast.className = `toast ${kind}`
   toast.hidden = false
   window.clearTimeout(toastTimer)
-  toastTimer = window.setTimeout(() => { toast.hidden = true }, kind === 'bad' ? 14000 : 7000)
+  toastTimer = window.setTimeout(() => { toast.hidden = true }, kind === 'bad' ? 14000 : 6000)
 }
 
 function errorText(error: unknown): string {
+  if (error instanceof ChatApiError) return error.message
   const text = plainContractError(error)
-  if (/Failed to fetch|NetworkError|ECONNREFUSED/i.test(text)) {
-    return 'Could not reach a server. If this was sign-in, start the sign-in server (npm run auth) and try again.'
-  }
+  if (/Failed to fetch|NetworkError|ECONNREFUSED/i.test(text)) return 'Could not reach the sign-in server. Start it with npm run auth, then try again.'
   return text
 }
 
-/** Run an action from a button: show a spinner, report errors in plain words. */
-async function run(button: HTMLButtonElement | null, action: () => Promise<void>): Promise<void> {
-  if (button) { button.disabled = true; button.classList.add('busy') }
+async function run(b: HTMLButtonElement | null, action: () => Promise<void>): Promise<void> {
+  if (b) { b.disabled = true; b.classList.add('busy') }
   try {
     await action()
   } catch (error) {
     show(errorText(error), 'bad')
   } finally {
-    if (button) { button.disabled = false; button.classList.remove('busy') }
+    if (b) { b.disabled = false; b.classList.remove('busy') }
   }
 }
 
-function button(label: string, action: () => Promise<void>, kind: 'primary' | 'secondary' | 'ghost' = 'primary'): HTMLButtonElement {
+function button(label: string, action: () => Promise<void>, kind: 'accent' | 'soft' | 'ghost' = 'accent'): HTMLButtonElement {
   const b = el('button', { className: `btn btn-${kind} btn-sm`, textContent: label, type: 'button' })
   b.addEventListener('click', () => void run(b, action))
   return b
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-/** After a transaction, give testnet a moment to finalise, then re-read everything. */
 async function afterTx(message: string): Promise<void> {
   show(`${message} Updating from testnet…`, 'ok')
   await wait(2500)
   await refreshAll()
   show(message, 'ok')
+}
+
+/* ---------- views ---------- */
+
+function goView(next: View): void {
+  view = next
+  for (const v of VIEWS) $(`#view-${v}`).hidden = v !== next
+  for (const item of document.querySelectorAll<HTMLButtonElement>('.nav-item')) item.classList.toggle('active', item.dataset.view === next)
+  $('#crumb-view').textContent = $(`#view-${next}`).dataset.title ?? ''
+  $('#sidebar').classList.remove('open')
+  $('#panel').scrollTop = 0
+  try { localStorage.setItem('commoncircle.view', next) } catch { /* ignore */ }
+  if (next === 'chat') { void openRoom(chatRoom); startChatPolling() } else stopChatPolling()
 }
 
 /* ---------- wallet ---------- */
@@ -101,14 +136,12 @@ function onAccountChange(nextAccountId: string): void {
   const changed = nextAccountId !== accountId
   accountId = nextAccountId
   $<HTMLInputElement>('#account-id').value = nextAccountId
-  const label = $('#wallet-account')
-  label.textContent = nextAccountId ? short(nextAccountId) : ''
-  label.title = nextAccountId
-  label.hidden = !nextAccountId
-  $('#connect-meteor').hidden = !!nextAccountId
-  $('#connect-wallet').hidden = !!nextAccountId
-  $('#disconnect-wallet').hidden = !nextAccountId
-  if (changed) void refreshMe()
+  $('#profile-out').hidden = !!nextAccountId
+  $('#profile-in').hidden = !nextAccountId
+  $('#wallet-account').textContent = nextAccountId
+  $('#wallet-account').title = nextAccountId
+  $('#profile-avatar').replaceWith(Object.assign(avatar(nextAccountId || '?'), { id: 'profile-avatar' }))
+  if (changed) { chatMessages.clear(); void refreshMe() }
 }
 
 function hasSavedWalletSession(): boolean {
@@ -150,10 +183,24 @@ async function disconnectWallet(): Promise<void> {
 }
 
 function requireWallet(): void {
-  if (!window.commonCircleWallet || !accountId) throw new Error('Connect a wallet first (top right).')
+  if (!window.commonCircleWallet || !accountId) throw new Error('Connect a wallet first (bottom left).')
 }
 
-/* ---------- actions ---------- */
+/* ---------- sign-in token ---------- */
+
+function session(): { accountId: string; token: string } | null {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(TOKEN_KEY) ?? 'null') as { accountId?: string; token?: string } | null
+    return saved?.accountId && saved.token ? { accountId: saved.accountId, token: saved.token } : null
+  } catch {
+    return null
+  }
+}
+
+function chatClient(): ChatClient | null {
+  const s = session()
+  return s && s.accountId === accountId ? new ChatClient(config.authUrl, s.token) : null
+}
 
 async function signIn(): Promise<void> {
   requireWallet()
@@ -163,14 +210,7 @@ async function signIn(): Promise<void> {
   show(`Signed in as ${result.accountId}. No fee was charged.`, 'ok')
 }
 
-function signedInAs(account: string): boolean {
-  try {
-    const saved = JSON.parse(sessionStorage.getItem(TOKEN_KEY) ?? 'null') as { accountId?: string } | null
-    return saved?.accountId === account
-  } catch {
-    return false
-  }
-}
+/* ---------- on-chain actions ---------- */
 
 function inviteFields() {
   return {
@@ -183,7 +223,7 @@ function inviteFields() {
 async function joinInvite(): Promise<void> {
   requireWallet()
   const { circleId: cid, invitePublicKey, inviteSecret } = inviteFields()
-  if (!inviteSecret || !invitePublicKey || !cid) throw new Error('Open your invite link first (or fill in the invite details below).')
+  if (!inviteSecret || !invitePublicKey || !cid) throw new Error('Open your invite link first (or fill in the invite details).')
   const invite = await readClient.getInvite(invitePublicKey)
   if (!invite) throw new Error('This invite was already used or does not exist.')
   if (invite.expired) throw new Error('This invite has expired. Ask for a new one.')
@@ -194,9 +234,14 @@ async function joinInvite(): Promise<void> {
   await afterTx('Welcome to the circle! Your card is being created.')
 }
 
+async function getUsdcId(): Promise<string> {
+  if (!usdcId) usdcId = (await readClient.getConfig()).usdc_id
+  return usdcId
+}
+
 async function registerForUsdc(): Promise<void> {
   requireWallet()
-  await client().registerWithToken({ tokenId: usdcId || (await readClient.getConfig()).usdc_id, accountId })
+  await client().registerWithToken({ tokenId: await getUsdcId(), accountId })
   await afterTx('Ready: lenders can now send you USDC.')
 }
 
@@ -208,30 +253,28 @@ async function requestLoan(lenderId: string, amountText: string, daysText: strin
   if (!Number.isInteger(durationDays) || durationDays < 1) throw new Error('Days must be a whole number.')
   const storage = await readClient.storageCosts()
   await client().createLoan({ circleId: cid, lenderId, amount, durationDays, deposit: storage.create_loan })
-  await afterTx(`Request sent. ${short(lenderId)} can now fund it (within 1 hour).`)
+  await afterTx(`Request sent. ${short(lenderId)} can fund it within 1 hour.`)
 }
 
 async function repay(loan: LoanView): Promise<void> {
   requireWallet()
-  const outcome = await client().repayLoan({ usdcId: usdcId || (await readClient.getConfig()).usdc_id, loanId: loan.loan_id, amount: loan.outstanding })
-  const after = await readClient.getLoan(loan.loan_id)
-  const notice = repaymentNotice(outcome, after)
+  const outcome = await client().repayLoan({ usdcId: await getUsdcId(), loanId: loan.loan_id, amount: loan.outstanding })
+  const notice = repaymentNotice(outcome, await readClient.getLoan(loan.loan_id))
   if (notice) { await refreshAll(); show(notice, 'bad'); return }
   await afterTx(`Repaid loan #${loan.loan_id}. The money went straight back to ${short(loan.lender_id)}.`)
 }
 
 async function fund(loan: LoanView): Promise<void> {
   requireWallet()
-  const outcome = await client().fundLoan({ usdcId: usdcId || (await readClient.getConfig()).usdc_id, loanId: loan.loan_id, amount: loan.principal })
+  const outcome = await client().fundLoan({ usdcId: await getUsdcId(), loanId: loan.loan_id, amount: loan.principal })
   if (outcome.fundingFailed.length || outcome.refunded.length) {
     await refreshAll()
-    show('Funding did not go through, and your USDC came straight back. Is the borrower registered for USDC?', 'bad')
+    show('Funding did not go through, and your USDC came straight back. Is the borrower set up for USDC?', 'bad')
     return
   }
   await afterTx(`Funded loan #${loan.loan_id}: ${formatUsdc(loan.principal)} USDC went straight to ${short(loan.borrower_id)}.`)
 }
 
-/** F-09: in a circle whose verified DAO is the admin, anyone may ask the stewards to clear a flag. */
 async function askToForgive(loan: LoanView): Promise<void> {
   requireWallet()
   const circle = await readClient.getCircle(loan.circle_id)
@@ -257,18 +300,9 @@ async function createInvite(): Promise<void> {
 }
 
 const testnetDemoParams: CircleParams = {
-  min_amount: '1000000',
-  member_max_amount: '10000000',
-  trusted_max_amount: '50000000',
-  max_duration_days: 14,
-  day_length_sec: '60',
-  funding_window_sec: '3600',
-  qualifying_min_amount: '1000000',
-  qualifying_min_days: 1,
-  trusted_threshold: 1,
-  min_distinct_lenders: 1,
-  recovery_lock_sec: '0',
-  writeoff_grace_sec: '2592000',
+  min_amount: '1000000', member_max_amount: '10000000', trusted_max_amount: '50000000', max_duration_days: 14,
+  day_length_sec: '60', funding_window_sec: '3600', qualifying_min_amount: '1000000', qualifying_min_days: 1,
+  trusted_threshold: 1, min_distinct_lenders: 1, recovery_lock_sec: '0', writeoff_grace_sec: '2592000',
 }
 
 async function createCircle(): Promise<void> {
@@ -277,7 +311,7 @@ async function createCircle(): Promise<void> {
   assertCircleName(name)
   const storage = await readClient.storageCosts()
   await client().createCircle({ name, params: testnetDemoParams, theme: readThemeForm('new-circle'), deposit: storage.create_circle })
-  show('Circle created with the short testnet settings. Look it up in the Circle tab.', 'ok')
+  show('Circle created with the short testnet settings.', 'ok')
 }
 
 async function saveDesign(): Promise<void> {
@@ -286,31 +320,187 @@ async function saveDesign(): Promise<void> {
   if (!/^\d+$/.test(cid)) throw new Error('Enter a circle number.')
   const circle = await readClient.getCircle(cid)
   if (!circle) throw new Error('That circle does not exist.')
-  if (circle.admin_id !== accountId) throw new Error(`Only the circle admin (${short(circle.admin_id)}) can change the design. In a DAO circle that is done by proposal.`)
+  if (circle.admin_id !== accountId) throw new Error(`Only the circle admin (${short(circle.admin_id)}) can change the design. In a DAO circle that is done by vote.`)
   const storage = await readClient.storageCosts()
   await client().setCircleTheme({ circleId: cid, theme: readThemeForm('design'), deposit: storage.set_circle_theme })
   show('Design saved. Cards update after the transaction is final.', 'ok')
 }
 
-async function checkChatAccess(quiet = false): Promise<void> {
-  if (!accountId) { if (!quiet) throw new Error('Connect a wallet first.'); return }
-  const access = await readClient.checkAccess(circleId, accountId)
-  chatUnlocked = access.allowed
-  $<HTMLTextAreaElement>('#chat-message').disabled = !chatUnlocked
-  $<HTMLButtonElement>('#send-chat').disabled = !chatUnlocked
-  $('#chat-access').textContent = chatUnlocked
-    ? `Unlocked: you are an active ${access.display_tier ?? 'member'} of this circle.`
-    : 'Locked: you need an active card in this circle.'
-  if (!quiet) show(chatUnlocked ? 'Chat unlocked.' : 'Chat stays locked.', chatUnlocked ? 'ok' : 'info')
+/* ---------- chat ---------- */
+
+function roomName(id: string): string {
+  return me?.circles.find((c) => c.id === id)?.name ?? (demo?.circle?.circle_id === id ? demo.circle.name : `Circle ${id}`)
 }
 
-function sendChat(): void {
-  if (!chatUnlocked) throw new Error('Check your access first.')
+function tierOf(account: string): string | null {
+  return demo?.passports.find((p) => p.owner_id === account)?.display_tier ?? null
+}
+
+function renderRooms(): void {
+  const query = $<HTMLInputElement>('#chat-search').value.trim().toLowerCase()
+  const ids = new Set<string>([...(me?.circles ?? []).map((c) => c.id), circleId])
+  const rooms = [...ids].filter((id) => roomName(id).toLowerCase().includes(query))
+  $('#room-list').replaceChildren(...(rooms.length ? rooms.map((id) => {
+    const msgs = chatMessages.get(id) ?? []
+    const last = msgs[msgs.length - 1]
+    const unread = msgs.filter((m) => m.id > (chatSeen.get(id) ?? 0) && m.account_id !== accountId).length
+    const item = el('button', { className: `room${id === chatRoom ? ' active' : ''}`, type: 'button' })
+    const icon = el('span', { className: 'avatar avatar-room', textContent: roomInitials(roomName(id)) })
+    item.append(icon, el('span', { className: 'room-main' },
+      el('span', { className: 'room-name' }, el('span', { textContent: roomName(id) }), last ? el('time', { textContent: timeLabel(last.at) }) : ''),
+      el('span', { className: 'room-last', textContent: last ? `${last.account_id === accountId ? 'You' : short(last.account_id)}: ${last.text}` : chatAllowed || id !== chatRoom ? 'No messages yet' : 'Members only' }),
+      unread && id !== chatRoom ? el('span', { className: 'room-new', textContent: `${unread} new message${unread > 1 ? 's' : ''}` }) : ''))
+    item.addEventListener('click', () => void openRoom(id))
+    return el('li', {}, item)
+  }) : [el('li', { className: 'muted small', textContent: 'No rooms match.' })]))
+
+  const people = (demo?.circle?.circle_id === chatRoom ? demo.passports : [])
+  $('#people-list').replaceChildren(...(people.length ? people.map((p) => el('li', {}, el('div', { className: 'room' },
+    avatar(p.owner_id),
+    el('span', { className: 'room-main' },
+      el('span', { className: 'room-name' }, el('span', { textContent: p.owner_id === accountId ? 'You' : short(p.owner_id) }), el('span', { className: `tier tier-${p.display_tier}`, textContent: p.display_tier })),
+      el('span', { className: 'room-last', textContent: `On time ${p.on_time_count} · late ${p.late_count}` }))))) : [el('li', { className: 'muted small', textContent: 'Open the circle in Home to see its people.' })]))
+  updateChatBadge()
+}
+
+function renderMessages(): void {
+  const box = $('#messages')
+  const msgs = chatMessages.get(chatRoom) ?? []
+  const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80
+  box.replaceChildren()
+  if (!chatAllowed) {
+    box.append(el('p', { className: 'chat-empty', textContent: 'Messages in this room are visible to its members only.' }))
+    return
+  }
+  if (!msgs.length) {
+    box.append(el('p', { className: 'chat-empty', textContent: 'No messages yet. Say hello to your circle.' }))
+    return
+  }
+  let lastDay = ''
+  let prev: ChatMessage | null = null
+  for (const m of msgs) {
+    const day = dayLabel(m.at)
+    if (day !== lastDay) { box.append(el('p', { className: 'day', textContent: day })); lastDay = day; prev = null }
+    const mine = m.account_id === accountId
+    const cont = !!prev && prev.account_id === m.account_id && m.at - prev.at < 5 * 60_000
+    const tier = tierOf(m.account_id)
+    const meta = el('div', { className: 'msg-meta' }, avatar(m.account_id, 'sm'), el('strong', { textContent: mine ? 'You' : short(m.account_id) }),
+      tier ? el('span', { className: `tier tier-${tier}`, textContent: tier }) : '', el('span', { textContent: timeLabel(m.at) }))
+    box.append(el('div', { className: `msg${mine ? ' mine' : ''}${cont ? ' cont' : ''}` }, meta, el('div', { className: 'bubble', textContent: m.text })))
+    prev = m
+  }
+  if (nearBottom || msgs.length) box.scrollTop = box.scrollHeight
+  chatSeen.set(chatRoom, msgs[msgs.length - 1].id)
+}
+
+function setGate(text: string, actions: HTMLElement[] = []): void {
+  chatAllowed = false
+  $('#chat-gate').hidden = false
+  $('#composer').hidden = true
+  $('#chat-access').textContent = text
+  $('#chat-gate-actions').replaceChildren(...actions)
+  $<HTMLTextAreaElement>('#chat-message').disabled = true
+  $<HTMLButtonElement>('#send-chat').disabled = true
+}
+
+async function openRoom(id: string): Promise<void> {
+  chatRoom = id
+  $<HTMLInputElement>('#chat-circle-id').value = id
+  $('#room-title').textContent = roomName(id)
+  $('#room-avatar').textContent = roomInitials(roomName(id))
+  const members = demo?.circle?.circle_id === id ? demo.circle.member_count : null
+  $('#room-sub').textContent = `Circle room${members !== null ? ` · ${members} members` : ''} · members only`
+  await checkChatAccess(true)
+  renderRooms()
+}
+
+async function checkChatAccess(quiet = false): Promise<void> {
+  if (!accountId) { setGate('Connect your wallet to open the chat.', [button('Connect Meteor', () => connectWallet('meteor-wallet')), button('MyNearWallet', () => connectWallet('my-near-wallet'), 'ghost')]); renderMessages(); return }
+  const access = await readClient.checkAccess(chatRoom, accountId)
+  if (!access.allowed) {
+    setGate(access.reason === 'NoPassport' ? 'Only members can read this room. Join the circle with an invite first.' : `Your card in this circle is ${access.reason}, so the room is locked.`,
+      [button('Go to my steps', async () => goView('home'), 'soft')])
+    renderMessages()
+    return
+  }
+  const chat = chatClient()
+  if (!chat) {
+    setGate('You are a member. Sign in once (a free signature) so the chat knows it is really you.', [button('Sign in to chat', async () => { await signIn(); await checkChatAccess(true) })])
+    renderMessages()
+    return
+  }
+  try {
+    const msgs = await chat.list(chatRoom)
+    chatMessages.set(chatRoom, msgs)
+    chatAllowed = true
+    $('#chat-gate').hidden = true
+    $('#composer').hidden = false
+    $<HTMLTextAreaElement>('#chat-message').disabled = false
+    $<HTMLButtonElement>('#send-chat').disabled = false
+    renderMessages()
+    if (!quiet) show('Chat is open.', 'ok')
+  } catch (error) {
+    if (error instanceof ChatApiError && error.status === 401) {
+      try { sessionStorage.removeItem(TOKEN_KEY) } catch { /* ignore */ }
+      setGate('Your sign-in expired. Sign in again to keep chatting.', [button('Sign in to chat', async () => { await signIn(); await checkChatAccess(true) })])
+    } else {
+      setGate(errorText(error), [button('Try again', () => checkChatAccess(false), 'soft')])
+    }
+    renderMessages()
+  }
+}
+
+async function pollChat(): Promise<void> {
+  const chat = chatClient()
+  if (!chat || !accountId) return
+  const ids = new Set<string>([...(me?.circles ?? []).map((c) => c.id)])
+  for (const id of ids) {
+    if (id === chatRoom && !chatAllowed) continue
+    const have = chatMessages.get(id) ?? []
+    const after = have.length ? have[have.length - 1].id : 0
+    try {
+      const fresh = await chat.list(id, after)
+      if (fresh.length) {
+        chatMessages.set(id, [...have, ...fresh])
+        if (id === chatRoom && view === 'chat') renderMessages()
+      }
+    } catch { /* room not readable right now */ }
+  }
+  renderRooms()
+}
+
+/** One timer at a time: every 3 s while the chat is open, every 15 s in the background (for the badge). */
+function setChatTimer(ms: number | null): void {
+  window.clearInterval(chatTimer)
+  chatTimer = ms === null ? 0 : window.setInterval(() => void pollChat(), ms)
+}
+function startChatPolling(): void { setChatTimer(3000) }
+function stopChatPolling(): void { setChatTimer(accountId && session() ? 15000 : null) }
+
+function updateChatBadge(): void {
+  let unread = 0
+  for (const [id, msgs] of chatMessages) {
+    if (view === 'chat' && id === chatRoom) continue
+    unread += msgs.filter((m) => m.id > (chatSeen.get(id) ?? 0) && m.account_id !== accountId).length
+  }
+  const badge = $('#nav-chat-badge')
+  badge.hidden = unread === 0
+  badge.textContent = String(unread)
+}
+
+async function sendChat(): Promise<void> {
+  const chat = chatClient()
+  if (!chat || !chatAllowed) throw new Error('Open the chat first.')
   const box = $<HTMLTextAreaElement>('#chat-message')
-  const value = box.value.trim()
-  if (!value) throw new Error('Write a message first.')
-  $('#chat-log').prepend(el('li', {}, el('strong', { textContent: short(accountId) }), ` ${value}`))
+  const text = box.value.trim()
+  if (!text) return
+  const message = await chat.send(chatRoom, text)
   box.value = ''
+  box.style.height = ''
+  const have = chatMessages.get(chatRoom) ?? []
+  if (!have.some((m) => m.id === message.id)) chatMessages.set(chatRoom, [...have, message])
+  renderMessages()
+  renderRooms()
 }
 
 /* ---------- reading state ---------- */
@@ -318,14 +508,16 @@ function sendChat(): void {
 async function refreshMe(): Promise<void> {
   if (!accountId) { me = null; renderAll(); return }
   try {
-    if (!usdcId) usdcId = (await readClient.getConfig()).usdc_id
-    const usdc = new CircleClient(config.rpcUrl, usdcId)
-    const [passport, registration, loans] = await Promise.all([
+    const usdc = new CircleClient(config.rpcUrl, await getUsdcId())
+    const [passport, registration, loans, tokens] = await Promise.all([
       readClient.passportFor(circleId, accountId),
       usdc.view<unknown>('storage_balance_of', { account_id: accountId }),
       readClient.loansByBorrower(accountId),
+      readClient.nftTokensForOwner(accountId, null, 50).catch(() => []),
     ])
-    me = { passport, registered: !!registration, loans: loans.filter((l) => l.circle_id === circleId), signedIn: signedInAs(accountId) }
+    const ids = [...new Set(tokens.map((t) => t.token_id.split(':')[0]))]
+    const circles = await Promise.all(ids.map(async (id) => ({ id, name: (await readClient.getCircle(id).catch(() => null))?.name ?? `Circle ${id}` })))
+    me = { passport, registered: !!registration, loans: loans.filter((l) => l.circle_id === circleId), signedIn: session()?.accountId === accountId, circles }
   } catch (error) {
     show(`Could not read your account: ${errorText(error)}`, 'bad')
   }
@@ -333,9 +525,10 @@ async function refreshMe(): Promise<void> {
   await Promise.all([
     loadMyCard().catch(() => {}),
     loadPositions().catch(() => {}),
-    checkChatAccess(true).catch(() => {}),
     renderTreasury().catch(() => {}),
+    view === 'chat' ? checkChatAccess(true).catch(() => {}) : Promise.resolve(),
   ])
+  if (view !== 'chat') stopChatPolling()
 }
 
 async function refreshAll(): Promise<void> {
@@ -348,6 +541,30 @@ async function refreshAll(): Promise<void> {
 function renderAll(): void {
   renderJourney()
   renderMembers()
+  renderSidebar()
+  renderRooms()
+}
+
+function renderSidebar(): void {
+  const ids = new Map<string, string>([[circleId, demo?.circle?.name ?? `Circle ${circleId}`]])
+  for (const c of me?.circles ?? []) ids.set(c.id, c.name)
+  $('#side-circles').replaceChildren(...[...ids].map(([id, name]) => {
+    const item = el('button', { className: `circle-item${id === circleId ? ' active' : ''}`, type: 'button', title: name },
+      el('span', { className: 'avatar avatar-sm avatar-room', textContent: roomInitials(name) }),
+      el('span', { className: 'grow', textContent: name }))
+    item.addEventListener('click', () => void run(null, async () => {
+      $<HTMLInputElement>('#demo-circle-id').value = id
+      await refreshAll()
+      goView('home')
+    }))
+    return item
+  }))
+  const tier = me?.passport ? `${me.passport.display_tier} · ${demo?.circle?.name ?? `circle ${circleId}`}` : accountId ? 'Not a member of this circle yet' : ''
+  $('#profile-tier').textContent = tier
+  $('#crumb-circle').textContent = demo?.circle?.name ?? `Circle ${circleId}`
+  const funded = me?.loans.find((l) => l.state === 'Funded')
+  $('#nav-loans-badge').hidden = !funded
+  $('#nav-loans-badge').textContent = funded ? '1' : ''
 }
 
 type StepState = 'done' | 'current' | 'waiting'
@@ -376,13 +593,9 @@ function loanRequestForm(): HTMLElement {
   if (preferred) select.value = preferred.owner_id
   const amount = el('input', { inputMode: 'decimal', value: '1' })
   const days = el('input', { inputMode: 'numeric', value: '7' })
-  const send = button('Send request', () => requestLoan(select.value, amount.value, days.value))
   return el('div', { className: 'step-form' },
-    el('label', {}, 'Ask', select),
-    el('label', {}, 'USDC', amount),
-    el('label', {}, 'Days', days),
-    send,
-  )
+    el('label', {}, 'Ask', select), el('label', {}, 'USDC', amount), el('label', {}, 'Days', days),
+    button('Send request', () => requestLoan(select.value, amount.value, days.value)))
 }
 
 function renderJourney(): void {
@@ -394,14 +607,7 @@ function renderJourney(): void {
   const funded = loans.find((l) => l.state === 'Funded' || l.state === 'Repaying')
   const open = loans.find((l) => l.state === 'Open')
   const repaid = loans.find((l) => l.state === 'Repaid')
-  const done = [
-    !!accountId,
-    isMember,
-    !!me?.signedIn,
-    !!me?.registered,
-    !!(funded || repaid),
-    !!repaid && !funded,
-  ]
+  const done = [!!accountId, isMember, !!me?.signedIn, !!me?.registered, !!(funded || repaid), !!repaid && !funded]
   const current = done.findIndex((d) => !d)
   const stateOf = (i: number): StepState => (done[i] ? 'done' : i === current ? 'current' : 'waiting')
   const steps: HTMLLIElement[] = []
@@ -409,30 +615,25 @@ function renderJourney(): void {
   steps.push(step(1, stateOf(0), 'Connect your wallet',
     accountId ? `Connected as ${accountId}.` : 'Use a NEAR testnet wallet. Meteor is recommended. Allow pop-ups when asked.',
     [button('Connect Meteor', () => connectWallet('meteor-wallet')), button('MyNearWallet', () => connectWallet('my-near-wallet'), 'ghost')]))
-
   steps.push(step(2, stateOf(1), `Join ${circleName}`,
     isMember ? `You are a ${passport!.display_tier} of ${circleName}.`
       : passport ? `Your card is ${passport.status}. Ask the stewards for help.`
-        : invite.inviteSecret ? `You have an invite. Joining costs about 0.009 NEAR, which pays for storing your card.`
+        : invite.inviteSecret ? 'You have an invite. Joining costs about 0.009 NEAR, which pays for storing your card.'
           : 'You need an invite link from a Trusted member of this circle. Open it in this browser.',
     invite.inviteSecret && !passport ? [button('Join the circle', joinInvite)] : []))
-
   steps.push(step(3, stateOf(2), 'Sign in',
-    me?.signedIn ? 'Signed in for this browser session.' : 'Prove this account is yours with a free signature. Nothing is sent to the blockchain.',
+    me?.signedIn ? 'Signed in for this browser session. The chat is open to you.' : 'A free signature that proves the account is yours. It also opens the circle chat.',
     [button('Sign in', signIn)]))
-
   steps.push(step(4, stateOf(3), 'Get ready to receive USDC',
     me?.registered ? 'Your account can receive USDC.' : 'A one-time setup so a lender can send you money. Costs 0.00125 NEAR.',
     [button('Set up USDC', registerForUsdc)]))
-
-  const trustedHint = passport?.effective_tier === 'Trusted' && !passport.steward ? ' As a Trusted member you can also ask the treasury (Treasury tab).' : ''
+  const trustedHint = passport?.effective_tier === 'Trusted' && !passport.steward ? ' As a Trusted member you can also ask the treasury.' : ''
+  const got = funded ?? repaid
   steps.push(step(5, stateOf(4), 'Ask a member for a loan',
-    funded || repaid ? `Loan #${(funded ?? repaid)!.loan_id}: ${formatUsdc((funded ?? repaid)!.principal)} USDC from ${short((funded ?? repaid)!.lender_id)}.`
-      : open ? el('span', {}, `Request #${open.loan_id} for ${formatUsdc(open.principal)} USDC is waiting for ${short(open.lender_id)} to fund it (they have 1 hour).`)
+    got ? `Loan #${got.loan_id}: ${formatUsdc(got.principal)} USDC from ${short(got.lender_id)}.`
+      : open ? `Request #${open.loan_id} for ${formatUsdc(open.principal)} USDC is waiting for ${short(open.lender_id)} to fund it (they have 1 hour).`
         : `Choose who to ask, how much, and for how long. Demo days are 60 seconds, so 7 days means 7 minutes to repay.${trustedHint}`,
-    [],
-    open ? undefined : loanRequestForm()))
-
+    [], open ? undefined : loanRequestForm()))
   let repayDesc: string | Node = 'Once your loan arrives, pay it back before the due time. Your card turns Trusted.'
   const repayActions: HTMLElement[] = []
   if (funded) {
@@ -440,17 +641,13 @@ function renderJourney(): void {
     repayActions.push(button('Repay now', () => repay(funded)))
   } else if (repaid) {
     const late = repaid.repaid_on_time === false && !repaid.flag_cleared
-    repayDesc = late
-      ? 'Repaid, but late. You can ask the stewards to forgive the late mark.'
+    repayDesc = late ? 'Repaid, but late. You can ask the stewards to forgive the late mark.'
       : `Repaid on time. Your card is ${passport?.effective_tier ?? 'updated'}${passport?.effective_tier === 'Trusted' ? '. Well done!' : '.'}`
-    if (late) repayActions.push(button('Ask stewards to forgive', () => askToForgive(repaid), 'secondary'))
+    if (late) repayActions.push(button('Ask stewards to forgive', () => askToForgive(repaid), 'soft'))
   }
   steps.push(step(6, funded ? 'current' : stateOf(5), 'Pay it back on time', repayDesc, repayActions))
-
   $('#steps').replaceChildren(...steps)
-  $('#journey-sub').textContent = current === -1
-    ? 'All done: you joined, borrowed and repaid. Check your card in the Me tab.'
-    : 'Follow these in order. Each one updates from the blockchain by itself.'
+  $('#journey-sub').textContent = current === -1 ? 'All done: you joined, borrowed and repaid. Your card is on the right.' : 'Follow these in order. Each one updates from the blockchain by itself.'
   tickDue()
 }
 
@@ -461,20 +658,21 @@ function renderMembers(): void {
     const fig = el('figure', { className: `member${card.passport.owner_id === accountId ? ' me' : ''}` })
     if (card.svg) fig.append(el('img', { alt: `${card.passport.owner_id} passport card`, src: URL.createObjectURL(new Blob([card.svg], { type: 'image/svg+xml' })) }))
     fig.append(el('figcaption', {},
-      el('span', { className: 'who', title: card.passport.owner_id, textContent: card.passport.owner_id === accountId ? 'You' : short(card.passport.owner_id) }),
+      el('span', { title: card.passport.owner_id, textContent: card.passport.owner_id === accountId ? 'You' : short(card.passport.owner_id) }),
       el('span', { className: `tier tier-${card.passport.display_tier}`, textContent: card.passport.display_tier })))
     grid.append(fig)
   }
   if (!grid.children.length) grid.append(el('p', { className: 'muted', textContent: 'No members yet.' }))
+  const lenders = $('#lender-options')
+  lenders.replaceChildren(...(demo?.passports ?? []).filter((p) => p.owner_id !== accountId).map((p) => el('option', { value: p.owner_id })))
 }
 
 function renderLoansTable(): void {
-  const body = $('#circle-loans')
   const loans = (demo?.loans ?? []).slice().sort((a, b) => Number(b.loan_id) - Number(a.loan_id))
-  body.replaceChildren(...(loans.length ? loans.map((l) => el('tr', {},
+  $('#circle-loans').replaceChildren(...(loans.length ? loans.map((l) => el('tr', {},
     el('td', { textContent: l.loan_id }),
-    el('td', { className: 'acct', title: l.borrower_id, textContent: short(l.borrower_id) }),
-    el('td', { className: 'acct', title: l.lender_id, textContent: l.lender_is_treasury ? 'Treasury (DAO)' : short(l.lender_id) }),
+    el('td', {}, who(l.borrower_id, l.borrower_id === accountId ? 'You' : short(l.borrower_id))),
+    el('td', {}, l.lender_is_treasury ? who(l.lender_id, 'Treasury (DAO)') : who(l.lender_id, l.lender_id === accountId ? 'You' : short(l.lender_id))),
     el('td', { textContent: `${formatUsdc(l.principal)} USDC` }),
     el('td', {}, el('span', { className: `state state-${l.state}`, textContent: l.state === 'Repaid' && l.repaid_on_time === false ? (l.flag_cleared ? 'Repaid (late, forgiven)' : 'Repaid late') : l.state })),
   )) : [el('tr', {}, el('td', { colSpan: 5, className: 'muted', textContent: 'No loans yet.' }))]))
@@ -494,49 +692,39 @@ async function loadMyCard(): Promise<void> {
   if (!accountId || !me?.passport) {
     image.hidden = true
     $('#load-my-card').hidden = true
-    $('#my-card-title').textContent = accountId ? 'You do not have a card in this circle yet. Join with an invite (step 2).' : 'Connect a wallet and join to see your card.'
+    $('#my-card-title').textContent = accountId ? 'No card in this circle yet. Join with an invite (step 2).' : 'Connect a wallet and join to see your card.'
     return
   }
   const passport = me.passport
   const [svg, token] = await Promise.all([readClient.cardSvg(passport.token_id), readClient.nftToken(passport.token_id)])
-  if (svg) {
-    image.src = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }))
-    image.hidden = false
-  }
+  if (svg) { image.src = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' })); image.hidden = false }
   $('#load-my-card').hidden = false
   $('#my-card-title').textContent = `${token?.metadata?.title ?? passportTokenTitle(demo?.circle?.name ?? '')} · ${passport.display_tier} · on time ${passport.on_time_count}, late ${passport.late_count}`
 }
 
 async function loadPositions(): Promise<void> {
   const list = $('#positions')
-  if (!accountId) { list.replaceChildren(el('li', { className: 'muted', textContent: 'Connect a wallet to see your loans.' })); return }
+  if (!accountId) { list.replaceChildren(el('li', { className: 'empty', textContent: 'Connect a wallet to see your loans.' })); return }
   const positions = await readClient.myPositions(accountId)
   const items: HTMLLIElement[] = []
-  if (me && !me.registered) {
-    items.push(el('li', {}, el('span', { textContent: 'Not set up for USDC yet, so nobody can send you a loan.' }), button('Set up USDC', registerForUsdc)))
-  }
+  if (me && !me.registered) items.push(el('li', {}, el('span', { textContent: 'Not set up for USDC yet, so nobody can send you a loan.' }), button('Set up USDC', registerForUsdc)))
   for (const loan of positions.borrowed.slice().reverse()) {
-    const li = el('li', {}, el('span', {},
-      el('strong', { textContent: `Borrowed #${loan.loan_id}` }),
-      ` · ${formatUsdc(loan.principal)} USDC from ${short(loan.lender_id)} `,
-      el('span', { className: `state state-${loan.state}`, textContent: loan.state }),
-      ' ', loan.state === 'Funded' ? dueSpan(loan) : ''))
+    const li = el('li', {}, el('span', {}, el('strong', { textContent: `Borrowed #${loan.loan_id}` }), ` · ${formatUsdc(loan.principal)} USDC from ${short(loan.lender_id)} `,
+      el('span', { className: `state state-${loan.state}`, textContent: loan.state }), ' ', loan.state === 'Funded' ? dueSpan(loan) : ''))
     if (loan.state === 'Funded') li.append(button('Repay', () => repay(loan)))
     const late = (loan.overdue || (loan.state === 'Repaid' && loan.repaid_on_time === false)) && !loan.flag_cleared
-    if (late) li.append(button('Ask stewards to forgive', () => askToForgive(loan), 'secondary'))
+    if (late) li.append(button('Ask stewards to forgive', () => askToForgive(loan), 'soft'))
     const note = repaymentNotice(null, loan)
     if (note) li.append(el('p', { className: 'notice', textContent: note }))
     items.push(li)
   }
   for (const loan of positions.lent.slice().reverse()) {
-    const li = el('li', {}, el('span', {},
-      el('strong', { textContent: `Lent #${loan.loan_id}` }),
-      ` · ${formatUsdc(loan.principal)} USDC to ${short(loan.borrower_id)} `,
+    const li = el('li', {}, el('span', {}, el('strong', { textContent: `Lent #${loan.loan_id}` }), ` · ${formatUsdc(loan.principal)} USDC to ${short(loan.borrower_id)} `,
       el('span', { className: `state state-${loan.state}`, textContent: loan.state })))
     if (loan.state === 'Open') li.append(button('Fund it', () => fund(loan)))
     items.push(li)
   }
-  if (!items.length) items.push(el('li', { className: 'muted', textContent: 'No loans yet. Ask a member in step 5.' }))
+  if (!items.length) items.push(el('li', { className: 'empty', textContent: 'No loans yet. Ask a member on the right, or follow step 5 on Home.' }))
   list.replaceChildren(...items)
   tickDue()
 }
@@ -551,50 +739,47 @@ async function renderTreasury(): Promise<void> {
   const cid = demo.circle.circle_id
   const dao = new SputnikDaoClient(config.rpcUrl, daoId, window.commonCircleWallet)
   const usdc = new CircleClient(config.rpcUrl, demo.config.usdc_id)
-  const [policy, proposals, balance] = await Promise.all([
-    dao.getPolicy(),
-    dao.recentProposals(10),
-    usdc.view<string>('ft_balance_of', { account_id: daoId }),
-  ])
+  const [policy, proposals, balance] = await Promise.all([dao.getPolicy(), dao.recentProposals(10), usdc.view<string>('ft_balance_of', { account_id: daoId })])
   const stewards = stewardsOf(policy)
   const bondNear = (Number(BigInt(policy.proposal_bond) / 10n ** 18n) / 1e6).toString()
   $('#stat-treasury').textContent = `${formatUsdc(balance)} USDC`
-  $('#treasury-summary').textContent = `Holds ${formatUsdc(balance)} USDC · Stewards: ${stewards.map(short).join(' and ')} · Asking costs a ${bondNear} NEAR deposit, returned when the vote passes.`
-
+  $('#treasury-summary').replaceChildren(
+    el('span', { className: 'muted small', textContent: 'Holds' }), el('b', { textContent: `${formatUsdc(balance)} USDC` }),
+    el('span', { textContent: `Stewards: ${stewards.map(short).join(' and ')}` }),
+    el('span', { className: 'muted small', textContent: `Asking costs a ${bondNear} NEAR deposit, returned when the vote passes.` }))
   const isSteward = !!accountId && stewards.includes(accountId)
   const passport = accountId ? await readClient.passportFor(cid, accountId) : null
   const eligible = !!passport && passport.effective_tier === 'Trusted' && !passport.steward && passport.status === 'Active'
   $('#treasury-ask').hidden = !eligible
-  $('#treasury-eligibility').textContent = !accountId
-    ? 'Connect a wallet to ask the treasury or, if you are a steward, to vote.'
+  $('#treasury-eligibility').textContent = !accountId ? 'Connect a wallet to ask the treasury or, if you are a steward, to vote.'
     : isSteward ? 'You are a steward: approve requests below. Stewards cannot borrow from the treasury.'
-      : !passport ? 'Join the circle first (step 2).'
-        : !eligible ? `Your card is ${passport.effective_tier}${passport.perks_paused ? ', with perks paused by an overdue loan' : ''}. The treasury lends only to Trusted members: repay a loan on time first.`
-          : ''
-
+      : !passport ? 'Join the circle first (Home, step 2).'
+        : !eligible ? `Your card is ${passport.effective_tier}${passport.perks_paused ? ', with perks paused by an overdue loan' : ''}. The treasury lends only to Trusted members: repay a loan on time first.` : ''
   if (eligible) {
-    const mine = await readClient.loansByBorrower(accountId)
-    const pending = loansNeedingProposal(mine, daoId, accountId, proposals)
+    const pending = loansNeedingProposal(await readClient.loansByBorrower(accountId), daoId, accountId, proposals)
     $('#treasury-pending').replaceChildren(...pending.map((loan) => el('li', {},
       el('span', { textContent: `Request #${loan.loan_id} · ${formatUsdc(loan.principal)} USDC · not sent to the stewards yet` }),
       button('2. Send to stewards', async () => {
         await dao.addProposal(treasuryFundProposal({ usdcId: demo!.config.usdc_id, circleContractId: config.contractId, loanId: loan.loan_id, amount: loan.principal, borrowerId: accountId }), policy.proposal_bond)
-        await afterTx(`Sent to the stewards. The money arrives when both have approved.`)
+        await afterTx('Sent to the stewards. The money arrives when both have approved.')
       }))))
   }
-
+  const voting = proposals.filter((p) => p.status === 'InProgress').length
+  $('#nav-treasury-badge').hidden = !voting
+  $('#nav-treasury-badge').textContent = String(voting)
   $('#treasury-proposals').replaceChildren(...(proposals.length ? proposals.map((p: SputnikProposal) => {
     const target = proposalLoanId(p)
     const approvals = Object.values(p.votes ?? {}).filter((v) => v === 'Approve').length
     const canVote = isSteward && p.status === 'InProgress' && !(accountId in (p.votes ?? {}))
-    const what = target ? (target.action === 'fund' ? `Pay loan #${target.loanId}` : `Forgive late mark on loan #${target.loanId}`) : p.description
-    const li = el('li', {}, el('span', {},
-      el('strong', { textContent: `#${p.id} ${what}` }),
-      ` · by ${short(p.proposer)} · ${approvals} of ${stewards.length} approvals `,
-      el('span', { className: `state state-${p.status === 'Approved' ? 'Repaid' : p.status === 'InProgress' ? 'Open' : 'Cancelled'}`, textContent: p.status === 'InProgress' ? 'Voting' : p.status })))
+    const what = target ? (target.action === 'fund' ? `Pay loan #${target.loanId}` : `Forgive the late mark on loan #${target.loanId}`) : p.description
+    const label = p.status === 'InProgress' ? 'Voting' : p.status === 'Approved' ? 'Approved' : 'Other'
+    const li = el('li', {}, avatar(p.proposer, 'sm'), el('span', {},
+      el('strong', { textContent: `#${p.id} ${what}` }), el('br'),
+      el('span', { className: 'muted small', textContent: `Asked by ${short(p.proposer)} · ${approvals} of ${stewards.length} approvals` })),
+      el('span', { className: `state state-${label}`, textContent: label === 'Other' ? p.status : label }))
     if (canVote) li.append(button('Approve', async () => { await dao.approve(p); await afterTx(`You approved proposal #${p.id}.`) }))
     return li
-  }) : [el('li', { className: 'muted', textContent: 'No proposals yet. A Trusted member files the first request.' })]))
+  }) : [el('li', { className: 'empty', textContent: 'No votes yet. A Trusted member files the first request.' })]))
 }
 
 async function requestFromTreasury(): Promise<void> {
@@ -614,11 +799,10 @@ async function loadDemo(): Promise<void> {
   demo = snapshot
   circleId = snapshot.circleId
   if (!usdcId) usdcId = snapshot.config.usdc_id
-  for (const id of ['#my-card-circle-id', '#chat-circle-id']) $<HTMLInputElement>(id).value = circleId
+  $<HTMLInputElement>('#my-card-circle-id').value = circleId
   const lines = [
     `Contract ${snapshot.contractId} · interface ${snapshot.config.interface_version}`,
-    `RPC ${snapshot.rpcUrl}`,
-    `USDC ${snapshot.config.usdc_id}`,
+    `RPC ${snapshot.rpcUrl}`, `USDC ${snapshot.config.usdc_id}`,
     `Circle ${snapshot.circleId}: ${snapshot.circle ? snapshot.circle.name : 'does not exist'}`,
   ]
   if (snapshot.circle) {
@@ -631,31 +815,20 @@ async function loadDemo(): Promise<void> {
   $('#stat-loans').textContent = snapshot.circle ? String(snapshot.circle.loan_count) : '–'
   const dao = $('#dao-status')
   if (snapshot.dao) {
-    dao.textContent = snapshot.dao.verified
-      ? '✓ Run by a real Sputnik DAO with no keys: only votes move its money.'
-      : '⚠ The treasury account failed the DAO safety check. Treasury buttons are hidden.'
+    dao.textContent = snapshot.dao.verified ? '✓ Run by a real Sputnik DAO with no keys: only votes move its money.' : '⚠ The treasury account failed the DAO safety check. Treasury buttons are hidden.'
     dao.title = `${snapshot.dao.daoId} · code ${snapshot.dao.codeHash ?? 'unknown'} · keys ${snapshot.dao.accessKeyCount ?? 'unknown'}`
     dao.className = `dao-status ${snapshot.dao.verified ? 'trusted' : ''}`
   } else {
-    dao.textContent = 'No DAO is attached yet: the founder runs this circle.'
+    dao.textContent = 'No DAO yet: the founder runs this circle.'
     dao.className = 'dao-status neutral'
   }
-  renderMembers()
+  if (!chatMessages.size) chatRoom = circleId
+  renderAll()
   renderLoansTable()
-  renderJourney()
   await renderTreasury().catch((error) => show(`Treasury: ${errorText(error)}`, 'bad'))
 }
 
-/* ---------- tabs and wiring ---------- */
-
-const TABS = ['circle', 'treasury', 'me', 'tools'] as const
-function goTab(name: (typeof TABS)[number]): void {
-  for (const t of TABS) {
-    $(`#tab-btn-${t}`).setAttribute('aria-selected', String(t === name))
-    $(`#tab-${t}`).hidden = t !== name
-  }
-  try { localStorage.setItem('commoncircle.tab', name) } catch { /* ignore */ }
-}
+/* ---------- wiring ---------- */
 
 function on(selector: string, action: () => Promise<void> | void): void {
   const b = $<HTMLButtonElement>(selector)
@@ -663,6 +836,13 @@ function on(selector: string, action: () => Promise<void> | void): void {
 }
 
 function wire(): void {
+  for (const item of document.querySelectorAll<HTMLButtonElement>('.nav-item')) item.addEventListener('click', () => goView(item.dataset.view as View))
+  $('#menu-btn').addEventListener('click', (event) => { event.stopPropagation(); $('#sidebar').classList.toggle('open') })
+  // Phone: a tap outside the slide-out menu closes it.
+  document.addEventListener('click', (event) => {
+    const sidebar = $('#sidebar')
+    if (sidebar.classList.contains('open') && !sidebar.contains(event.target as Node)) sidebar.classList.remove('open')
+  })
   on('#connect-meteor', () => connectWallet('meteor-wallet'))
   on('#connect-wallet', () => connectWallet('my-near-wallet'))
   on('#disconnect-wallet', disconnectWallet)
@@ -670,21 +850,28 @@ function wire(): void {
   on('#join-invite', joinInvite)
   on('#create-invite', createInvite)
   on('#create-circle', createCircle)
-  on('#create-loan', () => requestLoan(
-    $<HTMLInputElement>('#loan-lender-id').value.trim(),
-    $<HTMLInputElement>('#loan-amount').value,
-    $<HTMLInputElement>('#loan-duration-days').value,
-    $<HTMLInputElement>('#loan-circle-id').value.trim(),
-  ))
+  on('#create-loan', () => requestLoan($<HTMLInputElement>('#loan-lender-id').value.trim(), $<HTMLInputElement>('#loan-amount').value, $<HTMLInputElement>('#loan-duration-days').value, $<HTMLInputElement>('#loan-circle-id').value.trim()))
   on('#save-design', saveDesign)
   on('#load-positions', refreshMe)
   on('#check-chat-access', () => checkChatAccess(false))
-  on('#send-chat', sendChat)
   on('#load-my-card', loadMyCard)
   on('#load-demo', refreshAll)
   on('#journey-refresh', async () => { await refreshAll(); show('Up to date with testnet.', 'ok') })
   on('#treasury-request', requestFromTreasury)
-  for (const t of TABS) $(`#tab-btn-${t}`).addEventListener('click', () => goTab(t))
+  const composer = $<HTMLFormElement>('#composer')
+  const box = $<HTMLTextAreaElement>('#chat-message')
+  composer.addEventListener('submit', (event) => { event.preventDefault(); void run($<HTMLButtonElement>('#send-chat'), sendChat) })
+  box.addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); composer.requestSubmit() } })
+  box.addEventListener('input', () => { box.style.height = ''; box.style.height = `${Math.min(box.scrollHeight, 140)}px` })
+  $('#chat-search').addEventListener('input', renderRooms)
+  for (const [btn, show_, hide] of [['#seg-rooms', '#room-list', '#people-list'], ['#seg-people', '#people-list', '#room-list']] as const) {
+    $(btn).addEventListener('click', () => {
+      $('#seg-rooms').setAttribute('aria-selected', String(btn === '#seg-rooms'))
+      $('#seg-people').setAttribute('aria-selected', String(btn === '#seg-people'))
+      $(show_).hidden = false
+      $(hide).hidden = true
+    })
+  }
   bindThemeForm('new-circle', () => $<HTMLInputElement>('#new-circle-name').value.trim() || 'New circle', (error) => show(errorText(error), 'bad'))
   bindThemeForm('design', () => `Circle ${$<HTMLInputElement>('#design-circle-id').value.trim() || '?'}`, (error) => show(errorText(error), 'bad'))
   $<HTMLInputElement>('#new-circle-name').addEventListener('input', () => renderThemePreview('new-circle', $('#new-circle-preview'), $<HTMLInputElement>('#new-circle-name').value.trim() || 'New circle'))
@@ -698,6 +885,7 @@ function hydrateInviteFields(): void {
     $<HTMLInputElement>('#circle-id').value = invite.circleId
     $<HTMLInputElement>('#demo-circle-id').value = invite.circleId
     circleId = invite.circleId
+    chatRoom = invite.circleId
   }
   if (invite.invitePublicKey) $<HTMLInputElement>('#invite-public-key').value = invite.invitePublicKey
   if (invite.inviteSecret) $<HTMLInputElement>('#invite-secret').value = invite.inviteSecret
@@ -706,10 +894,11 @@ function hydrateInviteFields(): void {
 function boot(): void {
   hydrateInviteFields()
   wire()
-  let tab: (typeof TABS)[number] = 'circle'
-  try { const saved = localStorage.getItem('commoncircle.tab'); if (saved && (TABS as readonly string[]).includes(saved)) tab = saved as typeof tab } catch { /* ignore */ }
-  goTab(tab)
-  renderJourney()
+  let start: View = 'home'
+  try { const saved = localStorage.getItem('commoncircle.view'); if (saved && (VIEWS as readonly string[]).includes(saved)) start = saved as View } catch { /* ignore */ }
+  if (inviteFields().inviteSecret) start = 'home'
+  goView(start)
+  renderAll()
   void loadDemo().catch((error) => show(`Could not load testnet data: ${errorText(error)}`, 'bad'))
   void restoreWallet().catch(() => { /* no saved wallet session */ })
 }
