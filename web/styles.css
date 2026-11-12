@@ -385,3 +385,32 @@ input[aria-invalid="true"] { border-color: var(--bad); }
   .steps { margin-top: 10px; gap: 6px; }
 }
 @media (prefers-reduced-motion: reduce) { .btn.busy::after { animation: none; } .sidebar { transition: none; } }
+
+/* ---------- loan requests in the chat (LoanBook-style) ---------- */
+.req-card { align-self: center; display: grid; gap: 8px; width: min(560px, 100%); margin: 8px 0; padding: 14px 16px; border: 1px solid #f3d2b8; border-radius: 16px; background: #fffaf5; box-shadow: 0 6px 18px rgba(120, 60, 20, .08); }
+.req-card.mine { border-color: var(--accent); }
+.req-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: .86rem; }
+.req-who { flex: 1; min-width: 0; color: var(--muted); }
+.req-who .acct { color: var(--text); }
+.req-amount { font-size: .95rem; }
+.req-amount strong { font-size: 1.15rem; }
+.req-note { margin: 0; padding: 8px 12px; border-left: 3px solid var(--accent); border-radius: 6px; background: #fff; white-space: pre-wrap; overflow-wrap: anywhere; }
+.req-info { color: var(--muted); font-size: .84rem; }
+.req-info .acct { color: var(--text); }
+.req-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.ask-panel { display: grid; gap: 4px; padding: 14px 16px; border-top: 1px solid var(--line); background: #fff8f2; }
+.ask-panel label { margin-top: 6px; }
+.ask-panel textarea { resize: vertical; }
+.ask-panel .btn-row { margin-top: 8px; }
+.ask-title { font-weight: 700; }
+.ask-btn { display: grid; flex: 0 0 auto; width: 44px; height: 44px; place-items: center; border: 1px solid var(--line); border-radius: 50%; color: var(--accent-text); background: var(--accent-soft); cursor: pointer; }
+.ask-btn:hover { background: #fbe0cc; }
+.paste-box { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
+.paste-input { flex: 1 1 220px; margin: 0; }
+.step .step-action:has(.paste-box) { grid-column: 2 / -1; justify-content: stretch; }
+.open-requests { margin-top: 16px; }
+.open-requests em { color: var(--text); }
+.invite-box textarea { margin-top: 10px; font: .8rem/1.4 ui-monospace, monospace; }
+.invite-box + .box { margin-top: 16px; }
+.loans td.reason { max-width: 260px; overflow: hidden; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; }
+.chat-room { grid-template-rows: auto 1fr auto auto auto; }

@@ -19,6 +19,7 @@ import { createServer } from 'node:http'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ChatError, ChatService, rpcAccessCheck } from './chat.ts'
+import { RequestService, rpcLoanLookup } from './requests.ts'
 import { hasFullAccessKey, verifyNep413Signature } from './nep413.ts'
 
 const PORT = Number(process.env.AUTH_PORT ?? 3001)
@@ -40,6 +41,7 @@ function localSecret(): string {
 
 const JWT_SECRET = process.env.AUTH_JWT_SECRET ?? localSecret()
 const chat = new ChatService({ checkAccess: rpcAccessCheck(NEAR_RPC_URL, CONTRACT_ID), storePath: join(DATA_DIR, 'chat.json') })
+const requests = new RequestService({ checkAccess: rpcAccessCheck(NEAR_RPC_URL, CONTRACT_ID), getLoan: rpcLoanLookup(NEAR_RPC_URL, CONTRACT_ID), storePath: join(DATA_DIR, 'requests.json') })
 const challenges = new Map<string, {
   accountId: string
   message: string
@@ -121,6 +123,32 @@ async function chatRoute(request: Request, circleId: string, origin: string | nu
     if (error instanceof ChatError) return json({ error: error.message, code: error.code }, error.status, origin)
     console.error('[chat] failed:', error instanceof Error ? error.message : String(error))
     return json({ error: 'Chat is unavailable right now.' }, 503, origin)
+  }
+}
+
+/** Loan request cards in the circle room (server/requests.ts). Same sign-in and membership rules as the chat. */
+async function requestRoute(request: Request, circleId: string, rest: string, origin: string | null): Promise<Response> {
+  const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ?? ''
+  const accountId = token ? verifyJwt(token) : null
+  if (!accountId) return json({ error: 'Sign in first to see loan requests.' }, 401, origin)
+  try {
+    if (rest === '' && request.method === 'GET') return json({ requests: await requests.list(accountId, circleId) }, 200, origin)
+    const input = (await body(request)) ?? {}
+    if (rest === '' && request.method === 'POST') return json({ request: await requests.create(accountId, circleId, input) }, 201, origin)
+    if (rest === '/direct' && request.method === 'POST') return json({ request: await requests.direct(accountId, circleId, input) }, 201, origin)
+    const action = rest.match(/^\/(\d{1,9})\/(offer|cancel|link)$/)
+    if (action && request.method === 'POST') {
+      const [, id, verb] = action
+      const result = verb === 'offer' ? await requests.offer(accountId, circleId, id)
+        : verb === 'cancel' ? await requests.cancel(accountId, circleId, id)
+          : await requests.link(accountId, circleId, id, input.loan_id)
+      return json({ request: result }, 200, origin)
+    }
+    return json({ error: 'Not found' }, 404, origin)
+  } catch (error) {
+    if (error instanceof ChatError) return json({ error: error.message, code: error.code }, error.status, origin)
+    console.error('[requests] failed:', error instanceof Error ? error.message : String(error))
+    return json({ error: 'Loan requests are unavailable right now.' }, 503, origin)
   }
 }
 
@@ -207,6 +235,8 @@ async function handle(request: Request): Promise<Response> {
   if (url.pathname === '/verify' && request.method === 'POST') return verifyLogin(request, origin)
   const room = url.pathname.match(/^\/chat\/(\d{1,19})\/messages$/)
   if (room && (request.method === 'GET' || request.method === 'POST')) return chatRoute(request, room[1], origin)
+  const req = url.pathname.match(/^\/chat\/(\d{1,19})\/requests((?:\/[a-z0-9]+)*)$/)
+  if (req) return requestRoute(request, req[1], req[2], origin)
   return json({ error: 'Not found' }, 404, origin)
 }
 

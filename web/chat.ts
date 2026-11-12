@@ -41,6 +41,28 @@ export class ChatClient {
   async send(circleId: string, text: string): Promise<ChatMessage> {
     return (await this.call<{ message: ChatMessage }>(`/chat/${circleId}/messages`, { method: 'POST', body: JSON.stringify({ text }) })).message
   }
+
+  /* Loan request cards (server/requests.ts). amount is USDC base units. */
+  async requests(circleId: string): Promise<LoanRequestCard[]> {
+    return (await this.call<{ requests: LoanRequestCard[] }>(`/chat/${circleId}/requests`)).requests
+  }
+
+  async ask(circleId: string, input: { amount: string; days: number; note: string }): Promise<LoanRequestCard> {
+    return (await this.call<{ request: LoanRequestCard }>(`/chat/${circleId}/requests`, { method: 'POST', body: JSON.stringify(input) })).request
+  }
+
+  async requestAction(circleId: string, id: number, verb: 'offer' | 'cancel' | 'link', loanId?: string): Promise<LoanRequestCard> {
+    return (await this.call<{ request: LoanRequestCard }>(`/chat/${circleId}/requests/${id}/${verb}`, { method: 'POST', body: JSON.stringify(loanId ? { loan_id: loanId } : {}) })).request
+  }
+
+  async directNote(circleId: string, loanId: string, note: string): Promise<LoanRequestCard> {
+    return (await this.call<{ request: LoanRequestCard }>(`/chat/${circleId}/requests/direct`, { method: 'POST', body: JSON.stringify({ loan_id: loanId, note }) })).request
+  }
+}
+
+export type LoanRequestCard = {
+  id: number; circle_id: string; borrower: string; amount: string; days: number; note: string; at: number
+  offers: string[]; lender: string | null; loan_id: string | null; cancelled: boolean; direct: boolean
 }
 
 /** Stable, readable initials and colour for an account (no photos on-chain). */

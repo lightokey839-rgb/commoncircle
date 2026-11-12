@@ -32,6 +32,10 @@
             <span>Loans</span>
             <span class="nav-badge" id="nav-loans-badge" hidden></span>
           </button>
+          <button class="nav-item" data-view="direct">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>
+            <span>Direct loans</span>
+          </button>
           <button class="nav-item" data-view="treasury">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9 12 4l9 5M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/></svg>
             <span>Treasury</span>
@@ -108,6 +112,14 @@
               <ul id="for-you-list" class="requests"></ul>
             </div>
 
+            <div id="open-requests" class="box open-requests" hidden>
+              <div class="box-head row">
+                <h2>Open requests in this circle</h2>
+                <button id="open-chat-requests" class="btn btn-soft btn-sm" type="button">Open the chat</button>
+              </div>
+              <ul id="open-requests-list" class="requests"></ul>
+            </div>
+
             <div class="home-grid">
               <div class="box">
                 <div class="box-head">
@@ -173,7 +185,25 @@
                 <div id="chat-gate-actions" class="gate-actions"></div>
               </div>
 
+              <div id="ask-panel" class="ask-panel" hidden>
+                <p class="ask-title">Ask the circle for a loan</p>
+                <p class="muted small">Every member sees this card. Members offer to lend, then you pick one and sign the loan in your wallet. Posting is free.</p>
+                <div class="field-row">
+                  <div><label for="ask-amount">Amount (USDC)</label><input id="ask-amount" inputmode="decimal" value="1" /><p id="ask-amount-hint" class="hint"></p></div>
+                  <div><label for="ask-days">Days</label><input id="ask-days" inputmode="numeric" value="7" /><p id="ask-days-hint" class="hint"></p></div>
+                </div>
+                <label for="ask-note">What is the loan for?</label>
+                <textarea id="ask-note" rows="2" maxlength="500" placeholder="For example: school fees, stock for my shop, a bus ticket home"></textarea>
+                <div class="btn-row">
+                  <button id="ask-post" class="btn btn-accent btn-sm" type="button">Post request</button>
+                  <button id="ask-close" class="btn btn-ghost btn-sm" type="button">Not now</button>
+                </div>
+              </div>
+
               <form id="composer" class="composer" hidden>
+                <button id="ask-open" class="ask-btn" type="button" title="Ask the circle for a loan" aria-label="Ask the circle for a loan">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                </button>
                 <textarea id="chat-message" rows="1" placeholder="Type your message…" aria-label="Message" disabled></textarea>
                 <button id="send-chat" class="send-btn" type="submit" aria-label="Send" disabled>
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12 20 4l-4 16-4-7z"/></svg>
@@ -193,9 +223,12 @@
                 <ul id="positions" class="list" aria-live="polite"><li class="empty">Connect a wallet to see your loans.</li></ul>
               </div>
               <div class="box">
-                <h2>Ask for a loan</h2>
-                <p class="muted">Pick who to ask. Nothing moves until they fund it.</p>
-                <div id="loan-form-slot"></div>
+                <h2>Two ways to borrow</h2>
+                <p class="muted"><strong>Ask the circle</strong> in the chat: post what you need and why, members offer to lend, you pick one. <strong>Direct loan</strong>: you already know who to ask.</p>
+                <div class="btn-row">
+                  <button id="go-ask-chat" class="btn btn-accent" type="button">Ask in the chat</button>
+                  <button id="go-direct" class="btn btn-ghost" type="button">Direct loan</button>
+                </div>
               </div>
             </div>
             <div class="box">
@@ -203,10 +236,20 @@
               <p class="muted">Money goes straight from the lender to the borrower. The circle itself never holds it.</p>
               <div class="table-wrap">
                 <table class="loans">
-                  <thead><tr><th>#</th><th>Borrower</th><th>Lender</th><th>Amount</th><th>Status</th></tr></thead>
-                  <tbody id="circle-loans"><tr><td colspan="5" class="muted">Loading…</td></tr></tbody>
+                  <thead><tr><th>#</th><th>Borrower</th><th>Lender</th><th>Amount</th><th>Reason</th><th>Status</th></tr></thead>
+                  <tbody id="circle-loans"><tr><td colspan="6" class="muted">Loading…</td></tr></tbody>
                 </table>
               </div>
+            </div>
+          </section>
+
+          <!-- DIRECT LOANS -->
+          <section class="view" id="view-direct" data-title="Direct loans" hidden>
+            <div class="box">
+              <p class="eyebrow">Direct loan</p>
+              <h2 class="big">Ask one member directly</h2>
+              <p class="muted">You already know who to ask. The loan is created on-chain straight away and names them as the lender; only they can fund it. Prefer to ask everyone? Use the chat.</p>
+              <div id="loan-form-slot"></div>
             </div>
           </section>
 
@@ -245,6 +288,21 @@
 
           <!-- MEMBERS -->
           <section class="view" id="view-members" data-title="Members" hidden>
+            <div class="box invite-box">
+              <h2>Invite a friend</h2>
+              <p id="invite-eligibility" class="muted">Trusted members can invite. Make a link, copy it and send it privately; the friend opens it, or pastes it on Home.</p>
+              <div id="invite-form" hidden>
+                <div class="field-row">
+                  <div><label for="invitee-account-id">Their NEAR testnet account</label><input id="invitee-account-id" autocomplete="off" placeholder="friend.testnet" /></div>
+                  <div><label for="invite-expiry-hours">Link works for (hours)</label><input id="invite-expiry-hours" inputmode="numeric" value="24" /></div>
+                </div>
+                <div class="btn-row">
+                  <button id="create-invite" class="btn btn-accent" type="button">Create invite link</button>
+                  <button id="copy-invite" class="btn btn-ghost" type="button" hidden>Copy link</button>
+                </div>
+                <textarea id="invite-link" rows="2" readonly placeholder="The link appears here" hidden></textarea>
+              </div>
+            </div>
             <div class="box">
               <h2>Members and their cards</h2>
               <p class="muted">Each card belongs to one member. It cannot be sold or sent, and it changes when they repay on time.</p>
@@ -254,18 +312,6 @@
 
           <!-- TOOLS -->
           <section class="view" id="view-tools" data-title="Tools" hidden>
-            <details class="box details" open>
-              <summary>Invite someone</summary>
-              <p class="muted">Trusted members can invite. You get a link to send privately; its secret part never reaches a server.</p>
-              <label for="invite-circle-id">Circle number</label>
-              <input id="invite-circle-id" inputmode="numeric" value="3" />
-              <label for="invitee-account-id">Their NEAR account (recommended)</label>
-              <input id="invitee-account-id" autocomplete="off" placeholder="friend.testnet" />
-              <label for="invite-expiry-hours">Expires after (hours)</label>
-              <input id="invite-expiry-hours" inputmode="numeric" value="72" />
-              <button id="create-invite" class="btn btn-accent">Create invite link</button>
-              <textarea id="invite-link" rows="3" readonly placeholder="The link to share appears here"></textarea>
-            </details>
 
             <details class="box details">
               <summary>Start a new demo circle</summary>

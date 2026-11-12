@@ -1,4 +1,4 @@
-import { CircleClient, passportTokenTitle, type CircleParams, type LoanView, type PassportView } from './circle-client'
+import { CircleClient, parseFtTransferCallOutcome, passportTokenTitle, type CircleParams, type LoanView, type PassportView } from './circle-client'
 import { friendlyError, isRepeat, TOAST_MS, type NextAction, type ToastKind } from './notify'
 import { badgeFor, memberLabel, type Tier } from './labels'
 import { borrowLimit, canCancel, countdown, formatDuration, isWaiting, loanLengthText, requestsForLender, trustedProgress, validateLoanInput } from './loan-rules'
@@ -10,7 +10,7 @@ import { bindThemeForm, readThemeForm, renderThemePreview } from './theme'
 // The wallet library (~1.5 MB) loads only on Connect or when a session exists.
 import type { NearWalletController } from './near-wallet'
 import { assertCircleName } from './text-rules'
-import { avatarFor, ChatApiError, ChatClient, dayLabel, timeLabel, type ChatMessage } from './chat'
+import { avatarFor, ChatApiError, ChatClient, dayLabel, timeLabel, type ChatMessage, type LoanRequestCard } from './chat'
 import {
   clearFlagProposal, DEMO_TREASURY_LOAN_DAYS, formatUsdc, loansNeedingProposal, proposalLoanId, repaymentNotice,
   SputnikDaoClient, stewardsOf, treasuryFundProposal, type SputnikProposal,
@@ -35,7 +35,7 @@ const config = {
 const readClient = new CircleClient(config.rpcUrl, config.contractId)
 const client = () => new CircleClient(config.rpcUrl, config.contractId, window.commonCircleWallet)
 const TOKEN_KEY = 'commoncircle.session'
-const VIEWS = ['home', 'chat', 'loans', 'treasury', 'members', 'tools'] as const
+const VIEWS = ['home', 'chat', 'loans', 'direct', 'treasury', 'members', 'tools'] as const
 type View = (typeof VIEWS)[number]
 
 /** loans: as borrower in this circle; lent: as lender in this circle. */
@@ -54,6 +54,8 @@ let chatRoom = '3'
 let chatAllowed = false
 const chatMessages = new Map<string, ChatMessage[]>()
 const chatSeen = new Map<string, number>()
+/** Loan request cards per circle room (server/requests.ts); needs the sign-in token. */
+const chatRequests = new Map<string, LoanRequestCard[]>()
 let chatTimer = 0
 
 const $ = <T extends HTMLElement>(selector: string): T => document.querySelector(selector) as T
@@ -314,11 +316,25 @@ async function registerForUsdc(): Promise<void> {
 }
 
 /** create_loan in the current circle. `amount` is base units, already validated by the form. */
-async function requestLoan(lenderId: string, amount: string, durationDays: number): Promise<void> {
+/** The new loan id from a create_loan outcome (loan_created event), else the newest matching open loan. */
+async function newLoanId(raw: unknown, lenderId: string, amount: string): Promise<string | null> {
+  const event = parseFtTransferCallOutcome(raw).events.find((e) => e.event === 'loan_created')
+  const fromEvent = (event?.data[0] as { loan_id?: string } | undefined)?.loan_id
+  if (fromEvent) return fromEvent
+  const mine = await readClient.loansByBorrower(accountId).catch(() => [])
+  return mine.filter((l) => l.lender_id === lenderId && l.principal === amount && l.state === 'Open').map((l) => l.loan_id).sort((a, b) => Number(b) - Number(a))[0] ?? null
+}
+
+async function requestLoan(lenderId: string, amount: string, durationDays: number, note = ''): Promise<void> {
   requireWallet()
   if (!lenderId) throw new Error('Choose who you are asking.')
   const storage = await readClient.storageCosts()
-  await client().createLoan({ circleId, lenderId, amount, durationDays, deposit: storage.create_loan })
+  const raw = await client().createLoan({ circleId, lenderId, amount, durationDays, deposit: storage.create_loan })
+  const chat = chatClient()
+  if (note.trim() && chat) {
+    const loanId = await newLoanId(raw, lenderId, amount)
+    if (loanId) await chat.directNote(circleId, loanId, note.trim()).catch(() => show('The loan is on-chain, but its reason could not be saved (chat server offline).', 'bad'))
+  }
   const treasury = lenderId === demo?.circle?.treasury_id
   const fundingWindow = demo?.circle ? formatDuration(BigInt(demo.circle.params.funding_window_sec)) : 'the funding window'
   await afterTx(treasury ? 'Request recorded. Now open Treasury and press "2. Send to stewards".' : `Request sent. ${memberLabel(lenderId)} has ${fundingWindow} to fund it.`)
@@ -401,16 +417,21 @@ async function askToForgive(loan: LoanView): Promise<void> {
 
 async function createInvite(): Promise<void> {
   requireWallet()
-  const cid = $<HTMLInputElement>('#invite-circle-id').value.trim()
+  const cid = circleId
   const inviteeId = $<HTMLInputElement>('#invitee-account-id').value.trim() || null
-  const hours = BigInt($<HTMLInputElement>('#invite-expiry-hours').value || '72')
-  if (!/^\d+$/.test(cid) || hours <= 0n) throw new Error('Enter a circle number and a positive number of hours.')
+  const hoursText = $<HTMLInputElement>('#invite-expiry-hours').value.trim() || '24'
+  if (!/^\d+$/.test(hoursText) || hoursText === '0') throw new Error('Enter how many hours the link should work, for example 24.')
+  if (inviteeId && !/^[a-z0-9._-]+\.testnet$/.test(inviteeId)) throw new Error('Enter their testnet account, for example friend.testnet.')
+  const hours = BigInt(hoursText)
   const pair = await generateInviteKeyPair()
   const expiresAt = (BigInt(Date.now()) * 1_000_000n + hours * 3_600_000_000_000n).toString()
   const storage = await readClient.storageCosts()
   await client().registerInvite({ circleId: cid, invitePublicKey: pair.publicKey, expiresAt, inviteeId, deposit: storage.register_invite })
-  $<HTMLTextAreaElement>('#invite-link').value = buildInviteLink({ circleId: cid, invitePublicKey: pair.publicKey, inviteSecret: pair.secret })
-  show('Invite created. Send the link privately; only the person you named can use it.', 'ok')
+  const box = $<HTMLTextAreaElement>('#invite-link')
+  box.value = buildInviteLink({ circleId: cid, invitePublicKey: pair.publicKey, inviteSecret: pair.secret })
+  box.hidden = false
+  $('#copy-invite').hidden = false
+  show(inviteeId ? `Invite created for ${inviteeId}. Copy the link and send it privately.` : 'Invite created. Copy the link and send it privately.', 'ok')
 }
 
 const testnetDemoParams: CircleParams = {
@@ -486,15 +507,19 @@ function renderMessages(): void {
     box.append(el('p', { className: 'chat-empty', textContent: 'Messages in this room are visible to its members only.' }))
     return
   }
-  if (!msgs.length) {
-    box.append(el('p', { className: 'chat-empty', textContent: 'No messages yet. Say hello to your circle.' }))
+  const cards = chatRequests.get(chatRoom) ?? []
+  if (!msgs.length && !cards.length) {
+    box.append(el('p', { className: 'chat-empty', textContent: 'No messages yet. Say hello, or press + to ask the circle for a loan.' }))
     return
   }
   let lastDay = ''
   let prev: ChatMessage | null = null
-  for (const m of msgs) {
-    const day = dayLabel(m.at)
+  const stream: Array<{ at: number; msg?: ChatMessage; card?: LoanRequestCard }> = [...msgs.map((m) => ({ at: m.at, msg: m })), ...cards.map((c) => ({ at: c.at, card: c }))].sort((a, b) => a.at - b.at)
+  for (const item of stream) {
+    const day = dayLabel(item.at)
     if (day !== lastDay) { box.append(el('p', { className: 'day', textContent: day })); lastDay = day; prev = null }
+    if (item.card) { box.append(requestCard(item.card)); prev = null; continue }
+    const m = item.msg!
     const mine = m.account_id === accountId
     const cont = !!prev && prev.account_id === m.account_id && m.at - prev.at < 5 * 60_000
     const tier = tierOf(m.account_id)
@@ -504,7 +529,8 @@ function renderMessages(): void {
     prev = m
   }
   if (nearBottom || msgs.length) box.scrollTop = box.scrollHeight
-  chatSeen.set(chatRoom, msgs[msgs.length - 1].id)
+  if (msgs.length) chatSeen.set(chatRoom, msgs[msgs.length - 1].id)
+  tickDue()
 }
 
 function setGate(text: string, actions: HTMLElement[] = []): void {
@@ -546,6 +572,7 @@ async function checkChatAccess(quiet = false): Promise<void> {
   try {
     const msgs = await chat.list(chatRoom)
     chatMessages.set(chatRoom, msgs)
+    await loadRequests(chat, chatRoom)
     chatAllowed = true
     $('#chat-gate').hidden = true
     $('#composer').hidden = false
@@ -564,9 +591,18 @@ async function checkChatAccess(quiet = false): Promise<void> {
   }
 }
 
+async function loadRequests(chat: ChatClient, room: string): Promise<void> {
+  try { chatRequests.set(room, await chat.requests(room)) } catch { /* the chat gate already says when the server is offline */ }
+}
+
 async function pollChat(): Promise<void> {
   const chat = chatClient()
   if (!chat || !accountId) return
+  if (chatAllowed) {
+    const before = JSON.stringify(chatRequests.get(chatRoom) ?? [])
+    await loadRequests(chat, chatRoom)
+    if (view === 'chat' && JSON.stringify(chatRequests.get(chatRoom) ?? []) !== before) renderMessages()
+  }
   const ids = new Set<string>([...(me?.circles ?? []).map((c) => c.id)])
   for (const id of ids) {
     if (id === chatRoom && !chatAllowed) continue
@@ -617,6 +653,146 @@ async function sendChat(): Promise<void> {
   renderRooms()
 }
 
+/* ---------- loan requests in the chat (LoanBook-style) ---------- */
+
+/** The on-chain loan behind a linked request card, from data already loaded. */
+function chainLoanFor(card: LoanRequestCard): LoanView | null {
+  if (!card.loan_id) return null
+  return [...(me?.loans ?? []), ...(me?.lent ?? []), ...(demo?.loans ?? [])].find((l) => l.loan_id === card.loan_id) ?? null
+}
+
+/** Where a request stands, in plain words. */
+function requestStatus(card: LoanRequestCard, loan: LoanView | null): { label: string; cls: string } {
+  if (card.cancelled) return { label: 'Cancelled', cls: 'Cancelled' }
+  if (!card.loan_id) return { label: card.offers.length ? `${card.offers.length} offer${card.offers.length > 1 ? 's' : ''}` : 'Waiting for offers', cls: 'Open' }
+  if (!loan) return { label: `Loan #${card.loan_id}`, cls: 'Open' }
+  if (loan.state === 'Open') return isWaiting(loan, Date.now()) ? { label: 'Waiting for funding', cls: 'Open' } : { label: 'Expired', cls: 'Cancelled' }
+  if (loan.state === 'Repaid') return loan.repaid_on_time ? { label: 'Repaid on time', cls: 'Repaid' } : { label: 'Repaid late', cls: 'Repaid' }
+  if (loan.state === 'Funded' && loan.overdue) return { label: 'Overdue', cls: 'Cancelled' }
+  return { label: loan.state, cls: loan.state }
+}
+
+async function requestAction(card: LoanRequestCard, verb: 'offer' | 'cancel'): Promise<void> {
+  const chat = chatClient()
+  if (!chat) throw new Error('Sign in first (Home, step 3).')
+  await chat.requestAction(card.circle_id, card.id, verb)
+  await loadRequests(chat, card.circle_id)
+  renderMessages()
+  renderOpenRequests()
+}
+
+/** The borrower picks a lender who offered: create_loan naming them (wallet), then link it to the card. */
+async function chooseLender(card: LoanRequestCard, lenderId: string): Promise<void> {
+  requireWallet()
+  const chat = chatClient()
+  if (!chat) throw new Error('Sign in first (Home, step 3).')
+  const storage = await readClient.storageCosts()
+  const raw = await client().createLoan({ circleId: card.circle_id, lenderId, amount: card.amount, durationDays: card.days, deposit: storage.create_loan })
+  const loanId = await newLoanId(raw, lenderId, card.amount)
+  if (!loanId) throw new Error('The loan was sent, but its number could not be read yet. Press refresh in a few seconds.')
+  await chat.requestAction(card.circle_id, card.id, 'link', loanId)
+  await loadRequests(chat, card.circle_id)
+  await afterTx(`Loan #${loanId} created. ${memberLabel(lenderId)} can now fund it.`)
+  renderMessages()
+}
+
+function requestCard(card: LoanRequestCard): HTMLElement {
+  const loan = chainLoanFor(card)
+  const mine = card.borrower === accountId
+  const status = requestStatus(card, loan)
+  const length = loanLengthText(card.days, demo?.circle?.params.day_length_sec ?? '86400')
+  const head = el('div', { className: 'req-head' }, avatar(card.borrower, 'sm'),
+    el('span', { className: 'req-who' }, accountChip(card.borrower), card.direct ? ' made a direct loan request' : ' asks the circle for a loan'),
+    el('span', { className: `state state-${status.cls}`, textContent: status.label }))
+  const body = el('div', { className: 'req-body' },
+    el('p', { className: 'req-amount' }, el('strong', { textContent: `${formatUsdc(card.amount)} USDC` }), ` · ${length} · no interest`),
+    el('blockquote', { className: 'req-note', textContent: card.note }))
+  const actions: HTMLElement[] = []
+  const info: Array<Node | string> = []
+  if (!card.cancelled && !card.loan_id) {
+    if (card.offers.length) info.push('Offers from ', ...card.offers.flatMap((o, i) => (i ? [', ', accountChip(o)] : [accountChip(o)])), '.')
+    else info.push('No offers yet.')
+    if (mine) {
+      for (const o of card.offers) actions.push(button(`Borrow from ${memberLabel(o)}`, () => chooseLender(card, o)))
+      actions.push(button('Cancel request', () => requestAction(card, 'cancel'), 'ghost'))
+    } else if (accountId) {
+      actions.push(button(card.offers.includes(accountId) ? 'Withdraw my offer' : 'Offer to lend', () => requestAction(card, 'offer'), card.offers.includes(accountId) ? 'ghost' : 'accent'))
+    }
+  } else if (card.loan_id && loan) {
+    const lender = loan.lender_id === accountId ? 'you' : memberLabel(loan.lender_id)
+    if (isWaiting(loan, Date.now())) {
+      info.push(`Loan #${loan.loan_id} names ${lender} as lender. `, windowSpan(loan))
+      if (loan.lender_id === accountId) actions.push(button(`Fund ${formatUsdc(loan.principal)} USDC`, () => fund(loan)))
+      if (canCancel(loan, accountId, Date.now())) actions.push(button('Cancel request', () => cancelRequest(loan), 'ghost'))
+    } else if (loan.state === 'Funded' || loan.state === 'Repaying') {
+      info.push(`Loan #${loan.loan_id}: ${lender} sent the money. `, dueSpan(loan))
+      if (mine && loan.state === 'Funded') actions.push(button(`Repay ${formatUsdc(loan.outstanding)} USDC`, () => repay(loan)))
+    } else {
+      info.push(`Loan #${loan.loan_id} with ${lender}.`)
+    }
+  }
+  return el('article', { className: `req-card${mine ? ' mine' : ''}`, ariaLabel: 'Loan request' }, head, body,
+    info.length ? el('p', { className: 'req-info' }, ...info) : '',
+    actions.length ? el('div', { className: 'req-actions' }, ...actions) : '')
+}
+
+/** The "ask the circle" panel above the composer. Limits and validation come from borrowLimit(). */
+function askLimit() {
+  return demo?.circle ? borrowLimit(demo.circle.params, me?.passport ?? null, demo.config.hard_loan_cap) : null
+}
+
+function checkAsk() {
+  const limit = askLimit()
+  if (!limit || !demo?.circle) return null
+  const v = validateLoanInput($<HTMLInputElement>('#ask-amount').value, $<HTMLInputElement>('#ask-days').value, limit, formatUsdc)
+  $('#ask-amount-hint').textContent = v.errors.amount ?? `Your limit as a ${limit.tier}: ${formatUsdc(limit.min)} to ${formatUsdc(limit.max)} USDC.`
+  $('#ask-amount-hint').classList.toggle('bad', !!v.errors.amount)
+  $('#ask-days-hint').textContent = v.errors.days ?? `${loanLengthText(v.days!, demo.circle.params.day_length_sec)} to repay after funding.`
+  $('#ask-days-hint').classList.toggle('bad', !!v.errors.days)
+  return v
+}
+
+async function postAsk(): Promise<void> {
+  const chat = chatClient()
+  if (!chat || !chatAllowed) throw new Error('Open the chat and sign in first.')
+  const v = checkAsk()
+  if (!v?.amount || !v.days) throw new Error('Fix the highlighted fields first.')
+  const note = $<HTMLTextAreaElement>('#ask-note').value.trim()
+  if (!note) throw new Error('Say in a few words what the loan is for.')
+  await chat.ask(chatRoom, { amount: v.amount, days: v.days, note })
+  $<HTMLTextAreaElement>('#ask-note').value = ''
+  $('#ask-panel').hidden = true
+  await loadRequests(chat, chatRoom)
+  renderMessages()
+  renderOpenRequests()
+  show('Your request is in the chat. Members can now offer to lend.', 'ok')
+}
+
+/** Home: every open request in this circle, for every member (cards from the chat server, plus on-chain loans waiting for funding). */
+function renderOpenRequests(): void {
+  const now = Date.now()
+  const cards = (chatRequests.get(circleId) ?? []).filter((c) => !c.cancelled && (!c.loan_id || (() => { const l = chainLoanFor(c); return !l || isWaiting(l, now) })()))
+  const linked = new Set(cards.map((c) => c.loan_id).filter(Boolean))
+  const chainOnly = (demo?.loans ?? []).filter((l) => isWaiting(l, now) && !linked.has(l.loan_id) && !(chatRequests.get(circleId) ?? []).some((c) => c.loan_id === l.loan_id))
+  const items: HTMLLIElement[] = [
+    ...cards.map((c) => el('li', {}, el('span', {}, accountChip(c.borrower), ` asks for ${formatUsdc(c.amount)} USDC: `, el('em', { textContent: `"${c.note}"` }), ' ',
+      el('span', { className: 'muted small', textContent: c.loan_id ? `· loan #${c.loan_id}` : `· ${c.offers.length} offer${c.offers.length === 1 ? '' : 's'}` })))),
+    ...chainOnly.map((l) => el('li', {}, el('span', {}, accountChip(l.borrower_id), ` asks `, l.lender_is_treasury ? 'the treasury' : accountChip(l.lender_id), ` for ${formatUsdc(l.principal)} USDC. `, windowSpan(l)))),
+  ]
+  $('#open-requests').hidden = !items.length
+  $('#open-requests-list').replaceChildren(...items)
+}
+
+/** Members: the invite box, for Trusted members only (the contract's rule after attach_dao). */
+function renderInvite(): void {
+  const p = me?.passport
+  const can = !!p && p.status === 'Active' && p.effective_tier === 'Trusted'
+  $('#invite-form').hidden = !can
+  $('#invite-eligibility').textContent = !accountId ? 'Connect your wallet to invite a friend.'
+    : can ? 'Put in your friend\'s testnet account, make the link, copy it and send it privately. They open it, or paste it on Home.'
+      : 'Only Trusted members can invite in this circle. Repay one loan on time and your card turns Trusted.'
+}
+
 /* ---------- reading state ---------- */
 
 async function refreshMe(): Promise<void> {
@@ -640,6 +816,8 @@ async function refreshMe(): Promise<void> {
   } catch (error) {
     show(`Could not read your account. ${errorText(error)}`, 'bad', 'retry', refreshMe)
   }
+  const chatForHome = chatClient()
+  if (chatForHome && me?.passport) await loadRequests(chatForHome, circleId)
   renderAll()
   await Promise.all([
     loadMyCard().catch(() => {}),
@@ -659,6 +837,8 @@ async function refreshAll(): Promise<void> {
 
 function renderAll(): void {
   renderForYou()
+  renderOpenRequests()
+  renderInvite()
   renderJourney()
   renderMembers()
   renderSidebar()
@@ -771,6 +951,8 @@ function loanRequestForm(): HTMLElement {
   days.setAttribute('aria-describedby', `${id}-days-hint`)
   const amountHint = el('p', { id: `${id}-amount-hint`, className: 'hint' })
   const daysHint = el('p', { id: `${id}-days-hint`, className: 'hint' })
+  const note = el('textarea', { id: `${id}-note`, rows: 2, maxLength: 500, placeholder: 'For example: school fees, stock for my shop' })
+  const noteHint = el('p', { className: 'hint', textContent: session()?.accountId === accountId ? 'Members of the circle see this. It is stored on the chat server, not on-chain.' : 'Sign in (step 3) to attach a reason that members can see.' })
   const send = el('button', { className: 'btn btn-accent', type: 'button', textContent: 'Send request' })
   const check = () => {
     const v = validateLoanInput(amount.value, days.value, limit, formatUsdc)
@@ -789,7 +971,7 @@ function loanRequestForm(): HTMLElement {
     const v = check()
     const lender = picker.querySelector<HTMLInputElement>('input:checked')?.value ?? ''
     if (!v.amount || !v.days) throw new Error('Fix the highlighted fields first.')
-    await requestLoan(lender, v.amount, v.days)
+    await requestLoan(lender, v.amount, v.days, note.value)
   }))
   check()
   return el('div', { className: 'loan-form' },
@@ -797,7 +979,25 @@ function loanRequestForm(): HTMLElement {
     el('div', { className: 'field-row' },
       el('div', {}, el('label', { htmlFor: amount.id, textContent: 'Amount (USDC)' }), amount, amountHint),
       el('div', {}, el('label', { htmlFor: days.id, textContent: 'Days' }), days, daysHint)),
+    el('label', { htmlFor: note.id, textContent: 'What is the loan for?' }), note, noteHint,
     send)
+}
+
+/** Paste an invite link instead of opening it from the address bar. */
+function pasteInviteBox(): HTMLElement {
+  const input = el('input', { className: 'paste-input', placeholder: 'Paste your invite link here', autocomplete: 'off', ariaLabel: 'Invite link' })
+  const use = button('Use this link', async () => {
+    const text = input.value.trim()
+    let invite: ReturnType<typeof parseInviteLink>
+    try { invite = parseInviteLink(text) } catch { throw new Error('That is not an invite link. Copy the whole link, starting with http.') }
+    if (!invite.inviteSecret || !invite.invitePublicKey || !invite.circleId) throw new Error('That link is missing its invite part. Copy the whole link.')
+    rememberInvite(invite)
+    hydrateInviteFields()
+    if (invite.circleId !== (demo?.circleId ?? circleId)) await refreshAll()
+    renderJourney()
+    show('Invite found. Press "Join the circle".', 'ok')
+  })
+  return el('div', { className: 'paste-box' }, input, use)
 }
 
 function renderJourney(): void {
@@ -823,7 +1023,7 @@ function renderJourney(): void {
       : passport ? `Your card is ${passport.status}. Ask the stewards for help.`
         : invite.inviteSecret ? 'You have an invite. Joining costs about 0.009 NEAR, which pays for storing your card.'
           : 'You need an invite link from a Trusted member of this circle. Open it in this browser.',
-    invite.inviteSecret && !passport ? [button('Join the circle', joinInvite)] : []))
+    invite.inviteSecret && !passport ? [button('Join the circle', joinInvite)] : !passport ? [pasteInviteBox()] : []))
   steps.push(step(3, stateOf(2), 'Sign in',
     me?.signedIn ? 'Signed in for this browser session. The chat is open to you.' : 'A free signature that proves the account is yours. It also opens the circle chat.',
     [button('Sign in', signIn)]))
@@ -891,8 +1091,9 @@ function renderLoansTable(): void {
     el('td', {}, who(l.borrower_id, l.borrower_id === accountId ? 'You' : memberLabel(l.borrower_id))),
     el('td', {}, l.lender_is_treasury ? who(l.lender_id, 'Treasury (DAO)') : who(l.lender_id, l.lender_id === accountId ? 'You' : memberLabel(l.lender_id))),
     el('td', { textContent: `${formatUsdc(l.principal)} USDC` }),
+    el('td', { className: 'reason', textContent: (chatRequests.get(l.circle_id) ?? []).find((c) => c.loan_id === l.loan_id)?.note ?? '' }),
     el('td', {}, el('span', { className: `state state-${l.state}`, textContent: l.state === 'Repaid' && l.repaid_on_time === false ? (l.flag_cleared ? 'Repaid (late, forgiven)' : 'Repaid late') : l.state })),
-  )) : [el('tr', {}, el('td', { colSpan: 5, className: 'muted', textContent: 'No loans yet.' }))]))
+  )) : [el('tr', {}, el('td', { colSpan: 6, className: 'muted', textContent: 'No loans yet.' }))]))
 }
 
 function tickDue(): void {
@@ -1070,6 +1271,14 @@ function wire(): void {
   on('#connect-meteor', () => connectWallet('meteor-wallet'), 'wallet')
   on('#connect-wallet', () => connectWallet('my-near-wallet'), 'wallet')
   $('#status-close').addEventListener('click', hideToast)
+  on('#copy-invite', async () => { await navigator.clipboard.writeText($<HTMLTextAreaElement>('#invite-link').value); show('Link copied. Send it privately.', 'ok') })
+  $('#go-ask-chat').addEventListener('click', () => { goView('chat'); $('#ask-panel').hidden = false; checkAsk() })
+  $('#go-direct').addEventListener('click', () => goView('direct'))
+  $('#open-chat-requests').addEventListener('click', () => goView('chat'))
+  $('#ask-open').addEventListener('click', () => { $('#ask-panel').hidden = !$('#ask-panel').hidden; checkAsk() })
+  $('#ask-close').addEventListener('click', () => { $('#ask-panel').hidden = true })
+  for (const id of ['#ask-amount', '#ask-days']) $(id).addEventListener('input', () => { checkAsk() })
+  on('#ask-post', postAsk)
   on('#disconnect-wallet', disconnectWallet)
   on('#sign-in', signIn)
   on('#join-invite', joinInvite)
