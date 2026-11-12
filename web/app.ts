@@ -1,4 +1,6 @@
-import { CircleClient, passportTokenTitle, plainContractError, type CircleParams, type LoanView, type PassportView } from './circle-client'
+import { CircleClient, passportTokenTitle, type CircleParams, type LoanView, type PassportView } from './circle-client'
+import { friendlyError, isRepeat, TOAST_MS, type NextAction, type ToastKind } from './notify'
+import { badgeFor, memberLabel, type Tier } from './labels'
 import { signInWithNep413 } from './nep413'
 import { buildInviteLink, generateInviteKeyPair, parseInviteLink, signInviteWithSecret } from './invite'
 import { loadReadOnlyDemo, type ReadOnlyDemoSnapshot } from './demo'
@@ -69,44 +71,90 @@ function avatar(account: string, size = ''): HTMLSpanElement {
   return node
 }
 
-function who(account: string, label = short(account)): HTMLSpanElement {
+function who(account: string, label = memberLabel(account)): HTMLSpanElement {
   return el('span', { className: 'who', title: account }, avatar(account, 'sm'), el('span', { textContent: label }))
+}
+
+/** One badge component for Member / Trusted / Steward. */
+function badge(tier: Tier): HTMLSpanElement {
+  const b = badgeFor(tier)
+  return el('span', { className: b.className, textContent: b.text })
+}
+
+/** A friendly account label: short text, full account in the tooltip, copied on click. */
+function accountChip(account: string, label = account === accountId && accountId ? 'You' : memberLabel(account)): HTMLButtonElement {
+  const chip = el('button', { className: 'acct', type: 'button', title: `${account} (click to copy)` }, el('span', { textContent: label }))
+  chip.addEventListener('click', (event) => {
+    event.stopPropagation()
+    void navigator.clipboard?.writeText(account).then(() => show(`Copied ${account}.`, 'ok'), () => show(account, 'info'))
+  })
+  return chip
 }
 
 /* ---------- messages to the user ---------- */
 
 let toastTimer = 0
-function show(message: string, kind: 'info' | 'ok' | 'bad' = 'info'): void {
-  const toast = $('#status')
-  toast.textContent = message
-  toast.className = `toast ${kind}`
-  toast.hidden = false
+let toastShown: { text: string; kind: ToastKind; next: NextAction } | null = null
+
+function hideToast(): void {
   window.clearTimeout(toastTimer)
-  toastTimer = window.setTimeout(() => { toast.hidden = true }, kind === 'bad' ? 14000 : 6000)
+  $('#status').hidden = true
+  toastShown = null
 }
 
-function errorText(error: unknown): string {
+/** One toast at a time; repeats only restart the timer. `retry` re-runs the failed action. */
+function show(message: string, kind: ToastKind = 'info', next: NextAction = null, retry?: () => Promise<void>): void {
+  const toast = $('#status')
+  const repeat = isRepeat(toastShown, { text: message, kind })
+  toastShown = { text: message, kind, next }
+  if (!repeat) {
+    $('#status-text').textContent = message
+    const actions: HTMLElement[] = []
+    if (next === 'connect') actions.push(button('Retry', async () => { hideToast(); await connectWallet(lastWalletId) }, 'soft'))
+    else if (next === 'retry' && retry) actions.push(button('Retry', async () => { hideToast(); await retry() }, 'soft'))
+    $('#status-actions').replaceChildren(...actions)
+    toast.className = `toast ${kind}`
+    toast.hidden = false
+  }
+  window.clearTimeout(toastTimer)
+  toastTimer = window.setTimeout(hideToast, TOAST_MS[kind])
+}
+
+/** A plain sentence for any error (wallet, network, RPC, contract, chat server). */
+function errorText(error: unknown, context: 'wallet' | 'chat' | 'chain' = 'chain'): string {
   if (error instanceof ChatApiError) return error.message
-  const text = plainContractError(error)
-  if (/Failed to fetch|NetworkError|ECONNREFUSED/i.test(text)) return 'Could not reach the sign-in server. Start it with npm run auth, then try again.'
-  return text
+  return friendlyError(error, context).text
 }
 
-async function run(b: HTMLButtonElement | null, action: () => Promise<void>): Promise<void> {
+function showError(error: unknown, context: 'wallet' | 'chat' | 'chain' = 'chain', retry?: () => Promise<void>): void {
+  const friendly = error instanceof ChatApiError ? { text: error.message, next: null } : friendlyError(error, context)
+  show(friendly.text, 'bad', friendly.next, retry)
+}
+
+async function run(b: HTMLButtonElement | null, action: () => Promise<void>, context: 'wallet' | 'chat' | 'chain' = 'chain'): Promise<void> {
   if (b) { b.disabled = true; b.classList.add('busy') }
   try {
     await action()
   } catch (error) {
-    show(errorText(error), 'bad')
+    // A wallet error that arrives after another path already connected the account is stale.
+    if (context === 'wallet' && accountId) return
+    showError(error, context, action)
   } finally {
     if (b) { b.disabled = false; b.classList.remove('busy') }
   }
 }
 
-function button(label: string, action: () => Promise<void>, kind: 'accent' | 'soft' | 'ghost' = 'accent'): HTMLButtonElement {
+function button(label: string, action: () => Promise<void>, kind: 'accent' | 'soft' | 'ghost' = 'accent', context: 'wallet' | 'chat' | 'chain' = 'chain'): HTMLButtonElement {
   const b = el('button', { className: `btn btn-${kind} btn-sm`, textContent: label, type: 'button' })
-  b.addEventListener('click', () => void run(b, action))
+  b.addEventListener('click', () => void run(b, action, context))
   return b
+}
+
+function connectButtons(): HTMLButtonElement[] {
+  return [
+    button('Connect Meteor', () => connectWallet('meteor-wallet'), 'accent', 'wallet'),
+    button('MyNearWallet', () => connectWallet('my-near-wallet'), 'ghost', 'wallet'),
+  ]
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -143,6 +191,8 @@ function onAccountChange(nextAccountId: string): void {
   $('#profile-avatar').replaceWith(Object.assign(avatar(nextAccountId || '?'), { id: 'profile-avatar' }))
   // Re-render now so step 1 shows "Connected" at once; refreshMe() fills in the rest
   // after its testnet reads, which can take a few seconds.
+  // A "connect your wallet" error is stale once an account is connected.
+  if (nextAccountId && toastShown?.next === 'connect') hideToast()
   if (changed) { chatMessages.clear(); renderAll(); void refreshMe() }
 }
 
@@ -164,7 +214,11 @@ async function restoreWallet(): Promise<void> {
   window.commonCircleWallet = restored
 }
 
-async function connectWallet(walletId: 'my-near-wallet' | 'meteor-wallet'): Promise<void> {
+type WalletId = 'my-near-wallet' | 'meteor-wallet'
+let lastWalletId: WalletId = 'meteor-wallet'
+
+async function connectWallet(walletId: WalletId): Promise<void> {
+  lastWalletId = walletId
   if (!walletController) {
     show('Opening the wallet…')
     const { createNearWallet } = await import('./near-wallet')
@@ -172,7 +226,7 @@ async function connectWallet(walletId: 'my-near-wallet' | 'meteor-wallet'): Prom
     window.commonCircleWallet = walletController
   }
   const connected = await walletController.connect(walletId)
-  show(`Connected as ${connected}.`, 'ok')
+  show(`Connected as ${memberLabel(connected)}.`, 'ok')
 }
 
 async function disconnectWallet(): Promise<void> {
@@ -182,6 +236,13 @@ async function disconnectWallet(): Promise<void> {
   me = null
   renderAll()
   show('Wallet disconnected.')
+}
+
+/** Switch account: sign out of the wallet, then sign in again (the wallet lets you pick). */
+async function switchWallet(): Promise<void> {
+  const id = lastWalletId
+  await disconnectWallet()
+  await connectWallet(id)
 }
 
 function requireWallet(): void {
@@ -418,7 +479,7 @@ async function openRoom(id: string): Promise<void> {
 }
 
 async function checkChatAccess(quiet = false): Promise<void> {
-  if (!accountId) { setGate('Connect your wallet to open the chat.', [button('Connect Meteor', () => connectWallet('meteor-wallet')), button('MyNearWallet', () => connectWallet('my-near-wallet'), 'ghost')]); renderMessages(); return }
+  if (!accountId) { setGate('Connect your wallet to open the chat.', connectButtons()); renderMessages(); return }
   const access = await readClient.checkAccess(chatRoom, accountId)
   if (!access.allowed) {
     setGate(access.reason === 'NoPassport' ? 'Only members can read this room. Join the circle with an invite first.' : `Your card in this circle is ${access.reason}, so the room is locked.`,
@@ -571,12 +632,18 @@ function renderSidebar(): void {
 }
 
 type StepState = 'done' | 'current' | 'waiting'
-function step(n: number, state: StepState, title: string, desc: string | Node, actions: HTMLElement[] = [], form?: HTMLElement): HTMLLIElement {
+/**
+ * A checklist step. Only the current step shows its actions (one primary button);
+ * a done step collapses to a check and a one-line summary, with at most small
+ * ghost buttons (`doneActions`, e.g. Switch / Disconnect).
+ */
+function step(n: number, state: StepState, title: string, desc: string | Node, actions: HTMLElement[] = [], form?: HTMLElement, doneActions: HTMLElement[] = []): HTMLLIElement {
   const li = el('li', { className: `step ${state}` })
+  const shown = state === 'current' ? actions : state === 'done' ? doneActions : []
   li.append(
-    el('span', { className: 'step-dot', textContent: state === 'done' ? '✓' : String(n) }),
-    el('div', {}, el('p', { className: 'step-title', textContent: title }), el('p', { className: 'step-desc' }, desc)),
-    el('div', { className: 'step-action' }, ...(state === 'waiting' ? [] : actions)),
+    el('span', { className: 'step-dot', textContent: state === 'done' ? '✓' : String(n), ariaHidden: 'true' }),
+    el('div', { className: 'step-text' }, el('p', { className: 'step-title', textContent: state === 'done' ? `${title} · done` : title }), el('p', { className: 'step-desc' }, desc)),
+    el('div', { className: 'step-action' }, ...shown),
   )
   if (form && state === 'current') li.append(form)
   return li
@@ -616,8 +683,9 @@ function renderJourney(): void {
   const steps: HTMLLIElement[] = []
 
   steps.push(step(1, stateOf(0), 'Connect your wallet',
-    accountId ? `Connected as ${accountId}.` : 'Use a NEAR testnet wallet. Meteor is recommended. Allow pop-ups when asked.',
-    [button('Connect Meteor', () => connectWallet('meteor-wallet')), button('MyNearWallet', () => connectWallet('my-near-wallet'), 'ghost')]))
+    accountId ? el('span', {}, 'Connected as ', accountChip(accountId), '.') : 'Use a NEAR testnet wallet. Meteor is recommended. Allow pop-ups when asked.',
+    connectButtons(), undefined,
+    [button('Switch', switchWallet, 'ghost', 'wallet'), button('Disconnect', disconnectWallet, 'ghost')]))
   steps.push(step(2, stateOf(1), `Join ${circleName}`,
     isMember ? `You are a ${passport!.display_tier} of ${circleName}.`
       : passport ? `Your card is ${passport.status}. Ask the stewards for help.`
@@ -833,9 +901,9 @@ async function loadDemo(): Promise<void> {
 
 /* ---------- wiring ---------- */
 
-function on(selector: string, action: () => Promise<void> | void): void {
+function on(selector: string, action: () => Promise<void> | void, context: 'wallet' | 'chat' | 'chain' = 'chain'): void {
   const b = $<HTMLButtonElement>(selector)
-  b.addEventListener('click', () => void run(b, async () => { await action() }))
+  b.addEventListener('click', () => void run(b, async () => { await action() }, context))
 }
 
 function wire(): void {
@@ -846,8 +914,9 @@ function wire(): void {
     const sidebar = $('#sidebar')
     if (sidebar.classList.contains('open') && !sidebar.contains(event.target as Node)) sidebar.classList.remove('open')
   })
-  on('#connect-meteor', () => connectWallet('meteor-wallet'))
-  on('#connect-wallet', () => connectWallet('my-near-wallet'))
+  on('#connect-meteor', () => connectWallet('meteor-wallet'), 'wallet')
+  on('#connect-wallet', () => connectWallet('my-near-wallet'), 'wallet')
+  $('#status-close').addEventListener('click', hideToast)
   on('#disconnect-wallet', disconnectWallet)
   on('#sign-in', signIn)
   on('#join-invite', joinInvite)

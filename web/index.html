@@ -339,7 +339,11 @@
       </section>
     </div>
 
-    <div id="status" class="toast" role="status" aria-live="polite" hidden></div>
+    <div id="status" class="toast" role="status" aria-live="polite" hidden>
+      <span id="status-text" class="toast-text"></span>
+      <span id="status-actions" class="toast-actions"></span>
+      <button id="status-close" class="toast-close" type="button" aria-label="Dismiss message">×</button>
+    </div>
     <script type="module" src="./app.ts"></script>
   </body>
 </html>
