@@ -47,7 +47,7 @@ events, storage paid against storage used):
 node contracts/scripts/near-tx.mjs <tx_hash> <signer_account_id>
 ```
 
-To re-check every claim against the chain (25 rows across the three tracks),
+To re-check every claim against the chain (32 rows across the three tracks),
 re-read each transaction and view into `evidence/snapshots/`, then compare:
 
 ```bash
@@ -58,7 +58,10 @@ The web app runs locally with `npm ci && npm run dev`, then
 `http://localhost:5173/`. It opens on circle 3 "The Dogs (DEMO)" with no wallet:
 member cards, the DAO trust check and the treasury's proposals, all read from
 testnet. With a MyNearWallet or Meteor testnet wallet, a Trusted member can ask
-the treasury and a steward can approve. A hosted copy (GitHub Pages) goes live
+the treasury and a steward can approve. On 12 Nov 2026 a new Meteor testnet
+wallet did the whole member loop from the web app: join by invite, sign in and
+chat, set up USDC, ask, cancel, ask again, repay on time, and its card turned
+Trusted (rows `f0-web-*` and `f1-web-*`; the lender funded from the CLI). A hosted copy (GitHub Pages) goes live
 when the repository is made public at ship; Pages cannot serve it while the
 repository is private.
 

@@ -1,0 +1,144 @@
+{
+  "network": "testnet",
+  "tx_hash": "FVVgaWmNE8fYwLbUNJSDTr55bWDbTVgcN93fPH5pU7vw",
+  "signer_id": "254edye5v.testnet",
+  "receiver_id": "3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af",
+  "final_execution_status": "FINAL",
+  "status": "success",
+  "error": null,
+  "attached_deposit": "1",
+  "refunded_to_signer": "0",
+  "storage_kept": "1",
+  "storage_growth": null,
+  "storage_verdict": null,
+  "has_event": {
+    "ft_transfer": true,
+    "loan_repayment_started": true,
+    "loan_repaid": true,
+    "tier_changed": true
+  },
+  "error_codes": {},
+  "refund_memo": false,
+  "gas_at_tgas": {
+    "ft_transfer_call": 150,
+    "ft_on_transfer": 130.51,
+    "ft_transfer": 58.43,
+    "on_repay_forwarded": 68.43,
+    "ft_resolve_transfer": 15.51
+  },
+  "function_calls": [
+    {
+      "receiver": "3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af",
+      "predecessor": "254edye5v.testnet",
+      "method": "ft_transfer_call",
+      "gas_tgas": 150,
+      "ok": true
+    },
+    {
+      "receiver": "commoncircle-light.testnet",
+      "predecessor": "3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af",
+      "method": "ft_on_transfer",
+      "gas_tgas": 130.51,
+      "ok": true
+    },
+    {
+      "receiver": "3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af",
+      "predecessor": "commoncircle-light.testnet",
+      "method": "ft_transfer",
+      "gas_tgas": 58.43,
+      "ok": true
+    },
+    {
+      "receiver": "commoncircle-light.testnet",
+      "predecessor": "commoncircle-light.testnet",
+      "method": "on_repay_forwarded",
+      "gas_tgas": 68.43,
+      "ok": true
+    },
+    {
+      "receiver": "3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af",
+      "predecessor": "3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af",
+      "method": "ft_resolve_transfer",
+      "gas_tgas": 15.51,
+      "ok": true
+    }
+  ],
+  "receipt_failures": [],
+  "events": [
+    {
+      "standard": "nep141",
+      "version": "1.0.0",
+      "event": "ft_transfer",
+      "data": [
+        {
+          "old_owner_id": "254edye5v.testnet",
+          "new_owner_id": "commoncircle-light.testnet",
+          "amount": "1000000"
+        }
+      ]
+    },
+    {
+      "standard": "commoncircle",
+      "version": "1.0.0",
+      "event": "loan_repayment_started",
+      "data": [
+        {
+          "loan_id": "11",
+          "circle_id": "3",
+          "sender_id": "254edye5v.testnet",
+          "amount": "1000000",
+          "applied": "1000000"
+        }
+      ]
+    },
+    {
+      "standard": "nep141",
+      "version": "1.0.0",
+      "event": "ft_transfer",
+      "data": [
+        {
+          "old_owner_id": "commoncircle-light.testnet",
+          "new_owner_id": "commoncircle-light-lender.testnet",
+          "amount": "1000000",
+          "memo": "CommonCircle loan 11 repayment"
+        }
+      ]
+    },
+    {
+      "standard": "commoncircle",
+      "version": "1.0.0",
+      "event": "loan_repaid",
+      "data": [
+        {
+          "loan_id": "11",
+          "circle_id": "3",
+          "borrower_id": "254edye5v.testnet",
+          "lender_id": "commoncircle-light-lender.testnet",
+          "applied": "1000000",
+          "total_repaid": "1000000",
+          "repaid_at": "1794525344501038205",
+          "on_time": true,
+          "qualifying": true,
+          "excess_returned": "0"
+        }
+      ]
+    },
+    {
+      "standard": "commoncircle",
+      "version": "1.0.0",
+      "event": "tier_changed",
+      "data": [
+        {
+          "circle_id": "3",
+          "account_id": "254edye5v.testnet",
+          "token_id": "3:254edye5v.testnet",
+          "from": "Member",
+          "to": "Trusted",
+          "loan_id": "11"
+        }
+      ]
+    }
+  ],
+  "rpc": "https://test.rpc.fastnear.com",
+  "read_at": "2026-11-12T23:19:16.163Z"
+}

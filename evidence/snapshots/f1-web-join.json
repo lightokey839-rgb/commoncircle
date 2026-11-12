@@ -1,0 +1,69 @@
+{
+  "network": "testnet",
+  "tx_hash": "D6cK74PYcv82p5Kxb5i91rneoAwK74z2ZWN65jnLr4vA",
+  "signer_id": "254edye5v.testnet",
+  "receiver_id": "commoncircle-light.testnet",
+  "final_execution_status": "FINAL",
+  "status": "success",
+  "error": null,
+  "attached_deposit": "9000000000000000000000",
+  "refunded_to_signer": "4690000000000000000000",
+  "storage_kept": "4310000000000000000000",
+  "storage_growth": {
+    "account": "commoncircle-light.testnet",
+    "bytes": 256,
+    "cost_yocto": "2560000000000000000000",
+    "note": "other txs in the same blocks would also count"
+  },
+  "storage_verdict": "deposit covers storage growth",
+  "has_event": {
+    "nft_mint": true,
+    "invite_redeemed": true
+  },
+  "error_codes": {},
+  "refund_memo": false,
+  "gas_at_tgas": {
+    "redeem_invite": 50
+  },
+  "function_calls": [
+    {
+      "receiver": "commoncircle-light.testnet",
+      "predecessor": "254edye5v.testnet",
+      "method": "redeem_invite",
+      "gas_tgas": 50,
+      "ok": true
+    }
+  ],
+  "receipt_failures": [],
+  "events": [
+    {
+      "standard": "nep171",
+      "version": "1.2.0",
+      "event": "nft_mint",
+      "data": [
+        {
+          "owner_id": "254edye5v.testnet",
+          "token_ids": [
+            "3:254edye5v.testnet"
+          ]
+        }
+      ]
+    },
+    {
+      "standard": "commoncircle",
+      "version": "1.0.0",
+      "event": "invite_redeemed",
+      "data": [
+        {
+          "circle_id": "3",
+          "account_id": "254edye5v.testnet",
+          "token_id": "3:254edye5v.testnet",
+          "inviter_id": "commoncircle-light-borrower3.testnet",
+          "invite_public_key": "ed25519:GHyDua68h6hq61mwQrmvdhXK47WZmjVPQ4a3butuqgMS"
+        }
+      ]
+    }
+  ],
+  "rpc": "https://test.rpc.fastnear.com",
+  "read_at": "2026-11-12T23:19:14.740Z"
+}

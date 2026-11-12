@@ -20,6 +20,7 @@ const USDC = "3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af";
 const LENDER = "commoncircle-light-lender.testnet";
 const STEWARD = "commoncircle-light-steward.testnet";
 const B3 = "commoncircle-light-borrower3.testnet";
+const WEB = "254edye5v.testnet"; // the builder's Meteor testnet wallet (Gate 2 web-app test)
 const CI = "evidence/reports/ci-43108982043-rust.json";
 const SPUTNIK = "Ea8tHXFSQVszVwGASyzAfLq65DjcRDhkfab4FcPaRpgD";
 
@@ -49,6 +50,19 @@ const rows = [
   view("f0-zero-balance", OI, F0, USDC, "ft_balance_of", { account_id: C }, { result: "0" }),
   test("f0-sandbox", OI, F0, ["readme_checks::fund_to_an_unregistered_borrower", "sandbox_f0::f0_low_gas_fails_early_and_is_refunded",
     "redteam::rt_contract_never_subsidises_storage"]),
+
+  // Gate 2 web-app test (2026-11-12): the builder's Meteor testnet wallet, every tx signed in the web app
+  // except the lender's funding (testnet-dao.sh fund 11). Verified with near-tx.mjs over FastNEAR.
+  tx("f0-web-request", OI, F0, "9TDk7xsPm7NpunmeFvZDfTUJLXep4kVzxwt2LXbrgLfG", WEB,
+    { ...ok, has_event: { loan_created: true }, storage_verdict: "deposit covers storage growth" }),
+  tx("f0-web-cancel", OI, F0, "6ZcAoR3sqGV2rGti41t8Ug3RuNKyUp9HwokZDJGmmoS9", WEB, { ...ok, has_event: { loan_cancelled: true } }),
+  tx("f0-web-fund", OI, F0, "DZV3Kbm551wgjsHhjgWU8PMh1nKRsQGoLtP6n267dLHq", LENDER, { ...ok, has_event: { loan_funded: true } }),
+  tx("f0-web-repay", OI, F0, "FVVgaWmNE8fYwLbUNJSDTr55bWDbTVgcN93fPH5pU7vw", WEB, { ...ok, has_event: { loan_repaid: true } }),
+  tx("f1-web-join", NFT, F1, "D6cK74PYcv82p5Kxb5i91rneoAwK74z2ZWN65jnLr4vA", WEB,
+    { ...ok, has_event: { nft_mint: true, invite_redeemed: true }, storage_verdict: "deposit covers storage growth" }),
+  tx("f1-web-repay-tier", NFT, F1, "FVVgaWmNE8fYwLbUNJSDTr55bWDbTVgcN93fPH5pU7vw", WEB, { ...ok, has_event: { tier_changed: true } }),
+  view("f1-web-passport", NFT, F1, C, "passport_for", { circle_id: "3", account_id: WEB },
+    { result: { tier: "Trusted", effective_tier: "Trusted", status: "Active", on_time_count: 1, late_count: 0 } }),
 
   // NFTs That Do Something: F1
   tx("f1-tier-flip", NFT, F1, "2d42VciE6yCvsXmZ4SPBkrGqnezaseEgv8eYHn8HJv1Q", B3, { ...ok, has_event: { tier_changed: true } }),

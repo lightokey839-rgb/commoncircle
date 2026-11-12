@@ -6,6 +6,10 @@ Gate 1 contract freeze Wed 11 Nov 23:59 · Gate 2 Tier A proof **Thu 12 Nov
 23:59** · Gate 3 pilot/user-test proof and feature freeze **Fri 13 Nov 23:59** ·
 Ship Sat 14 Nov 17:59. This replaces amendment A11's Gate 2/3 times.
 
+## Gate 2: COMPLETE (2026-11-12 ~23:20 UTC)
+
+The builder's Meteor testnet wallet `254edye5v.testnet` did the member loop from the web app: join by invite, sign in, chat, USDC setup, ask, cancel, ask the lender, repay on time; the card turned Trusted. Every tx verified over FastNEAR (`docs/VERIFICATION.md`, "Gate 2: the builder's wallet test"). `npm run claims`: 32 rows, 0 FAIL, all three tracks PASS. The web polish P0 (branch `lane/web-polish`) was the build used for this test.
+
 ## Gate 2 progress (lead, 2026-11-11 ~22:30 UTC)
 
 - **D-009 is deployed** (interface 1.1.1, code hash
