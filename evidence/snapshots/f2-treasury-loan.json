@@ -1,0 +1,35 @@
+{
+  "network": "testnet",
+  "account_id": "commoncircle-light.testnet",
+  "method": "get_loan",
+  "args": {
+    "loan_id": "6"
+  },
+  "block_height": 277346004,
+  "result": {
+    "loan_id": "6",
+    "circle_id": "3",
+    "borrower_id": "commoncircle-light-borrower3.testnet",
+    "lender_id": "dogs-dao.commoncircle-light.testnet",
+    "lender_is_treasury": true,
+    "principal": "1000000",
+    "total_repaid": "1000000",
+    "outstanding": "0",
+    "duration_days": 7,
+    "duration_sec": "420",
+    "created_at": "1794476209403138150",
+    "funding_deadline": "1794479809403138150",
+    "funded_at": "1794476244147656406",
+    "due_at": "1794476664147656406",
+    "repaid_at": "1794476268419888645",
+    "state": "Repaid",
+    "cancel_reason": null,
+    "funded_via": "Treasury",
+    "overdue": false,
+    "repaid_on_time": true,
+    "qualifying": true,
+    "flag_cleared": false
+  },
+  "rpc": "https://test.rpc.fastnear.com",
+  "read_at": "2026-11-12T09:44:41.894Z"
+}

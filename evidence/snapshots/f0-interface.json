@@ -1,0 +1,28 @@
+{
+  "network": "testnet",
+  "account_id": "commoncircle-light.testnet",
+  "method": "get_config",
+  "args": {},
+  "block_height": 277345919,
+  "result": {
+    "interface_version": "1.1.1",
+    "usdc_id": "3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af",
+    "vault_id": "vault.commoncircle-light.testnet",
+    "hard_loan_cap": "50000000",
+    "floors": {
+      "funding_window_sec": "0",
+      "qualifying_duration_sec": "0",
+      "recovery_lock_sec": "0",
+      "day_length_sec": "0"
+    },
+    "gas": {
+      "min_ft_on_transfer": "70",
+      "recommended_ft_transfer_call": "150"
+    },
+    "features": {
+      "recovery": false
+    }
+  },
+  "rpc": "https://test.rpc.fastnear.com",
+  "read_at": "2026-11-12T09:43:55.233Z"
+}

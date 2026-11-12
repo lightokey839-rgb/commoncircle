@@ -1,0 +1,143 @@
+{
+  "network": "testnet",
+  "tx_hash": "3dYZEiVpvXFGRPjte9TvCFsKPhPstqJTS4th8Cv8je1r",
+  "signer_id": "commoncircle-light-steward.testnet",
+  "receiver_id": "dogs-dao.commoncircle-light.testnet",
+  "final_execution_status": "FINAL",
+  "status": "success",
+  "error": null,
+  "attached_deposit": "0",
+  "refunded_to_signer": "0",
+  "storage_kept": "0",
+  "storage_growth": null,
+  "storage_verdict": null,
+  "has_event": {
+    "ft_transfer": true,
+    "loan_funding_started": true,
+    "loan_funded": true
+  },
+  "error_codes": {},
+  "refund_memo": false,
+  "gas_at_tgas": {
+    "act_proposal": 300,
+    "ft_transfer_call": 147.98,
+    "ft_on_transfer": 128.46,
+    "ft_transfer": 57.18,
+    "on_fund_forwarded": 67.18,
+    "ft_resolve_transfer": 15.48,
+    "on_proposal_callback": 147.98
+  },
+  "function_calls": [
+    {
+      "receiver": "dogs-dao.commoncircle-light.testnet",
+      "predecessor": "commoncircle-light-steward.testnet",
+      "method": "act_proposal",
+      "gas_tgas": 300,
+      "ok": true
+    },
+    {
+      "receiver": "3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af",
+      "predecessor": "dogs-dao.commoncircle-light.testnet",
+      "method": "ft_transfer_call",
+      "gas_tgas": 147.98,
+      "ok": true
+    },
+    {
+      "receiver": "commoncircle-light.testnet",
+      "predecessor": "3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af",
+      "method": "ft_on_transfer",
+      "gas_tgas": 128.46,
+      "ok": true
+    },
+    {
+      "receiver": "3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af",
+      "predecessor": "commoncircle-light.testnet",
+      "method": "ft_transfer",
+      "gas_tgas": 57.18,
+      "ok": true
+    },
+    {
+      "receiver": "commoncircle-light.testnet",
+      "predecessor": "commoncircle-light.testnet",
+      "method": "on_fund_forwarded",
+      "gas_tgas": 67.18,
+      "ok": true
+    },
+    {
+      "receiver": "3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af",
+      "predecessor": "3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af",
+      "method": "ft_resolve_transfer",
+      "gas_tgas": 15.48,
+      "ok": true
+    },
+    {
+      "receiver": "dogs-dao.commoncircle-light.testnet",
+      "predecessor": "dogs-dao.commoncircle-light.testnet",
+      "method": "on_proposal_callback",
+      "gas_tgas": 147.98,
+      "ok": true
+    }
+  ],
+  "receipt_failures": [],
+  "events": [
+    {
+      "standard": "nep141",
+      "version": "1.0.0",
+      "event": "ft_transfer",
+      "data": [
+        {
+          "old_owner_id": "dogs-dao.commoncircle-light.testnet",
+          "new_owner_id": "commoncircle-light.testnet",
+          "amount": "1000000",
+          "memo": "CommonCircle treasury loan 6: 1 USDC to commoncircle-light-borrower3.testnet (Trusted, not a steward)"
+        }
+      ]
+    },
+    {
+      "standard": "commoncircle",
+      "version": "1.0.0",
+      "event": "loan_funding_started",
+      "data": [
+        {
+          "loan_id": "6",
+          "circle_id": "3",
+          "sender_id": "dogs-dao.commoncircle-light.testnet",
+          "amount": "1000000",
+          "funded_via": "Treasury"
+        }
+      ]
+    },
+    {
+      "standard": "nep141",
+      "version": "1.0.0",
+      "event": "ft_transfer",
+      "data": [
+        {
+          "old_owner_id": "commoncircle-light.testnet",
+          "new_owner_id": "commoncircle-light-borrower3.testnet",
+          "amount": "1000000",
+          "memo": "CommonCircle loan 6 funding"
+        }
+      ]
+    },
+    {
+      "standard": "commoncircle",
+      "version": "1.0.0",
+      "event": "loan_funded",
+      "data": [
+        {
+          "loan_id": "6",
+          "circle_id": "3",
+          "borrower_id": "commoncircle-light-borrower3.testnet",
+          "lender_id": "dogs-dao.commoncircle-light.testnet",
+          "amount": "1000000",
+          "funded_via": "Treasury",
+          "funded_at": "1794476244147656406",
+          "due_at": "1794476664147656406"
+        }
+      ]
+    }
+  ],
+  "rpc": "https://test.rpc.fastnear.com",
+  "read_at": "2026-11-12T09:44:29.578Z"
+}

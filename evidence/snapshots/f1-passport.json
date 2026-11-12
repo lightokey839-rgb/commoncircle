@@ -1,0 +1,33 @@
+{
+  "network": "testnet",
+  "account_id": "commoncircle-light.testnet",
+  "method": "passport_for",
+  "args": {
+    "circle_id": "3",
+    "account_id": "commoncircle-light-borrower3.testnet"
+  },
+  "block_height": 277345944,
+  "result": {
+    "token_id": "3:commoncircle-light-borrower3.testnet",
+    "circle_id": "3",
+    "owner_id": "commoncircle-light-borrower3.testnet",
+    "tier": "Trusted",
+    "steward": false,
+    "display_tier": "Trusted",
+    "status": "Active",
+    "expires_at": null,
+    "joined_at": "1794416212117252806",
+    "invited_by": "commoncircle-light-lender.testnet",
+    "on_time_count": 2,
+    "late_count": 0,
+    "qualifying_count": 2,
+    "distinct_lenders": 1,
+    "open_loans": 2,
+    "overdue_loans": 0,
+    "perks_paused": false,
+    "effective_tier": "Trusted",
+    "recovery": null
+  },
+  "rpc": "https://test.rpc.fastnear.com",
+  "read_at": "2026-11-12T09:44:09.570Z"
+}

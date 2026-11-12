@@ -1,0 +1,115 @@
+{
+  "network": "testnet",
+  "tx_hash": "9bR1fvUPNYqvAgg18uuYhpiNSNt4akvcGygxVjuHAzr8",
+  "signer_id": "commoncircle-light-lender.testnet",
+  "receiver_id": "commoncircle-light.testnet",
+  "final_execution_status": "FINAL",
+  "status": "success",
+  "error": null,
+  "attached_deposit": "157000000000000000000000",
+  "refunded_to_signer": "122720000000000000000000",
+  "storage_kept": "34280000000000000000000",
+  "storage_growth": {
+    "account": "commoncircle-light.testnet",
+    "bytes": 3428,
+    "cost_yocto": "34280000000000000000000",
+    "note": "other txs in the same blocks would also count"
+  },
+  "storage_verdict": "deposit covers storage growth",
+  "has_event": {
+    "circle_created": true,
+    "circle_theme_set": true,
+    "nft_mint": true,
+    "invite_redeemed": true
+  },
+  "error_codes": {},
+  "refund_memo": false,
+  "gas_at_tgas": {
+    "create_circle": 150
+  },
+  "function_calls": [
+    {
+      "receiver": "commoncircle-light.testnet",
+      "predecessor": "commoncircle-light-lender.testnet",
+      "method": "create_circle",
+      "gas_tgas": 150,
+      "ok": true
+    }
+  ],
+  "receipt_failures": [],
+  "events": [
+    {
+      "standard": "commoncircle",
+      "version": "1.0.0",
+      "event": "circle_created",
+      "data": [
+        {
+          "circle_id": "3",
+          "founder_id": "commoncircle-light-lender.testnet",
+          "name": "The Dogs (DEMO)",
+          "params": {
+            "min_amount": "1000000",
+            "member_max_amount": "10000000",
+            "trusted_max_amount": "20000000",
+            "max_duration_days": 7,
+            "day_length_sec": "60",
+            "funding_window_sec": "3600",
+            "qualifying_min_amount": "1000000",
+            "qualifying_min_days": 1,
+            "trusted_threshold": 1,
+            "min_distinct_lenders": 1,
+            "recovery_lock_sec": "0",
+            "writeoff_grace_sec": "600"
+          }
+        }
+      ]
+    },
+    {
+      "standard": "commoncircle",
+      "version": "1.0.0",
+      "event": "circle_theme_set",
+      "data": [
+        {
+          "circle_id": "3",
+          "by": "commoncircle-light-lender.testnet",
+          "tagline": "Good dogs pay back",
+          "background": "#2B2D42",
+          "accent": "#FFB703",
+          "text": "#FFFFFF",
+          "pattern": "Waves",
+          "emblem_mime": "image/png",
+          "emblem_bytes": 2676
+        }
+      ]
+    },
+    {
+      "standard": "nep171",
+      "version": "1.2.0",
+      "event": "nft_mint",
+      "data": [
+        {
+          "owner_id": "commoncircle-light-lender.testnet",
+          "token_ids": [
+            "3:commoncircle-light-lender.testnet"
+          ]
+        }
+      ]
+    },
+    {
+      "standard": "commoncircle",
+      "version": "1.0.0",
+      "event": "invite_redeemed",
+      "data": [
+        {
+          "circle_id": "3",
+          "account_id": "commoncircle-light-lender.testnet",
+          "token_id": "3:commoncircle-light-lender.testnet",
+          "inviter_id": null,
+          "invite_public_key": null
+        }
+      ]
+    }
+  ],
+  "rpc": "https://test.rpc.fastnear.com",
+  "read_at": "2026-11-12T09:44:03.571Z"
+}

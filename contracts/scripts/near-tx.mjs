@@ -175,6 +175,21 @@ if (growth && growth.bytes !== undefined) {
   storageVerdict = kept >= BigInt(growth.cost_yocto) ? "deposit covers storage growth" : "STORAGE SUBSIDISED by the contract";
 }
 
+// Order-free summaries, so evidence rows can match on them (the claims harness
+// compares arrays position by position).
+const hasEvent = Object.fromEntries(allEvents.filter((e) => e.event).map((e) => [e.event, true]));
+const errorCodes = {};
+for (const f of [...failures.map((x) => x.error), overall.ok ? "" : overall.error]) {
+  const m = String(f ?? "").match(/E\d\d_[A-Z_]+/);
+  if (m) errorCodes[m[0]] = true;
+}
+for (const e of allEvents) {
+  for (const d of e.data ?? []) if (typeof d?.reason === "string" && /^E\d\d_/.test(d.reason)) errorCodes[d.reason] = true;
+}
+const refundMemo = allEvents.some((e) => e.event === "ft_transfer" && (e.data ?? []).some((d) => d.memo === "refund"));
+const gasAt = {};
+for (const f of fnCalls) if (!(f.method in gasAt)) gasAt[f.method] = f.gas_tgas;
+
 const snapshot = {
   network: RPC.includes("test") ? "testnet" : "mainnet",
   tx_hash: tx.hash,
@@ -188,6 +203,10 @@ const snapshot = {
   storage_kept: kept.toString(),
   storage_growth: growth,
   storage_verdict: storageVerdict,
+  has_event: hasEvent,
+  error_codes: errorCodes,
+  refund_memo: refundMemo,
+  gas_at_tgas: gasAt,
   function_calls: fnCalls,
   receipt_failures: failures,
   events: allEvents,

@@ -1,0 +1,47 @@
+{
+  "network": "testnet",
+  "account_id": "dogs-dao.commoncircle-light.testnet",
+  "method": "get_policy",
+  "args": {},
+  "block_height": 277345954,
+  "result": {
+    "roles": [
+      {
+        "name": "stewards",
+        "kind": {
+          "Group": [
+            "commoncircle-light-steward.testnet",
+            "commoncircle-light-lender.testnet"
+          ]
+        },
+        "permissions": [
+          "*:*"
+        ],
+        "vote_policy": {}
+      },
+      {
+        "name": "members-may-ask",
+        "kind": "Everyone",
+        "permissions": [
+          "call:AddProposal",
+          "transfer:AddProposal"
+        ],
+        "vote_policy": {}
+      }
+    ],
+    "default_vote_policy": {
+      "weight_kind": "RoleWeight",
+      "quorum": "0",
+      "threshold": [
+        1,
+        2
+      ]
+    },
+    "proposal_bond": "100000000000000000000000",
+    "proposal_period": "3600000000000",
+    "bounty_bond": "100000000000000000000000",
+    "bounty_forgiveness_period": "86400000000000"
+  },
+  "rpc": "https://test.rpc.fastnear.com",
+  "read_at": "2026-11-12T09:44:14.882Z"
+}

@@ -1,6 +1,528 @@
 {
   "schema_version": "A9",
   "project": "CommonCircle",
-  "generated_at": "2026-11-10T00:00:00Z",
-  "claims": []
+  "generated_at": "2026-11-12T09:44:47.490Z",
+  "claims": [
+    {
+      "id": "f0-code-hash",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "network": "testnet",
+      "kind": "view",
+      "reference": {
+        "account_id": "commoncircle-light.testnet",
+        "method": "view_account",
+        "args": {},
+        "snapshot": "evidence/snapshots/f0-code-hash.json"
+      },
+      "expected": {
+        "result": {
+          "code_hash": "J4X6efoAqFoKVYxaSNtpDYUTyKrKDzrqa2vPZxvMLxGr"
+        }
+      }
+    },
+    {
+      "id": "f0-interface",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "network": "testnet",
+      "kind": "view",
+      "reference": {
+        "account_id": "commoncircle-light.testnet",
+        "method": "get_config",
+        "args": {},
+        "snapshot": "evidence/snapshots/f0-interface.json"
+      },
+      "expected": {
+        "result": {
+          "interface_version": "1.1.1",
+          "usdc_id": "3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af"
+        }
+      }
+    },
+    {
+      "id": "f0-refund",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "network": "testnet",
+      "kind": "tx",
+      "reference": {
+        "tx_hash": "9eRRis9rGq1QFjYWdAr7E627HXvtHvEjmnQEwjJQ9B2K",
+        "signer_id": "commoncircle-light-lender.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/9eRRis9rGq1QFjYWdAr7E627HXvtHvEjmnQEwjJQ9B2K",
+        "snapshot": "evidence/snapshots/f0-refund.json"
+      },
+      "expected": {
+        "final_execution_status": "FINAL",
+        "status": "success",
+        "has_event": {
+          "loan_funding_failed": true
+        },
+        "refund_memo": true
+      }
+    },
+    {
+      "id": "f0-fund",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "network": "testnet",
+      "kind": "tx",
+      "reference": {
+        "tx_hash": "CyYFrPZW2P8iaWKKzFEa3e6wrYfsJJT8HDzzjtRnDxKn",
+        "signer_id": "commoncircle-light-lender.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/CyYFrPZW2P8iaWKKzFEa3e6wrYfsJJT8HDzzjtRnDxKn",
+        "snapshot": "evidence/snapshots/f0-fund.json"
+      },
+      "expected": {
+        "final_execution_status": "FINAL",
+        "status": "success",
+        "has_event": {
+          "loan_funded": true
+        }
+      }
+    },
+    {
+      "id": "f0-repay",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "network": "testnet",
+      "kind": "tx",
+      "reference": {
+        "tx_hash": "2d42VciE6yCvsXmZ4SPBkrGqnezaseEgv8eYHn8HJv1Q",
+        "signer_id": "commoncircle-light-borrower3.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/2d42VciE6yCvsXmZ4SPBkrGqnezaseEgv8eYHn8HJv1Q",
+        "snapshot": "evidence/snapshots/f0-repay.json"
+      },
+      "expected": {
+        "final_execution_status": "FINAL",
+        "status": "success",
+        "has_event": {
+          "loan_repaid": true
+        }
+      }
+    },
+    {
+      "id": "f0-storage-charged",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "network": "testnet",
+      "kind": "tx",
+      "reference": {
+        "tx_hash": "9bR1fvUPNYqvAgg18uuYhpiNSNt4akvcGygxVjuHAzr8",
+        "signer_id": "commoncircle-light-lender.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/9bR1fvUPNYqvAgg18uuYhpiNSNt4akvcGygxVjuHAzr8",
+        "snapshot": "evidence/snapshots/f0-storage-charged.json"
+      },
+      "expected": {
+        "final_execution_status": "FINAL",
+        "status": "success",
+        "storage_verdict": "deposit covers storage growth"
+      }
+    },
+    {
+      "id": "f0-low-gas-real-usdc",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "network": "testnet",
+      "kind": "tx",
+      "reference": {
+        "tx_hash": "DiMweYz7TbTGGVdraXFcjZm3y7352J2LBFPop3hsMuNj",
+        "signer_id": "commoncircle-light-lender.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/DiMweYz7TbTGGVdraXFcjZm3y7352J2LBFPop3hsMuNj",
+        "snapshot": "evidence/snapshots/f0-low-gas-real-usdc.json"
+      },
+      "expected": {
+        "final_execution_status": "FINAL",
+        "status": "success",
+        "error_codes": {
+          "E60_LOW_GAS": true
+        },
+        "refund_memo": true
+      }
+    },
+    {
+      "id": "f0-zero-balance",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "network": "testnet",
+      "kind": "view",
+      "reference": {
+        "account_id": "3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af",
+        "method": "ft_balance_of",
+        "args": {
+          "account_id": "commoncircle-light.testnet"
+        },
+        "snapshot": "evidence/snapshots/f0-zero-balance.json"
+      },
+      "expected": {
+        "result": "0"
+      }
+    },
+    {
+      "id": "f0-sandbox",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "network": "testnet",
+      "kind": "test",
+      "reference": {
+        "report": "evidence/reports/ci-43108982043-rust.json"
+      },
+      "expected": {
+        "tests": {
+          "readme_checks::fund_to_an_unregistered_borrower": "ok",
+          "sandbox_f0::f0_low_gas_fails_early_and_is_refunded": "ok",
+          "redteam::rt_contract_never_subsidises_storage": "ok"
+        }
+      }
+    },
+    {
+      "id": "f1-tier-flip",
+      "track": "NFTs That Do Something",
+      "feature": "Passport NFT written by repayments; gates credit",
+      "network": "testnet",
+      "kind": "tx",
+      "reference": {
+        "tx_hash": "2d42VciE6yCvsXmZ4SPBkrGqnezaseEgv8eYHn8HJv1Q",
+        "signer_id": "commoncircle-light-borrower3.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/2d42VciE6yCvsXmZ4SPBkrGqnezaseEgv8eYHn8HJv1Q",
+        "snapshot": "evidence/snapshots/f1-tier-flip.json"
+      },
+      "expected": {
+        "final_execution_status": "FINAL",
+        "status": "success",
+        "has_event": {
+          "tier_changed": true
+        }
+      }
+    },
+    {
+      "id": "f1-passport",
+      "track": "NFTs That Do Something",
+      "feature": "Passport NFT written by repayments; gates credit",
+      "network": "testnet",
+      "kind": "view",
+      "reference": {
+        "account_id": "commoncircle-light.testnet",
+        "method": "passport_for",
+        "args": {
+          "circle_id": "3",
+          "account_id": "commoncircle-light-borrower3.testnet"
+        },
+        "snapshot": "evidence/snapshots/f1-passport.json"
+      },
+      "expected": {
+        "result": {
+          "tier": "Trusted",
+          "effective_tier": "Trusted",
+          "status": "Active",
+          "steward": false
+        }
+      }
+    },
+    {
+      "id": "f1-card",
+      "track": "NFTs That Do Something",
+      "feature": "Passport NFT written by repayments; gates credit",
+      "network": "testnet",
+      "kind": "view",
+      "reference": {
+        "account_id": "commoncircle-light.testnet",
+        "method": "nft_token",
+        "args": {
+          "token_id": "3:commoncircle-light-borrower3.testnet"
+        },
+        "snapshot": "evidence/snapshots/f1-card.json"
+      },
+      "expected": {
+        "result": {
+          "owner_id": "commoncircle-light-borrower3.testnet",
+          "metadata": {
+            "title": "The Dogs (DEMO) Passport"
+          }
+        }
+      }
+    },
+    {
+      "id": "f1-gates",
+      "track": "NFTs That Do Something",
+      "feature": "Passport NFT written by repayments; gates credit",
+      "network": "testnet",
+      "kind": "test",
+      "reference": {
+        "report": "evidence/reports/ci-43108982043-rust.json"
+      },
+      "expected": {
+        "tests": {
+          "readme_checks::try_nft_transfer_on_a_passport": "ok",
+          "readme_checks::create_a_loan_naming_a_non_member": "ok"
+        }
+      }
+    },
+    {
+      "id": "f2-dao-by-hash-locked",
+      "track": "Social Money",
+      "feature": "Sputnik DAO treasury lends to Trusted members by proposal",
+      "network": "testnet",
+      "kind": "view",
+      "reference": {
+        "account_id": "dogs-dao.commoncircle-light.testnet",
+        "method": "view_account",
+        "args": {},
+        "snapshot": "evidence/snapshots/f2-dao-by-hash-locked.json"
+      },
+      "expected": {
+        "result": {
+          "global_contract_hash": "Ea8tHXFSQVszVwGASyzAfLq65DjcRDhkfab4FcPaRpgD",
+          "key_count": 0
+        }
+      }
+    },
+    {
+      "id": "f2-dao-council",
+      "track": "Social Money",
+      "feature": "Sputnik DAO treasury lends to Trusted members by proposal",
+      "network": "testnet",
+      "kind": "view",
+      "reference": {
+        "account_id": "dogs-dao.commoncircle-light.testnet",
+        "method": "get_policy",
+        "args": {},
+        "snapshot": "evidence/snapshots/f2-dao-council.json"
+      },
+      "expected": {
+        "result": {
+          "roles": [
+            {
+              "name": "stewards",
+              "kind": {
+                "Group": [
+                  "commoncircle-light-steward.testnet",
+                  "commoncircle-light-lender.testnet"
+                ]
+              }
+            }
+          ],
+          "default_vote_policy": {
+            "threshold": [
+              1,
+              2
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "f2-attach",
+      "track": "Social Money",
+      "feature": "Sputnik DAO treasury lends to Trusted members by proposal",
+      "network": "testnet",
+      "kind": "tx",
+      "reference": {
+        "tx_hash": "2zYZ7zxQw8S9w121k1hHvYjcG3vLaz68iipNv4M5iduR",
+        "signer_id": "commoncircle-light-lender.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/2zYZ7zxQw8S9w121k1hHvYjcG3vLaz68iipNv4M5iduR",
+        "snapshot": "evidence/snapshots/f2-attach.json"
+      },
+      "expected": {
+        "final_execution_status": "FINAL",
+        "status": "success",
+        "has_event": {
+          "dao_attached": true
+        }
+      }
+    },
+    {
+      "id": "f2-circle",
+      "track": "Social Money",
+      "feature": "Sputnik DAO treasury lends to Trusted members by proposal",
+      "network": "testnet",
+      "kind": "view",
+      "reference": {
+        "account_id": "commoncircle-light.testnet",
+        "method": "get_circle",
+        "args": {
+          "circle_id": "3"
+        },
+        "snapshot": "evidence/snapshots/f2-circle.json"
+      },
+      "expected": {
+        "result": {
+          "admin_id": "dogs-dao.commoncircle-light.testnet",
+          "treasury_id": "dogs-dao.commoncircle-light.testnet",
+          "dao_attached": true,
+          "steward_count": 2,
+          "treasury_lending_enabled": true
+        }
+      }
+    },
+    {
+      "id": "f2-steward-refused",
+      "track": "Social Money",
+      "feature": "Sputnik DAO treasury lends to Trusted members by proposal",
+      "network": "testnet",
+      "kind": "tx",
+      "reference": {
+        "tx_hash": "J7XZHt17De96uBniiMWwHdzoA8tSc2X7cDJ8PxdRmuMd",
+        "signer_id": "commoncircle-light-lender.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/J7XZHt17De96uBniiMWwHdzoA8tSc2X7cDJ8PxdRmuMd",
+        "snapshot": "evidence/snapshots/f2-steward-refused.json"
+      },
+      "expected": {
+        "final_execution_status": "FINAL",
+        "status": "failure",
+        "error_codes": {
+          "E19_TREASURY_RULES": true
+        }
+      }
+    },
+    {
+      "id": "f2-proposal-funds-loan",
+      "track": "Social Money",
+      "feature": "Sputnik DAO treasury lends to Trusted members by proposal",
+      "network": "testnet",
+      "kind": "tx",
+      "reference": {
+        "tx_hash": "3dYZEiVpvXFGRPjte9TvCFsKPhPstqJTS4th8Cv8je1r",
+        "signer_id": "commoncircle-light-steward.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/3dYZEiVpvXFGRPjte9TvCFsKPhPstqJTS4th8Cv8je1r",
+        "snapshot": "evidence/snapshots/f2-proposal-funds-loan.json"
+      },
+      "expected": {
+        "final_execution_status": "FINAL",
+        "status": "success",
+        "has_event": {
+          "loan_funded": true
+        }
+      }
+    },
+    {
+      "id": "f2-proposal",
+      "track": "Social Money",
+      "feature": "Sputnik DAO treasury lends to Trusted members by proposal",
+      "network": "testnet",
+      "kind": "view",
+      "reference": {
+        "account_id": "dogs-dao.commoncircle-light.testnet",
+        "method": "get_proposal",
+        "args": {
+          "id": 3
+        },
+        "snapshot": "evidence/snapshots/f2-proposal.json"
+      },
+      "expected": {
+        "result": {
+          "proposer": "commoncircle-light-borrower3.testnet",
+          "status": "Approved",
+          "kind": {
+            "Transfer": {
+              "receiver_id": "commoncircle-light.testnet",
+              "amount": "1000000"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "f2-treasury-repaid",
+      "track": "Social Money",
+      "feature": "Sputnik DAO treasury lends to Trusted members by proposal",
+      "network": "testnet",
+      "kind": "tx",
+      "reference": {
+        "tx_hash": "BtakkTRfz1iEgJEHoz4YRG39K4PBrJVMfKwzG1C3xC5r",
+        "signer_id": "commoncircle-light-borrower3.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/BtakkTRfz1iEgJEHoz4YRG39K4PBrJVMfKwzG1C3xC5r",
+        "snapshot": "evidence/snapshots/f2-treasury-repaid.json"
+      },
+      "expected": {
+        "final_execution_status": "FINAL",
+        "status": "success",
+        "has_event": {
+          "loan_repaid": true
+        }
+      }
+    },
+    {
+      "id": "f2-treasury-loan",
+      "track": "Social Money",
+      "feature": "Sputnik DAO treasury lends to Trusted members by proposal",
+      "network": "testnet",
+      "kind": "view",
+      "reference": {
+        "account_id": "commoncircle-light.testnet",
+        "method": "get_loan",
+        "args": {
+          "loan_id": "6"
+        },
+        "snapshot": "evidence/snapshots/f2-treasury-loan.json"
+      },
+      "expected": {
+        "result": {
+          "lender_id": "dogs-dao.commoncircle-light.testnet",
+          "funded_via": "Treasury",
+          "state": "Repaid",
+          "repaid_on_time": true
+        }
+      }
+    },
+    {
+      "id": "f2-approved-but-not-trusted",
+      "track": "Social Money",
+      "feature": "Sputnik DAO treasury lends to Trusted members by proposal",
+      "network": "testnet",
+      "kind": "tx",
+      "reference": {
+        "tx_hash": "AmBADVeLJJqM66KSP1eRjGhqH8cHQD5zRNz5WPv3qpvQ",
+        "signer_id": "commoncircle-light-steward.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/AmBADVeLJJqM66KSP1eRjGhqH8cHQD5zRNz5WPv3qpvQ",
+        "snapshot": "evidence/snapshots/f2-approved-but-not-trusted.json"
+      },
+      "expected": {
+        "final_execution_status": "FINAL",
+        "status": "success",
+        "error_codes": {
+          "E19_TREASURY_RULES": true
+        },
+        "refund_memo": true
+      }
+    },
+    {
+      "id": "f2-dao-clears-flag",
+      "track": "Social Money",
+      "feature": "Sputnik DAO treasury lends to Trusted members by proposal",
+      "network": "testnet",
+      "kind": "tx",
+      "reference": {
+        "tx_hash": "43mAx3pTTjTDFDVfpZrGBVwfDSJZHZ12xoUDuA3HVtTk",
+        "signer_id": "commoncircle-light-steward.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/43mAx3pTTjTDFDVfpZrGBVwfDSJZHZ12xoUDuA3HVtTk",
+        "snapshot": "evidence/snapshots/f2-dao-clears-flag.json"
+      },
+      "expected": {
+        "final_execution_status": "FINAL",
+        "status": "success",
+        "has_event": {
+          "flag_cleared": true
+        }
+      }
+    },
+    {
+      "id": "f2-sandbox",
+      "track": "Social Money",
+      "feature": "Sputnik DAO treasury lends to Trusted members by proposal",
+      "network": "testnet",
+      "kind": "test",
+      "reference": {
+        "report": "evidence/reports/ci-43108982043-rust.json"
+      },
+      "expected": {
+        "tests": {
+          "sandbox_sputnik::sputnik_function_call_proposal_funds_a_treasury_loan": "ok",
+          "sandbox_sputnik::sputnik_transfer_with_msg_funds_or_leaves_the_treasury_whole": "ok",
+          "readme_checks::treasury_loan_for_a_steward_or_with_fewer_than_two_stewards": "ok",
+          "redteam::rt_dao_cannot_take_a_passport_or_count_as_steward": "ok"
+        }
+      }
+    }
+  ]
 }

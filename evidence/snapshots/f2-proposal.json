@@ -1,0 +1,48 @@
+{
+  "network": "testnet",
+  "account_id": "dogs-dao.commoncircle-light.testnet",
+  "method": "get_proposal",
+  "args": {
+    "id": 3
+  },
+  "block_height": 277345986,
+  "result": {
+    "id": 3,
+    "proposer": "commoncircle-light-borrower3.testnet",
+    "description": "CommonCircle treasury loan 6: 1 USDC to commoncircle-light-borrower3.testnet (Trusted, not a steward)",
+    "kind": {
+      "Transfer": {
+        "token_id": "3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af",
+        "receiver_id": "commoncircle-light.testnet",
+        "amount": "1000000",
+        "msg": "{\"action\":\"fund\",\"loan_id\":\"6\"}"
+      }
+    },
+    "status": "Approved",
+    "vote_counts": {
+      "stewards": [
+        "2",
+        "0",
+        "0"
+      ]
+    },
+    "votes": {
+      "commoncircle-light-steward.testnet": "Approve",
+      "commoncircle-light-lender.testnet": "Approve"
+    },
+    "submission_time": "1794476222047612718",
+    "last_actions_log": [
+      {
+        "block_height": "277345229"
+      },
+      {
+        "block_height": "277345249"
+      },
+      {
+        "block_height": "277345262"
+      }
+    ]
+  },
+  "rpc": "https://test.rpc.fastnear.com",
+  "read_at": "2026-11-12T09:44:32.009Z"
+}

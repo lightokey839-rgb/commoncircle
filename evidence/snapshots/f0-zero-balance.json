@@ -1,0 +1,12 @@
+{
+  "network": "testnet",
+  "account_id": "3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af",
+  "method": "ft_balance_of",
+  "args": {
+    "account_id": "commoncircle-light.testnet"
+  },
+  "block_height": 277345939,
+  "result": "0",
+  "rpc": "https://test.rpc.fastnear.com",
+  "read_at": "2026-11-12T09:44:06.548Z"
+}

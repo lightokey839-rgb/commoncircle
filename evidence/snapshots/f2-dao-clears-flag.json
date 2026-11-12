@@ -1,0 +1,65 @@
+{
+  "network": "testnet",
+  "tx_hash": "43mAx3pTTjTDFDVfpZrGBVwfDSJZHZ12xoUDuA3HVtTk",
+  "signer_id": "commoncircle-light-steward.testnet",
+  "receiver_id": "dogs-dao.commoncircle-light.testnet",
+  "final_execution_status": "FINAL",
+  "status": "success",
+  "error": null,
+  "attached_deposit": "0",
+  "refunded_to_signer": "0",
+  "storage_kept": "0",
+  "storage_growth": null,
+  "storage_verdict": null,
+  "has_event": {
+    "flag_cleared": true
+  },
+  "error_codes": {},
+  "refund_memo": false,
+  "gas_at_tgas": {
+    "act_proposal": 300,
+    "clear_flag": 30,
+    "on_proposal_callback": 266.04
+  },
+  "function_calls": [
+    {
+      "receiver": "dogs-dao.commoncircle-light.testnet",
+      "predecessor": "commoncircle-light-steward.testnet",
+      "method": "act_proposal",
+      "gas_tgas": 300,
+      "ok": true
+    },
+    {
+      "receiver": "commoncircle-light.testnet",
+      "predecessor": "dogs-dao.commoncircle-light.testnet",
+      "method": "clear_flag",
+      "gas_tgas": 30,
+      "ok": true
+    },
+    {
+      "receiver": "dogs-dao.commoncircle-light.testnet",
+      "predecessor": "dogs-dao.commoncircle-light.testnet",
+      "method": "on_proposal_callback",
+      "gas_tgas": 266.04,
+      "ok": true
+    }
+  ],
+  "receipt_failures": [],
+  "events": [
+    {
+      "standard": "commoncircle",
+      "version": "1.0.0",
+      "event": "flag_cleared",
+      "data": [
+        {
+          "loan_id": "4",
+          "circle_id": "3",
+          "borrower_id": "commoncircle-light-borrower3.testnet",
+          "late_count_reduced": true
+        }
+      ]
+    }
+  ],
+  "rpc": "https://test.rpc.fastnear.com",
+  "read_at": "2026-11-12T09:44:47.160Z"
+}

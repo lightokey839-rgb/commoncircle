@@ -1,0 +1,48 @@
+{
+  "network": "testnet",
+  "tx_hash": "2zYZ7zxQw8S9w121k1hHvYjcG3vLaz68iipNv4M5iduR",
+  "signer_id": "commoncircle-light-lender.testnet",
+  "receiver_id": "commoncircle-light.testnet",
+  "final_execution_status": "FINAL",
+  "status": "success",
+  "error": null,
+  "attached_deposit": "1",
+  "refunded_to_signer": "0",
+  "storage_kept": "1",
+  "storage_growth": null,
+  "storage_verdict": null,
+  "has_event": {
+    "dao_attached": true
+  },
+  "error_codes": {},
+  "refund_memo": false,
+  "gas_at_tgas": {
+    "attach_dao": 30
+  },
+  "function_calls": [
+    {
+      "receiver": "commoncircle-light.testnet",
+      "predecessor": "commoncircle-light-lender.testnet",
+      "method": "attach_dao",
+      "gas_tgas": 30,
+      "ok": true
+    }
+  ],
+  "receipt_failures": [],
+  "events": [
+    {
+      "standard": "commoncircle",
+      "version": "1.0.0",
+      "event": "dao_attached",
+      "data": [
+        {
+          "circle_id": "3",
+          "dao_id": "dogs-dao.commoncircle-light.testnet",
+          "previous_admin_id": "commoncircle-light-lender.testnet"
+        }
+      ]
+    }
+  ],
+  "rpc": "https://test.rpc.fastnear.com",
+  "read_at": "2026-11-12T09:44:16.784Z"
+}

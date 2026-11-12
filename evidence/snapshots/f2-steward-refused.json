@@ -1,0 +1,45 @@
+{
+  "network": "testnet",
+  "tx_hash": "J7XZHt17De96uBniiMWwHdzoA8tSc2X7cDJ8PxdRmuMd",
+  "signer_id": "commoncircle-light-lender.testnet",
+  "receiver_id": "commoncircle-light.testnet",
+  "final_execution_status": "FINAL",
+  "status": "failure",
+  "error": "E19_TREASURY_RULES: treasury loans need a Trusted, non-steward borrower and at least 2 stewards",
+  "attached_deposit": "14560000000000000000000",
+  "refunded_to_signer": "0",
+  "storage_kept": "14560000000000000000000",
+  "storage_growth": {
+    "account": "commoncircle-light.testnet",
+    "bytes": 0,
+    "cost_yocto": "0",
+    "note": "other txs in the same blocks would also count"
+  },
+  "storage_verdict": "deposit covers storage growth",
+  "has_event": {},
+  "error_codes": {
+    "E19_TREASURY_RULES": true
+  },
+  "refund_memo": false,
+  "gas_at_tgas": {
+    "create_loan": 150
+  },
+  "function_calls": [
+    {
+      "receiver": "commoncircle-light.testnet",
+      "predecessor": "commoncircle-light-lender.testnet",
+      "method": "create_loan",
+      "gas_tgas": 150,
+      "ok": false
+    }
+  ],
+  "receipt_failures": [
+    {
+      "receiver": "commoncircle-light.testnet",
+      "error": "E19_TREASURY_RULES: treasury loans need a Trusted, non-steward borrower and at least 2 stewards"
+    }
+  ],
+  "events": [],
+  "rpc": "https://test.rpc.fastnear.com",
+  "read_at": "2026-11-12T09:44:27.329Z"
+}

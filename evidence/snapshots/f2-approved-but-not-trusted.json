@@ -1,0 +1,111 @@
+{
+  "network": "testnet",
+  "tx_hash": "AmBADVeLJJqM66KSP1eRjGhqH8cHQD5zRNz5WPv3qpvQ",
+  "signer_id": "commoncircle-light-steward.testnet",
+  "receiver_id": "dogs-dao.commoncircle-light.testnet",
+  "final_execution_status": "FINAL",
+  "status": "success",
+  "error": null,
+  "attached_deposit": "0",
+  "refunded_to_signer": "0",
+  "storage_kept": "0",
+  "storage_growth": null,
+  "storage_verdict": null,
+  "has_event": {
+    "ft_transfer": true,
+    "transfer_refunded": true
+  },
+  "error_codes": {
+    "E19_TREASURY_RULES": true
+  },
+  "refund_memo": true,
+  "gas_at_tgas": {
+    "act_proposal": 300,
+    "ft_transfer_call": 148.01,
+    "ft_on_transfer": 128.49,
+    "ft_resolve_transfer": 15.48,
+    "on_proposal_callback": 148.01
+  },
+  "function_calls": [
+    {
+      "receiver": "dogs-dao.commoncircle-light.testnet",
+      "predecessor": "commoncircle-light-steward.testnet",
+      "method": "act_proposal",
+      "gas_tgas": 300,
+      "ok": true
+    },
+    {
+      "receiver": "3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af",
+      "predecessor": "dogs-dao.commoncircle-light.testnet",
+      "method": "ft_transfer_call",
+      "gas_tgas": 148.01,
+      "ok": true
+    },
+    {
+      "receiver": "commoncircle-light.testnet",
+      "predecessor": "3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af",
+      "method": "ft_on_transfer",
+      "gas_tgas": 128.49,
+      "ok": true
+    },
+    {
+      "receiver": "3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af",
+      "predecessor": "3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af",
+      "method": "ft_resolve_transfer",
+      "gas_tgas": 15.48,
+      "ok": true
+    },
+    {
+      "receiver": "dogs-dao.commoncircle-light.testnet",
+      "predecessor": "dogs-dao.commoncircle-light.testnet",
+      "method": "on_proposal_callback",
+      "gas_tgas": 148.01,
+      "ok": true
+    }
+  ],
+  "receipt_failures": [],
+  "events": [
+    {
+      "standard": "nep141",
+      "version": "1.0.0",
+      "event": "ft_transfer",
+      "data": [
+        {
+          "old_owner_id": "dogs-dao.commoncircle-light.testnet",
+          "new_owner_id": "commoncircle-light.testnet",
+          "amount": "1000000",
+          "memo": "CommonCircle treasury loan 5: 1 USDC to commoncircle-light-borrower3.testnet (Trusted, not a steward)"
+        }
+      ]
+    },
+    {
+      "standard": "commoncircle",
+      "version": "1.0.0",
+      "event": "transfer_refunded",
+      "data": [
+        {
+          "token_id": "3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af",
+          "sender_id": "dogs-dao.commoncircle-light.testnet",
+          "amount": "1000000",
+          "reason": "E19_TREASURY_RULES",
+          "loan_id": "5"
+        }
+      ]
+    },
+    {
+      "standard": "nep141",
+      "version": "1.0.0",
+      "event": "ft_transfer",
+      "data": [
+        {
+          "old_owner_id": "commoncircle-light.testnet",
+          "new_owner_id": "dogs-dao.commoncircle-light.testnet",
+          "amount": "1000000",
+          "memo": "refund"
+        }
+      ]
+    }
+  ],
+  "rpc": "https://test.rpc.fastnear.com",
+  "read_at": "2026-11-12T09:44:43.935Z"
+}

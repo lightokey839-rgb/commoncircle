@@ -1,0 +1,48 @@
+{
+  "network": "testnet",
+  "account_id": "commoncircle-light.testnet",
+  "method": "get_circle",
+  "args": {
+    "circle_id": "3"
+  },
+  "block_height": 277345961,
+  "result": {
+    "circle_id": "3",
+    "name": "The Dogs (DEMO)",
+    "founder_id": "commoncircle-light-lender.testnet",
+    "admin_id": "dogs-dao.commoncircle-light.testnet",
+    "treasury_id": "dogs-dao.commoncircle-light.testnet",
+    "dao_attached": true,
+    "created_at": "1794416200957896079",
+    "params": {
+      "min_amount": "1000000",
+      "member_max_amount": "10000000",
+      "trusted_max_amount": "20000000",
+      "max_duration_days": 7,
+      "day_length_sec": "60",
+      "funding_window_sec": "3600",
+      "qualifying_min_amount": "1000000",
+      "qualifying_min_days": 1,
+      "trusted_threshold": 1,
+      "min_distinct_lenders": 1,
+      "recovery_lock_sec": "0",
+      "writeoff_grace_sec": "600"
+    },
+    "member_count": 3,
+    "steward_count": 2,
+    "loan_count": 5,
+    "treasury_lending_enabled": true,
+    "theme": {
+      "tagline": "Good dogs pay back",
+      "background": "#2B2D42",
+      "accent": "#FFB703",
+      "text": "#FFFFFF",
+      "pattern": "Waves",
+      "emblem_mime": "image/png",
+      "emblem_bytes": 2676,
+      "custom": true
+    }
+  },
+  "rpc": "https://test.rpc.fastnear.com",
+  "read_at": "2026-11-12T09:44:19.153Z"
+}

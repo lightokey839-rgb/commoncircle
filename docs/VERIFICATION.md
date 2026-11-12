@@ -22,7 +22,9 @@ the history is honest. The current state is:
 | Card art in wallets | PASS: MyNearWallet and Meteor | "Interface 1.1.0" |
 | Both USDC ids | PASS (USDC, 6 decimals) | "USDC verification output" |
 | Red-team findings | see `docs/REDTEAM_GATE1.md`; the storage-charging fix (D-009, interface 1.1.1) is **deployed** | "Gate 1 red team and D-009", "Interface 1.1.1 on testnet" |
-| Still UNVERIFIED | NEP-366 relayer onboarding, Sputnik DAO proposal funding, event indexer, NEP-413 phone sign-in, any mainnet transaction | Gate 2 and later |
+| Sputnik DAO treasury loans on testnet | PASS: DAO by global hash, keys deleted, proposals funded and refused loans, flag cleared by vote | "Gate 2: Sputnik DAO treasury on testnet" |
+| Tier A evidence (`npm run claims`) | PASS 25/25; Open Innovation, NFTs That Do Something, Social Money all PASS | "Tier A evidence rows" |
+| Still UNVERIFIED | NEP-366 relayer onboarding, event indexer, NEP-413 phone sign-in, web wallet flows, any mainnet transaction | Gate 2 web lane and later |
 
 Superseded rows below: "Annotated baseline tag in original checkout" (the tag
 is pushed to the private remote), "Toolchain pins and lockfiles", "Circle
@@ -346,6 +348,25 @@ transaction back over FastNEAR with `near-tx.mjs` and views.
 | **A Transfer-with-msg proposal funds a treasury loan** | PASS | loan 4 by `borrower3` (Trusted, not a steward) `Bs65Bi7ZBaki8RGZiPKQ3XRA8TztgZ4jVCAQ1ZpvfaC6`; proposal 0 filed by the borrower `6g4WarjaaiKC8MLrHBDC1mXSeB6AKfCitN9i2ovmG9vK`; votes `2rXRsRM6TBoZmjbvBkeMjosrPSLsR91GTqfZUiA7uQdG` and `Gmm9nWXrfBsQunBzxP7emKK5whgfu5s5EPuh58aBTfvg`. Executing vote: Sputnik's `ft_transfer_call` got **148.02 Tgas**, the circle's `ft_on_transfer` got **128.5 Tgas** (minimum 70), `loan_funding_started` `funded_via: Treasury`, `ft_transfer` 1 USDC to the borrower, `loan_funded`, proposal `Approved` (votes 2/0/0), bond 0.1 NEAR returned. So the Transfer form works with real USDC; the FunctionCall fallback is not needed |
 | An approved proposal is still refused when the borrower is no longer Trusted | PASS | loan 5 `5PCGmtrNJ6iSTD55ewqK1iSoPH7wAuSvWJRBpqUgLUcM`, proposal 1 `8ZuMVqPPnQ64iS4DoFADtS74ySr84TuDqkosw3obw4PH`, executing vote `AmBADVeLJJqM66KSP1eRjGhqH8cHQD5zRNz5WPv3qpvQ`: `ft_on_transfer` got 128.49 Tgas, `transfer_refunded` reason `E19_TREASURY_RULES`, USDC `ft_transfer` memo `refund` back to the DAO. Cause: loan 4 had become overdue (see below), so the borrower's effective tier was Member |
 | Script fault found | fixed | DEMO circle "days" are 60 s, so the 1-day loan 4 was due 60 s after funding and went overdue (`perks_paused: true`, effective tier Member), which also refused loan 6 at `create_loan` (`HDcRsXYN64Vej4sNnV1ExpsjNHjdRDxG7Y2BgXpN9q2e`, E19). `testnet-dao.sh` now defaults treasury loans to 7 demo days and adds `repay <id>` and `clearflag <id>` (the DAO forgives a flag by proposal) |
+
+### Recovery, clean cycle and F-16 (2026-11-12 ~09:50 UTC)
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Late treasury loan repaid to the DAO | PASS | `G5DC1pWSm6iHuSaw7gCFGqCpmim8cCKdy6HuaFUYojkQ`: `loan_repaid` loan 4, `on_time: false`, 1 USDC to the DAO; DAO 2 USDC |
+| **The DAO forgives the flag by proposal (F-09 path)** | PASS | proposal 2 (FunctionCall `clear_flag`), filed `3Ninu5qMsq1hY2oGQpSL5wErHSsGZ4YyaDHRxdjQs8V4`, votes `3odZxHojv5DYebNGGYyQtcsixFg7AJ7ehHV6SS2x2Lg9` and `43mAx3pTTjTDFDVfpZrGBVwfDSJZHZ12xoUDuA3HVtTk` (the second executes: `clear_flag` with 30 Tgas, `flag_cleared`, `late_count_reduced: true`); proposal `Approved` 2/0/0. Passport: Trusted, effective Trusted, late 0, perks restored |
+| **Clean treasury cycle** | PASS | loan 6 (7 demo days) `6UEXS9hPFDY6aTWQmvkouTQ4xro87ZFAB6jfpcW5FfsM`; proposal 3 (Transfer with msg) by the borrower `AcCktkEDZa9rKRR2mmSp8VjNRAeeMDXpTwxQpKjtWkT1`; votes `9RdVFqRvX3MAziHv9cNFjfGgVV6QT2swwecobFAZpNdW` and `3dYZEiVpvXFGRPjte9TvCFsKPhPstqJTS4th8Cv8je1r` (Sputnik `ft_transfer_call` 147.98 Tgas, circle `ft_on_transfer` 128.46 Tgas, `loan_funded` via Treasury); repay `BtakkTRfz1iEgJEHoz4YRG39K4PBrJVMfKwzG1C3xC5r` (`loan_repaid`, on time, qualifying). Loan 6 `Repaid`; DAO back to 2 USDC; circle 0 |
+| **F-16: low gas against real USDC** | PASS | loan 7 `9Stvpg5NYWGqSh5evXfAfQ6Tg7gxtRp36GhXB8VDvV5k`; fund with 40 Tgas `DiMweYz7TbTGGVdraXFcjZm3y7352J2LBFPop3hsMuNj`: the circle's `ft_on_transfer` received 20.5 Tgas and failed `E60_LOW_GAS`; USDC `ft_transfer` memo `refund`; lender 18,000,000 before and after; loan 7 still `Open`; circle 0. F-16 moves from SUSPECTED to CONFIRMED safe |
+| End state | PASS | `check-testnet.mjs` ALL CHECKS PASS; DAO keys `[]`, DAO 2 USDC; lender 18 USDC (2 seeded into the DAO) |
+
+### Tier A evidence rows
+
+`evidence/evidence.json` now has 25 rows (Open Innovation 9, NFTs That Do
+Something 4, Social Money 12), written by `contracts/scripts/build-evidence.mjs`,
+which re-reads every tx and view from FastNEAR into `evidence/snapshots/`. Test
+rows cite `evidence/reports/ci-43108982043-rust.json` (parsed from that run's log).
+`npm run claims`: 25/25 PASS, all three tracks PASS; `npm run claims:test` passes
+(a wrong hash is still rejected).
 
 ## Incident: testnet secret key exposed in chat (2026-11-11)
 

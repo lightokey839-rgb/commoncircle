@@ -47,6 +47,13 @@ events, storage paid against storage used):
 node contracts/scripts/near-tx.mjs <tx_hash> <signer_account_id>
 ```
 
+To re-check every claim against the chain (25 rows across the three tracks),
+re-read each transaction and view into `evidence/snapshots/`, then compare:
+
+```bash
+node contracts/scripts/build-evidence.mjs && npm run claims
+```
+
 A hosted read-only web demo is in progress. Locally:
 `npm ci && npm run dev`, then open `http://localhost:5173/web/index.html`.
 
@@ -55,7 +62,8 @@ A hosted read-only web demo is in progress. Locally:
 Each row links a testnet transaction or a test that CI runs on every push
 (workflow "CommonCircle Gate 1"). Rows marked *not yet* are not claimed.
 
-Testnet rows come from the interface 1.1.1 proof run (circle 3, "The Dogs (DEMO)").
+Testnet rows come from interface 1.1.1, circle 3 "The Dogs (DEMO)", whose
+admin and treasury is a Sputnik DAO.
 
 | Do | See | Proof |
 | --- | --- | --- |
@@ -66,13 +74,17 @@ Testnet rows come from the interface 1.1.1 proof run (circle 3, "The Dogs (DEMO)
 | Create a loan naming a non-member | Rejected (`E11_LENDER_NO_PASSPORT`; a borrower without a passport gets `E10`) | sandbox `create_a_loan_naming_a_non_member` |
 | Fund a loan from an account that is not the named lender | Refunded | sandbox `fund_a_loan_from_an_account_that_is_not_the_named_lender` |
 | Send a different token to the contract | Refunded | sandbox `send_a_different_token_to_the_contract` |
-| Fund with too little gas | Refused early and refunded | sandbox `f0_low_gas_fails_early_and_is_refunded`; testnet run with real USDC *not yet* |
+| Fund with too little gas | Refused early and refunded | testnet with real USDC [`DiMweYz7…MuNj`](https://testnet.nearblocks.io/txns/DiMweYz7TbTGGVdraXFcjZm3y7352J2LBFPop3hsMuNj): 40 Tgas attached, the circle received 20.5 Tgas and refused (`E60_LOW_GAS`), memo `refund`, lender balance unchanged; sandbox `f0_low_gas_fails_early_and_is_refunded` |
 | Let a loan pass its due date | Overdue flag, Trusted perks paused | sandbox `let_a_loan_pass_its_due_date` |
 | Try `nft_transfer` on a passport | Fails (`E40_NON_TRANSFERABLE`) | sandbox `try_nft_transfer_on_a_passport` |
 | Redeem an invite twice, or as the wrong account | Rejected | sandbox `redeem_an_invite_twice_or_with_the_wrong_account_for_a_named_invite`; red-team `rt_invite_signature_cannot_be_replayed_by_another_account` |
-| Treasury loan for a steward, or with fewer than 2 stewards | Rejected (`E19_TREASURY_RULES`) | sandbox `treasury_loan_for_a_steward_or_with_fewer_than_two_stewards`, `sputnik_function_call_proposal_funds_a_treasury_loan` |
+| A Sputnik DAO proposal funds a loan to a Trusted member | The member files the request; both stewards approve; the DAO pays the borrower through the circle in the same transaction | testnet: DAO [`dogs-dao.commoncircle-light.testnet`](https://testnet.nearblocks.io/address/dogs-dao.commoncircle-light.testnet), proposal 3, executing vote [`3dYZEiVp…je1r`](https://testnet.nearblocks.io/txns/3dYZEiVpvXFGRPjte9TvCFsKPhPstqJTS4th8Cv8je1r): `loan_funded`, `funded_via: Treasury`; the circle received 128.5 Tgas; sandbox `sputnik_function_call_proposal_funds_a_treasury_loan` |
+| Repay a treasury loan | The money goes back to the DAO | testnet [`BtakkTRf…xC5r`](https://testnet.nearblocks.io/txns/BtakkTRfz1iEgJEHoz4YRG39K4PBrJVMfKwzG1C3xC5r): loan 6 `Repaid` on time; DAO back to 2 USDC |
+| The DAO cannot be bypassed | It runs the fixed Sputnik code (global hash `Ea8tHX…RpgD`) and nobody holds a key to it | `node contracts/scripts/near-view.mjs dogs-dao.commoncircle-light.testnet view_account` → `global_contract_hash`, `key_count: 0` (keys deleted in [`6nXfe4gr…b4TM`](https://testnet.nearblocks.io/txns/6nXfe4grVpHEhAHwe35hMrmDPoc13PNFmnoCXE8Ub6Qc)) |
+| Treasury loan for a steward, or with fewer than 2 stewards | Rejected (`E19_TREASURY_RULES`) | testnet [`J7XZHt17…uMd`](https://testnet.nearblocks.io/txns/J7XZHt17De96uBniiMWwHdzoA8tSc2X7cDJ8PxdRmuMd) (a steward asks: refused); sandbox `treasury_loan_for_a_steward_or_with_fewer_than_two_stewards` |
+| Approve a treasury loan for a member who has since gone overdue | The vote passes, but the circle refuses the money and returns it to the DAO | testnet [`AmBADVeL…v3qpvQ`](https://testnet.nearblocks.io/txns/AmBADVeLJJqM66KSP1eRjGhqH8cHQD5zRNz5WPv3qpvQ): `transfer_refunded` reason `E19_TREASURY_RULES`, memo `refund` |
+| The stewards forgive a late flag | The DAO clears it by proposal; the late count drops | testnet [`43mAx3pT…VtTk`](https://testnet.nearblocks.io/txns/43mAx3pTTjTDFDVfpZrGBVwfDSJZHZ12xoUDuA3HVtTk): `flag_cleared`, `late_count_reduced: true` |
 | The DAO account tries to take a passport and count as a steward | Rejected (`E37_TREASURY_NO_PASSPORT`) | red-team `rt_dao_cannot_take_a_passport_or_count_as_steward` |
-| A Sputnik DAO proposal funds a loan to a Trusted member | The DAO pays the borrower through the circle; repayment returns to the DAO | sandbox `sputnik_function_call_proposal_funds_a_treasury_loan` (the exact Sputnik code testnet serves by global hash); testnet *not yet* |
 | Ask the relayer to sponsor a call outside the allowlist | Refused | *not yet* (relayer unit tests only) |
 | Join with an account that never bought NEAR | Joining and first repayment work | *not yet* |
 | List the access keys on the contract account | Empty | *not yet*: done last, at ship |
@@ -124,7 +136,9 @@ its rows in [`evidence/evidence.json`](evidence/evidence.json).
 <!-- Generated by `npm run claims`; do not edit this table manually. -->
 | Track | Feature | Evidence status |
 | --- | --- | --- |
-| _No verified tracks yet_ | — | UNVERIFIED |
+| Open Innovation | Loans that never rest in the contract; every failure refunds | PASS |
+| NFTs That Do Something | Passport NFT written by repayments; gates credit | PASS |
+| Social Money | Sputnik DAO treasury lends to Trusted members by proposal | PASS |
 <!-- COMMONCIRCLE_TRACK_TABLE_END -->
 
 ## How this differs from pot-rotation circles
@@ -147,9 +161,11 @@ its rows in [`evidence/evidence.json`](evidence/evidence.json).
   contract does not check that this account really is a DAO. A check in the
   web app (compare the account's code hash with Sputnik's and warn if they
   differ) is planned but not built yet. Until then, check it yourself with
-  `view_account`.
+  `view_account`. The demo DAO passes that check: it runs Sputnik by global
+  hash and has no access keys.
 - **Two stewards means two accounts.** Treasury lending needs two steward
-  passports, but those could belong to one person.
+  passports, but those could belong to one person. In the testnet demo they
+  do: the builder controls every demo account (founder, steward, borrowers).
 - **Reputation is local, and a colluding circle can farm it.** It records
   repayments between members of one circle and never leaves that circle. Demo
   circles need one loan to reach Trusted; the defaults are 3 qualifying loans

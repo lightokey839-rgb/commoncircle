@@ -17,13 +17,20 @@ Ship Sat 14 Nov 17:59. This replaces amendment A11's Gate 2/3 times.
 - **README rewritten (F-02):** status box, keyless check
   (`node contracts/scripts/check-testnet.mjs`), "do X, see Y" with tx links,
   trust assumptions, pot-rotation comparison. Rows not yet proven say *not yet*.
-- **Social Money prep:** Sputnik `sputnikdao2` exists on testnet as a global
-  contract **by hash** `Ea8tHXFSQVszVwGASyzAfLq65DjcRDhkfab4FcPaRpgD`, so the
-  DAO deploys without the 6 NEAR factory deposit. Sandbox test
-  `tests/sandbox_sputnik.rs` runs that exact code; `contracts/scripts/testnet-dao.sh`
-  runs the flow on testnet (builder signs). Not yet run on testnet.
-- Still open: Tier A rows in `evidence/evidence.json`; F-16 low-gas on real
-  USDC (`testnet-dao.sh lowgas`); web lane F-03 to F-06 and F-04 relayer test.
+- **Social Money DONE on testnet (2026-11-12):** DAO
+  `dogs-dao.commoncircle-light.testnet` runs Sputnik by global hash
+  `Ea8tHXFSQVszVwGASyzAfLq65DjcRDhkfab4FcPaRpgD`, has no keys, and is circle 3's
+  admin and treasury. A member's Transfer-with-msg proposal, approved by both
+  stewards, funded treasury loan 6, which was repaid on time to the DAO. A
+  steward's own request was refused (E19); an approved loan for a member who had
+  gone overdue was refused and refunded; the DAO cleared a late flag by vote.
+  Sandbox `tests/sandbox_sputnik.rs` 2/2.
+- **F-16 confirmed on real USDC:** 40 Tgas → the circle got 20.5 Tgas → `E60_LOW_GAS`, refunded.
+- **Tier A evidence: `npm run claims` 25/25 PASS, all three tracks PASS.**
+  Re-check online: `node contracts/scripts/build-evidence.mjs && npm run claims`.
+- **Gate 2 contracts lane: complete.** Still open for Gate 2 (web lane):
+  F-04 relayer test, F-03 wallet + root app + hosted demo, F-05 claims online
+  mode in CI, F-06 DAO hash check, sign-in, chat gate, request-to-fund, card.
 
 ## Red team after Gate 1 (2026-11-11 ~18:45 UTC): one Critical bug found, fixed (deployed later, see above)
 
