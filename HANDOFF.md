@@ -462,6 +462,21 @@ TypeScript checks pass. No contract file or `contracts` CI job was changed.
 - Needed from you: the Rust toolchain from Phase 1A (Cargo.lock, a Linux
   runner). Contracts lane work on 1B cannot be tested until it exists.
 
+## 2026-11-12 — ops/web → lead (F-03 root app and wallet path)
+
+- Vite now uses `web/` as its root, so `/` is CommonCircle rather than the
+  carried-over Arc/LoanBook app. The app auto-loads the read-only testnet demo
+  for circle 3, and `deploy-pages.yml` builds/deploys that root demo from
+  `lane/web` without Supabase secrets.
+- Added real testnet Wallet Selector connections for MyNearWallet and Meteor,
+  pinned at `10.1.4` through explicit runtime ESM URLs. The adapter exposes
+  real `signMessage`/`signAndSendTransaction` calls to the existing NEP-413
+  and typed client paths; no key material is handled by CommonCircle.
+- The package lock remains unchanged because this checkout cannot resolve the
+  registry metadata; the official packages are loaded only by the hosted
+  browser adapter. Local Vite/npm build validation is still pending a clean
+  install. No keys or transactions were used.
+
 ## 2026-11-12 — ops/web → lead (F-04 relayer test)
 
 - Fixed `tests/relayer.test.ts`: the total-cap scenario now uses three

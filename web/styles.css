@@ -15,6 +15,7 @@ input[type="file"] { padding: 9px; }
 option { color: #f7fff9; background: #09120f; }
 button { width: fit-content; padding: 11px 15px; border: 0; border-radius: 999px; color: #082014; background: #8ce3ae; font-weight: 700; cursor: pointer; }
 button.secondary { color: #dff7e7; background: #244936; }
+.wallet-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .demo-card { border-color: #527d62; }
 .demo-output { min-height: 92px; margin: 4px 0 0; padding: 12px; overflow: auto; border-radius: 9px; color: #bdebc9; background: #09120f; white-space: pre-wrap; font: .8rem/1.55 ui-monospace, monospace; }
 .demo-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }

@@ -3,12 +3,13 @@ import { signInWithNep413, type Nep413Wallet } from './nep413'
 import { buildInviteLink, generateInviteKeyPair, parseInviteLink, signInviteWithSecret } from './invite'
 import { loadReadOnlyDemo } from './demo'
 import { bindThemeForm, readThemeForm, renderThemePreview } from './theme'
+import { createNearWallet, type NearWalletController } from './near-wallet'
 
 type BrowserWallet = Nep413Wallet & NearWallet
 
 declare global {
   interface Window {
-    commonCircleWallet?: BrowserWallet
+    commonCircleWallet?: NearWalletController
     commonCircleInviteSigner?: (input: { message: string; secret: string }) => Promise<string>
     COMMONCIRCLE_CONFIG?: { rpcUrl: string; contractId: string; authUrl: string; recipient: string }
   }
@@ -24,6 +25,7 @@ const readClient = new CircleClient(config.rpcUrl, config.contractId)
 const client = () => new CircleClient(config.rpcUrl, config.contractId, window.commonCircleWallet)
 let accountId = ''
 let chatUnlocked = false
+let walletController: NearWalletController | null = null
 
 const $ = <T extends HTMLElement>(selector: string): T => document.querySelector(selector) as T
 const status = () => $('#status')
@@ -40,12 +42,36 @@ function row(label: string, value: string): HTMLLIElement {
 
 async function signIn(): Promise<void> {
   const wallet = window.commonCircleWallet
-  accountId = $<HTMLInputElement>('#account-id').value.trim()
-  if (!wallet) throw new Error('Connect a NEAR wallet adapter before signing in.')
+  if (!wallet) throw new Error('Connect a MyNearWallet or Meteor testnet wallet first.')
+  accountId = wallet.accountId || $<HTMLInputElement>('#account-id').value.trim()
   if (!accountId) throw new Error('Enter the NEAR account that the wallet will sign for.')
   const result = await signInWithNep413({ authUrl: config.authUrl, recipient: config.recipient, accountId, wallet })
   sessionStorage.setItem('commoncircle.token', result.token)
   show(`Signed in as ${result.accountId}.`)
+}
+
+async function connectWallet(walletId: 'my-near-wallet' | 'meteor-wallet'): Promise<void> {
+  if (!walletController) {
+    walletController = await createNearWallet({
+      contractId: config.contractId,
+      onAccountChange: (nextAccountId) => {
+        accountId = nextAccountId
+        $<HTMLInputElement>('#account-id').value = nextAccountId
+        $('#wallet-account').textContent = nextAccountId ? `Connected: ${nextAccountId}` : 'No wallet connected.'
+        $<HTMLButtonElement>('#disconnect-wallet').hidden = !nextAccountId
+      },
+    })
+    window.commonCircleWallet = walletController
+  }
+  const connected = await walletController.connect(walletId)
+  show(`Connected to ${walletId === 'my-near-wallet' ? 'MyNearWallet' : 'Meteor'} as ${connected}.`)
+}
+
+async function disconnectWallet(): Promise<void> {
+  if (!walletController) return
+  await walletController.disconnect()
+  sessionStorage.removeItem('commoncircle.token')
+  show('Wallet disconnected.')
 }
 
 async function joinInvite(): Promise<void> {
@@ -197,7 +223,7 @@ async function loadMyCard(): Promise<void> {
 }
 
 async function loadDemo(): Promise<void> {
-  const circleId = $<HTMLInputElement>('#demo-circle-id').value.trim() || '2'
+  const circleId = $<HTMLInputElement>('#demo-circle-id').value.trim() || '3'
   const snapshot = await loadReadOnlyDemo(circleId)
   const lines = [
     'READ-ONLY TESTNET DEMO',
@@ -233,6 +259,9 @@ async function loadDemo(): Promise<void> {
 }
 
 function wire(): void {
+  $('#connect-wallet').addEventListener('click', () => void connectWallet('my-near-wallet').catch((error) => show(error instanceof Error ? error.message : String(error))))
+  $('#connect-meteor').addEventListener('click', () => void connectWallet('meteor-wallet').catch((error) => show(error instanceof Error ? error.message : String(error))))
+  $('#disconnect-wallet').addEventListener('click', () => void disconnectWallet().catch((error) => show(error instanceof Error ? error.message : String(error))))
   $('#sign-in').addEventListener('click', () => void signIn().catch((error) => show(error instanceof Error ? error.message : String(error))))
   $('#join-invite').addEventListener('click', () => void joinInvite().catch((error) => show(plainContractError(error))))
   $('#create-invite').addEventListener('click', () => void createInvite().catch((error) => show(plainContractError(error))))
@@ -256,5 +285,11 @@ function hydrateInviteFields(): void {
   if (invite.inviteSecret) $<HTMLInputElement>('#invite-secret').value = invite.inviteSecret
 }
 
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { hydrateInviteFields(); wire() })
-else { hydrateInviteFields(); wire() }
+function boot(): void {
+  hydrateInviteFields()
+  wire()
+  void loadDemo().catch((error) => show(error instanceof Error ? error.message : String(error)))
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot)
+else boot()

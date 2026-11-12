@@ -4,7 +4,7 @@ export const TESTNET_DEMO = {
   network: 'testnet',
   rpcUrl: 'https://test.rpc.fastnear.com',
   contractId: 'commoncircle-light.testnet',
-  circleId: '2',
+  circleId: '3',
 } as const
 
 export type ReadOnlyDemoSnapshot = {

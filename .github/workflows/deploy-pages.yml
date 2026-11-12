@@ -1,9 +1,9 @@
-name: Deploy LoanBook preview
+name: Deploy CommonCircle testnet demo
 
 on:
   push:
     branches:
-      - codex/loanbook-release-candidate
+      - lane/web
   workflow_dispatch:
 
 permissions:
@@ -19,11 +19,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-      VITE_NETWORK: mainnet
-      VITE_MAINNET_LOANBOOK_ADDRESS: "0x08435c5d74a00591c4eaa25ad433eeccb5c0980e"
-      VITE_BASE_PATH: /Loanbook/
+      VITE_BASE_PATH: /commoncircle/
     steps:
       - name: Check out release candidate
         uses: actions/checkout@v4
@@ -31,15 +27,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Validate public build configuration
-        shell: bash
-        run: |
-          test -n "$VITE_SUPABASE_URL" || { echo "::error::Missing VITE_SUPABASE_URL Actions secret"; exit 1; }
-          test -n "$VITE_SUPABASE_ANON_KEY" || { echo "::error::Missing VITE_SUPABASE_ANON_KEY Actions secret"; exit 1; }
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Build frontend
-        run: npm run build -- --configLoader runner
+        run: npm run build -- --configLoader native
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
