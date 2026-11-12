@@ -112,7 +112,12 @@ describe('relayer allowlist and daily caps', () => {
     await guard.authorize(request(third, { accountId: 'dave.testnet', invitePublicKey: third.invitePublicKey, inviteSignature: third.inviteSignature, estimatedCost: '90' }), readerFor(third.invite))
     await expect(guard.authorize(request(proof, { estimatedCost: '11' }), reader)).rejects.toMatchObject({ code: 'RELAYER_TOTAL_CAP' })
     clock += 86_400_000
-    const reset = await guard.authorize(request(proof, { estimatedCost: '100' }), reader)
+    // A day later the 60-second invite has expired (the guard is right to refuse it),
+    // so bob comes back as a member: an active passport and an allowlisted USDC call.
+    await expect(guard.authorize(request(proof, { estimatedCost: '100' }), reader)).rejects.toMatchObject({ code: 'RELAYER_INVITE' })
+    const member = { invitePublicKey: undefined, inviteSignature: undefined, receiverId: config.receivers.usdc, methodName: 'storage_deposit' }
+    const reset = await guard.authorize(request(proof, { ...member, estimatedCost: '100' }), readerFor(null, true))
     expect(reset.accountRemaining).toBe('0')
+    expect(reset.totalRemaining).toBe('150')
   })
 })
