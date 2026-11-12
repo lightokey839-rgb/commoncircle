@@ -3,6 +3,83 @@
 Amendment A1: each lane edits only its own files. Requests to the other lane go
 here, newest first, with the date (UTC) and the lane that wrote them.
 
+## 2026-11-12 ~10:15 UTC — lead → ops/web: contracts lane Gate 2 is done; your Gate 2 list (deadline TODAY 23:59 UTC)
+
+**State.** Interface 1.1.1 is live. Circle 3 "The Dogs (DEMO)" now has a real
+Sputnik DAO as admin and treasury: `dogs-dao.commoncircle-light.testnet`, Sputnik
+deployed **by global hash** `Ea8tHXFSQVszVwGASyzAfLq65DjcRDhkfab4FcPaRpgD`, **no
+access keys**. Council = `commoncircle-light-lender.testnet` and
+`commoncircle-light-steward.testnet`, both must approve, bond 0.1 NEAR, 1-hour
+proposals. Trusted, non-steward member: `commoncircle-light-borrower3.testnet`.
+A member's Transfer-with-msg proposal funded treasury loan 6, which was repaid to
+the DAO. `npm run claims` is 25/25 PASS on all three tracks. Read
+`docs/VERIFICATION.md` "Gate 2: Sputnik DAO treasury on testnet" for every hash.
+
+Your list, in order. Commit on `lane/web` after each item and tell the builder
+the commit hash, so the lead can merge and run CI.
+
+1. **F-04:** fix `tests/relayer.test.ts` (spread the total-cap case over three
+   accounts). The CI npm job stops at `npm test`, so claims never run in CI
+   until this is green.
+2. **F-03:**
+   - make CommonCircle the root app (`/`);
+   - replace `window.commonCircleWallet` with a real NEAR wallet connection
+     (MyNearWallet and Meteor both render our cards);
+   - host the read-only demo with the existing `deploy-pages.yml`. First
+     screen: circle 3's cards and a treasury panel.
+3. **F-06, DAO check:** call `view_account(dao)`.
+   - Show green "Sputnik DAO · no keys" only when **both** of these hold:
+     - `global_contract_hash` (or `code_hash`) equals the pinned hash above;
+     - `view_access_key_list(dao)` is empty.
+   - Otherwise show a red warning and hide every contribute or ask-the-treasury
+     button.
+   - The demo DAO passes, so you can test against it.
+4. **Treasury UI (the Social Money demo beat).**
+   - Show the stewards and the DAO's USDC balance, and list the proposals
+     (`get_last_proposal_id`, `get_proposal`).
+   - **Ask the treasury** (only for an effective-Trusted, non-steward member):
+     `create_loan(lender_id = DAO)`, then `add_proposal` with a Transfer kind
+     (`token_id` USDC, `receiver_id` circle, `amount`,
+     `msg` `{"action":"fund","loan_id":"N"}`). Attach the deposit from
+     `get_policy().proposal_bond`.
+   - **Steward approve:** `act_proposal {id, action:"VoteApprove", proposal:<kind from get_proposal>}`
+     with 300 Tgas.
+   - The exact JSON is in `contracts/scripts/testnet-dao.sh` (`propose`, `vote`,
+     `clearflag`).
+   - **Demo "days" are 60 s.** Default the demo loan length to at least 7 days
+     and show a due countdown. A 1-day loan goes overdue in one minute, which
+     is what broke our first run.
+5. **Interface 1.1.1 in forms:** always attach the `storage_costs()` amount
+   (the excess is refunded); map `E37_TREASURY_NO_PASSPORT`; reject invisible
+   and direction-changing characters in the name and tagline, using the same
+   ranges as the contract (D-009 in `docs/SPEC_DEVIATIONS.md`).
+6. **F-09:** when a repayment bounces, tell the borrower why. In a DAO circle,
+   "ask stewards to clear the flag" files a FunctionCall `clear_flag`
+   proposal (see `clearflag` in the script; proven on testnet,
+   `43mAx3pTTjTDFDVfpZrGBVwfDSJZHZ12xoUDuA3HVtTk`).
+7. **F-05, claims online:** in CI, run
+   `node contracts/scripts/build-evidence.mjs` before `npm run claims`. It
+   re-reads every row from FastNEAR. Keep the snapshot fields (`has_event`,
+   `error_codes`, `refund_memo` and the rest): the harness matches arrays by
+   position, so rows use those order-free fields.
+8. **Gate 2 web rows:** NEP-413 sign-in, the chat gate (`check_access`),
+   request-to-fund, and the passport card.
+9. **README:** you own these parts:
+   - the hosted demo link;
+   - delete the "one relayer test … fails" sentence once item 1 is green;
+   - the F-06 trust bullet once item 3 ships.
+
+   Never hand-edit the do-X/see-Y proof rows or the generated track table.
+
+**Rules:**
+- No keys anywhere; never run `near account export-account`.
+- Testnet only; label demo circles DEMO.
+- Never write "savings circle", "ROSCA", "first" or "only".
+- Never write "no admin" or "locked" about the live circle contract: it still
+  has a full-access key until ship.
+- Read-only helpers you can reuse: `contracts/scripts/check-testnet.mjs`,
+  `near-tx.mjs` and `near-view.mjs`.
+
 ## 2026-11-11 ~22:30 UTC — lead → ops/web: 1.1.1 is live; README rewritten
 
 1. **Interface 1.1.1 is deployed on testnet** (code hash
