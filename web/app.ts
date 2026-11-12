@@ -778,7 +778,7 @@ function loanRequestForm(): HTMLElement {
     amountHint.textContent = v.errors.amount ?? `Your limit as a ${limit.tier}: ${formatUsdc(limit.min)} to ${formatUsdc(limit.max)} USDC.`
     amountHint.classList.toggle('bad', !!v.errors.amount)
     amount.ariaInvalid = v.errors.amount ? 'true' : 'false'
-    daysHint.textContent = v.errors.days ?? `${loanLengthText(v.days!, circle.params.day_length_sec)} to repay, counted from when the money arrives.`
+    daysHint.textContent = v.errors.days ?? `${loanLengthText(v.days!, circle.params.day_length_sec)} to repay after funding.`
     daysHint.classList.toggle('bad', !!v.errors.days)
     days.ariaInvalid = v.errors.days ? 'true' : 'false'
     send.disabled = !v.amount || !v.days
@@ -852,7 +852,20 @@ function renderJourney(): void {
     if (late) repayActions.push(button('Ask stewards to forgive', () => askToForgive(repaid), 'soft'))
   }
   steps.push(step(6, funded ? 'current' : stateOf(5), 'Pay it back on time', repayDesc, repayActions, undefined, repayActions))
+  // Two or more finished steps at the top fold into one line, so the next step stays in view.
+  const leadingDone = steps.findIndex((li) => !li.classList.contains('done'))
+  const folded = leadingDone === -1 ? steps.length : leadingDone
+  if (folded >= 2 && current !== -1) {
+    const summaries = ['Wallet connected', isMember ? `joined as ${passport!.display_tier}` : 'joined', 'signed in', 'ready for USDC', 'loan received'].slice(0, folded)
+    const group = el('li', { className: 'step done group' },
+      el('span', { className: 'step-dot', textContent: '✓', ariaHidden: 'true' }),
+      el('div', { className: 'step-text' }, el('p', { className: 'step-title', textContent: `Steps 1–${folded} done` }),
+        el('p', { className: 'step-desc' }, `${summaries.join(' · ')}. `, accountChip(accountId))),
+      el('div', { className: 'step-action' }, button('Switch', switchWallet, 'ghost', 'wallet')))
+    steps.splice(0, folded, group)
+  }
   $('#steps').replaceChildren(...steps)
+  $('#home-hero').classList.toggle('compact', isMember)
   $('#journey-sub').textContent = current === -1 ? 'All done: you joined, borrowed and repaid. Your card is on the right.' : 'Follow these in order. Each one updates from the blockchain by itself.'
   tickDue()
 }

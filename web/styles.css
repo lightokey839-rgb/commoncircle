@@ -11,7 +11,7 @@
   --soft-2: #f4eee8;
   --line: #efe7e0;
   --text: #221c18;
-  --muted: #8b8078;
+  --muted: #6b625b; /* 6:1 on white, WCAG AA for small text */
   /* accent */
   --accent: #ee7b32;
   --accent-2: #f59a57;
@@ -29,6 +29,8 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html, body { height: 100%; }
+/* One scroll container: the white panel. The page itself never scrolls. */
+html, body { overflow: hidden; }
 body {
   margin: 0;
   color: var(--text);
@@ -54,6 +56,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
   gap: 14px;
   width: min(1400px, calc(100% - 48px));
   height: calc(100vh - 48px);
+  height: calc(100dvh - 48px);
   margin: 24px auto;
   padding: 14px;
   border: 1px solid var(--chrome-line);
@@ -132,6 +135,13 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .dao-status { padding: 8px 10px; border-radius: 10px; color: var(--bad); background: var(--bad-soft); font-size: .82rem; font-weight: 600; }
 .dao-status.trusted { color: var(--good); background: var(--good-soft); }
 .dao-status.neutral { color: var(--muted); background: var(--soft); }
+/* Once you are a member the hero shrinks to a one-line circle bar, so your card and next step are in view. */
+.home-hero.compact { grid-template-columns: 1fr; padding: 12px 14px; }
+.home-hero.compact > div:first-child { display: none; }
+.home-hero.compact .snapshot { grid-template-columns: auto 1fr auto; align-items: center; padding: 8px 12px; }
+.home-hero.compact .stats div { padding: 4px 10px; }
+.home-hero.compact .stats dd { font-size: 1rem; }
+.for-you { margin-top: 16px; }
 .home-grid { display: grid; grid-template-columns: 1fr 300px; gap: 16px; margin-top: 16px; }
 .card-box { align-self: start; }
 .my-card { display: block; width: 100%; max-width: 300px; margin-top: 12px; border-radius: 14px; box-shadow: 0 10px 30px rgba(60, 30, 10, .15); }
@@ -143,11 +153,16 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .step-title { font-weight: 700; }
 .step-desc { margin-top: 1px; color: var(--muted); font-size: .88rem; }
 .step-action { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
-.step.done { background: var(--soft); }
+.step.done { padding-block: 8px; background: var(--soft); }
+.step.done .step-desc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.step.done .step-title { font-weight: 650; }
+.step-text { min-width: 0; }
 .step.done .step-dot { color: #fff; background: var(--good); }
 .step.current { border-color: var(--accent); background: linear-gradient(90deg, #fff6ef, #fff); box-shadow: 0 0 0 3px var(--accent-soft); }
 .step.current .step-dot { color: #fff; background: var(--accent); }
-.step.waiting { opacity: .55; }
+.step.waiting { border-style: dashed; background: #fff; }
+.step.waiting .step-title { color: #4f4640; }
+.step.waiting .step-dot { color: #4f4640; background: var(--soft-2); }
 .step-form { display: grid; grid-column: 2 / -1; grid-template-columns: 2fr 1fr 1fr auto; gap: 8px; align-items: end; }
 .step-form label { display: grid; gap: 4px; }
 .due { color: var(--accent-text); font-variant-numeric: tabular-nums; }
@@ -309,10 +324,12 @@ textarea { resize: vertical; }
 
 /* loan form (P0-3) */
 .loan-form { display: grid; gap: 6px; }
-.step .loan-form { grid-column: 2 / -1; }
+.step .loan-form { grid-column: 1 / -1; }
+.pick .avatar { display: none; }
+.pick-main { flex-wrap: wrap; }
 .field-label { margin-top: 10px; color: var(--muted); font-size: .82rem; font-weight: 600; }
-.picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
-.pick { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-items: center; margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; color: var(--text); background: #fff; font-size: .9rem; font-weight: 500; cursor: pointer; }
+.picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.pick { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; align-items: center; margin: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; color: var(--text); background: #fff; font-size: .9rem; font-weight: 500; cursor: pointer; }
 .pick:has(input:checked) { border-color: var(--accent); background: #fff6ef; box-shadow: 0 0 0 2px var(--accent-soft); }
 .pick input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
 .pick-main { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -348,10 +365,24 @@ input[aria-invalid="true"] { border-color: var(--bad); }
   .chat-side { gap: 8px; max-height: 210px; border-right: 0; border-bottom: 1px solid var(--line); }
   .chat-note { display: none; }
   .step { grid-template-columns: 28px 1fr; }
+  .home-hero.compact .snapshot { grid-template-columns: 1fr; }
+  .home-hero { padding: 16px; }
+  .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .picker { grid-template-columns: 1fr; }
+  .toast { flex-wrap: wrap; }
   .step-action { grid-column: 2; justify-content: flex-start; }
   .step-form { grid-column: 1 / -1; grid-template-columns: 1fr 1fr; }
   .step-form label:first-child { grid-column: 1 / -1; }
   .theme-grid, .field-row { grid-template-columns: 1fr; }
   .msg { max-width: 88%; }
+}
+/* Short screens (1366x768 laptops): less chrome, so the next step fits without scrolling. */
+@media (min-width: 861px) and (max-height: 860px) {
+  .frame { height: calc(100vh - 24px); height: calc(100dvh - 24px); margin: 12px auto; }
+  .view { padding: 18px 22px; }
+  .topbar { padding-bottom: 10px; }
+  .home-hero.compact { padding: 8px 10px; }
+  .home-grid { margin-top: 12px; }
+  .steps { margin-top: 10px; gap: 6px; }
 }
 @media (prefers-reduced-motion: reduce) { .btn.busy::after { animation: none; } .sidebar { transition: none; } }
