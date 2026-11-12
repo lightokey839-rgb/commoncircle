@@ -1,9 +1,8 @@
 name: Deploy CommonCircle testnet demo
 
 on:
-  push:
-    branches:
-      - lane/web
+  # Manual until the repository is public at ship: GitHub Pages cannot serve a
+  # private repository on this plan, so a push-triggered run would only fail.
   workflow_dispatch:
 
 permissions:
@@ -34,7 +33,7 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: web/dist  # vite.config.ts sets root: 'web', so the build lands in web/dist
 
   deploy:
     needs: build

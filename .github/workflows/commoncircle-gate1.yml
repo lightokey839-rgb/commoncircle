@@ -173,6 +173,13 @@ jobs:
         run: |
           set -o pipefail
           npm run claims 2>&1 | tee artifacts/claims.log
+      - name: Online claims (F-05) - re-read every evidence row from testnet, then check
+        shell: bash
+        run: |
+          set -o pipefail
+          node contracts/scripts/build-evidence.mjs 2>&1 | tee artifacts/claims-online-build.log
+          npm run claims 2>&1 | tee artifacts/claims-online.log
+          cp -r evidence/snapshots artifacts/online-snapshots
       - name: Verify pinned USDC contracts from A6 RPC variables
         shell: bash
         run: |

@@ -54,8 +54,13 @@ re-read each transaction and view into `evidence/snapshots/`, then compare:
 node contracts/scripts/build-evidence.mjs && npm run claims
 ```
 
-A hosted read-only web demo is in progress. Locally:
-`npm ci && npm run dev`, then open `http://localhost:5173/web/index.html`.
+The web app runs locally with `npm ci && npm run dev`, then
+`http://localhost:5173/`. It opens on circle 3 "The Dogs (DEMO)" with no wallet:
+member cards, the DAO trust check and the treasury's proposals, all read from
+testnet. With a MyNearWallet or Meteor testnet wallet, a Trusted member can ask
+the treasury and a steward can approve. A hosted copy (GitHub Pages) goes live
+when the repository is made public at ship; Pages cannot serve it while the
+repository is private.
 
 ## Do X, see Y
 
@@ -100,9 +105,6 @@ npm test
 npm run claims:test
 npm run claims
 ```
-
-One relayer test (`tests/relayer.test.ts`, the total-cap case) is currently
-wrong and fails; its fix is in progress. The cap logic itself is correct.
 
 Contracts (Rust): CI runs them on Ubuntu on every push. The suites are:
 
@@ -158,11 +160,11 @@ its rows in [`evidence/evidence.json`](evidence/evidence.json).
   can appoint stewards, suspend or revoke members, clear flags and change the
   card design. Join a circle only if you trust its founder.
 - **After `attach_dao`, the DAO account is the admin and the treasury.** The
-  contract does not check that this account really is a DAO. A check in the
-  web app (compare the account's code hash with Sputnik's and warn if they
-  differ) is planned but not built yet. Until then, check it yourself with
-  `view_account`. The demo DAO passes that check: it runs Sputnik by global
-  hash and has no access keys.
+  contract does not check that this account really is a DAO. The web app
+  does: it shows "Sputnik DAO · no keys" and enables the treasury only when the
+  account runs the pinned Sputnik code hash **and** has no access keys;
+  otherwise it shows a red warning and hides every treasury button
+  (`web/dao.ts`, tested in `tests/treasury.test.ts`). The demo DAO passes.
 - **Two stewards means two accounts.** Treasury lending needs two steward
   passports, but those could belong to one person. In the testnet demo they
   do: the builder controls every demo account (founder, steward, borrowers).
@@ -194,12 +196,13 @@ is in [`NEW_FILES.md`](NEW_FILES.md).
   scaffold), the CommonCircle web client under `web/`, the relayer and NEP-413
   sign-in under `server/`, and the evidence harness and checks under `scripts/`
   and `contracts/scripts/`.
-- **Carried over:** the LoanBook app at the repository root (still served at
-  `/` by `npm run dev` for now) and its EVM contract.
+- **Carried over:** the LoanBook app's source under `src/` (no longer served;
+  `npm run dev` now serves the CommonCircle app from `web/`) and its EVM
+  contract.
 - **Libraries:**
   - contracts: near-sdk 5.30.1, near-workspaces 0.24.0, cargo-near 0.23.0;
   - DAO: Sputnik DAO v2 (`sputnikdao2`), the global contract code on testnet;
-  - web: Vite.
+  - web: Vite, NEAR Wallet Selector 10.1.4 (MyNearWallet, Meteor), `@near-js/transactions` 2.5.1.
 
 ## Risk and privacy
 
