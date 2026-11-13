@@ -1,8 +1,9 @@
 # CommonCircle events (NEP-297)
 
-Contract: `circle`. Interface: `docs/CIRCLE_INTERFACE.md` 1.1.0.
-Status: matches the source in `contracts/circle/src`. Not yet compiled or tested;
-see `STATUS.md`.
+Contract: `circle`. Interface: `docs/CIRCLE_INTERFACE.md` 1.1.1 (deployed on testnet as
+`commoncircle-light.testnet`). Status: matches the source in `contracts/circle/src`;
+events are asserted by the sandbox suites in CI and read from real testnet receipts by
+`contracts/scripts/near-tx.mjs` (see `docs/VERIFICATION.md`).
 
 Every event is one log line:
 

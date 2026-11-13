@@ -6,6 +6,12 @@ Gate 1 contract freeze Wed 11 Nov 23:59 · Gate 2 Tier A proof **Thu 12 Nov
 23:59** · Gate 3 pilot/user-test proof and feature freeze **Fri 13 Nov 23:59** ·
 Ship Sat 14 Nov 17:59. This replaces amendment A11's Gate 2/3 times.
 
+## Finishing pass (13 Nov 2026 ~01:20 UTC, branch `lane/web-polish`, not pushed)
+
+- Two-wallet loan done **from the web app on both sides** (request card in chat, offer, pick lender, lender funds from its own browser, repay). Repaid 26 s late, so it counts as late. Evidence 36/36.
+- New pages: Overview dashboard (live stats, zero-custody balance, DAO balance, activity), My Passport, Evidence & Tracks (from `npm run claims` output), Direct loans; honest labels for the frontend DAO check, demo settings and shared steward operator; repay route for a lender who left USDC.
+- Not done / not verified: contract Rust suites (CI only, needs a push); `npm ci` (not re-run, 10–25 min here); the lender-registration route live; hosted chat; key deletion (needs approval, `docs/SHIP_CHECKLIST.md`).
+
 ## Web polish (branch `lane/web-polish`, started 2026-11-12 ~21:20 UTC)
 
 - P0-1 toasts and wallet state: PASS. Toasts auto-dismiss (6 s, errors 10 s), have a close button, do not repeat; wallet/RPC errors become one plain sentence plus Retry (`web/notify.ts`, `tests/notify.test.ts`); step 1 shows Switch/Disconnect once connected. Checked in the browser pane: clean load has no toast and no console error; a blocked wallet pop-up shows "Allow pop-ups…" with Retry and clears after 10 s.

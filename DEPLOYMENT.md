@@ -1,3 +1,5 @@
+> **HISTORICAL — LoanBook (Arc/EVM), October 2026.** This file describes the earlier LoanBook app this repository started from (tag `baseline-loanbook-port`). It is kept for the record and is **not** about CommonCircle on NEAR. Current documents: `README.md`, `STATUS.md`, `docs/VERIFICATION.md`, `docs/SHIP_CHECKLIST.md`, `docs/DEMO_SCRIPT.md`.
+
 # Deployment handover
 
 The Supabase upgrade was deployed on 29 October 2026 to project itlnfringcqusrboqqgh as migration `20261029140324_verified_community_loans`. The `verify-loan` Edge Function is active at version 1 with platform JWT verification enabled. A branch named `codex/loanbook-release-candidate` was created from the current GitHub `main` head, but source changes have not been pushed into it. No public frontend deployment has been made. Existing destinations are GitHub lightokey839-rgb/Loanbook and Supabase Loanbook project itlnfringcqusrboqqgh. Announce the exact branch and hosting destination before publishing. Do not create a replacement repository or overwrite Arc Studio history.

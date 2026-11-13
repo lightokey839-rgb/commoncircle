@@ -1,39 +1,43 @@
-# CommonCircle web scaffold
+# CommonCircle web app (`web/`)
 
-This directory is the ops/web handoff surface for the live testnet
-`docs/CIRCLE_INTERFACE.md` 1.1.0 interface supplied by the contracts lane.
+The current CommonCircle front end. Plain TypeScript, no UI framework, built by Vite
+(`vite.config.ts` sets `root: 'web'`). The old LoanBook React app in `src/` is not served.
 
-- `circle-client.ts` contains typed JSON-RPC views and the invite transaction
-  wrapper. U64/U128 values remain decimal strings; no money is converted to a
-  JavaScript number.
-- `invite.ts` generates an Ed25519 key pair in WebCrypto, registers the public
-  key, and puts only the private secret in the URL fragment of a share link.
-- `CircleClient.fundLoan`, `fundLoanFromVault`, and `repayLoan` send the exact
-  NEP-141 `ft_transfer_call` messages with 1 yoctoNEAR and 150 Tgas. Their
-  result parser exposes unused amounts and the CommonCircle funding/refund/
-  repayment events without treating a UI submission as proof of finality.
-- The client exposes circle/loan creation, cancellation, all core loan/passport
-  views, caller-controlled pagination, passport card SVG, NEP-171 metadata
-  views, and per-circle passport themes. The visible creation forms use
-  labelled testnet DEMO parameters only.
-- `demo.ts` provides a wallet-free read-only mode against testnet contract
-  `commoncircle-light.testnet` via `https://test.rpc.fastnear.com`. The contract
-  code hash handoff for interface 1.1.0 is
-  `CCYR2EZ87by5MX65Ci1V49EVqhF93p8ymwFa6LeH9whm`; the default screen is the
-  read-only circle 2 **The Dogs (DEMO)** with passport cards.
-- `server/relayer.ts` is the F4 authorization core: it verifies a current
-  on-chain invite and its canonical signature, or an active passport, restricts
-  receivers/methods to the configured circle/vault/USDC allowlist, and reserves
-  configurable per-account and total UTC-day budgets. It does not contain a
-  private key or submit transactions.
-- `nep413.ts` performs the nonce → wallet `signMessage` → server verification
-  flow. The server receives the signed challenge, never an invite secret.
-- `index.html`, `app.ts`, `styles.css`, and `theme.ts` are the join-by-invite,
-  theme-editor, chat-gate, passport-card, request-to-fund, and “my positions”
-  screen scaffold. A wallet adapter is injected as
-  `window.commonCircleWallet`; the host build can provide the real wallet
-  selector without changing the typed contract client.
+Run it (Windows PowerShell or any shell), from the repository root:
 
-This is a scaffold, not a claim that a user transaction succeeded. The
-read-only demo is explicitly labelled, and transaction finality still needs
-receipt evidence from the contract lane before it is called a live pilot.
+```bash
+npm ci
+npm run build      # writes web/dist
+npm run preview    # serves http://localhost:5173
+npm run auth       # second terminal: NEP-413 sign-in, members-only chat and loan requests on :3001
+```
+
+`npm run dev` also works on most machines; on the builder's PC Vite's dependency
+pre-bundling stalls, so build + preview is the tested path.
+
+## Pages
+
+| Page | What it shows | Data |
+| --- | --- | --- |
+| Overview | Circle stats, the loan contract's live USDC balance (zero custody), DAO balance, demo-settings label, your steps, your card, recent activity | `loans_in_circle`, `passports_in_circle`, `get_circle`, USDC `ft_balance_of` |
+| Chat | Members-only room; loan request cards with a reason, offers, "Borrow from …", Fund, Repay | sign-in server (`server/chat.ts`, `server/requests.ts`) + contract views |
+| Loans / Direct loans | Your loans, requests for you, all circle loans with reasons; a direct request to a chosen member | `loans_by_borrower`, `loans_by_lender`, `create_loan`, `cancel_loan`, USDC `ft_transfer_call` |
+| My Passport | Any member's passport (read-only), its stats, the exact road to Trusted from the circle params, what it unlocks, treasury eligibility | `passports_in_circle`, `card_svg`, `get_circle().params` |
+| Treasury | Sputnik DAO balance, stewards, proposals and approvals; ask / approve when eligible | DAO `get_policy`, `get_proposal`; frontend DAO trust check (`dao.ts`) |
+| Members | Cards, badges, counts; Invite a friend (Trusted members) | `register_invite` |
+| Advanced tools | New circle (demo or standard rules), card design, raw data | `create_circle`, `set_circle_theme` |
+| Evidence & Tracks | The three tracks with every claim and its PASS/FAIL | `web/evidence-status.json`, written only by `npm run claims` |
+
+## Files
+
+- `app.ts` – the page logic. `circle-client.ts` – typed views and calls (1.1.1).
+- `near-wallet.ts` – NEAR Wallet Selector 10.1.4 (Meteor, MyNearWallet), pinned from npm.
+- `money.ts` – the "check before you sign" flow for fund / repay / cancel, including the
+  optional USDC registration of a lender who left the token.
+- `loan-rules.ts`, `overview.ts` – pure rules and stats from the circle params (unit-tested).
+- `notify.ts`, `labels.ts` – plain-language errors, member labels and badges.
+- `dao.ts` – the fail-closed frontend DAO check: pinned Sputnik code hash **and** no access keys.
+  The circle contract does not check this; the app does.
+
+Money is handled as integer base units (USDC 6 decimals) in strings and BigInt.
+Testnet only; there is no mainnet setting.

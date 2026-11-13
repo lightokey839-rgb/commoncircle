@@ -1,3 +1,5 @@
+> **HISTORICAL — LoanBook (Arc/EVM), October 2026.** This file describes the earlier LoanBook app this repository started from (tag `baseline-loanbook-port`). It is kept for the record and is **not** about CommonCircle on NEAR. Current documents: `README.md`, `STATUS.md`, `docs/VERIFICATION.md`, `docs/SHIP_CHECKLIST.md`, `docs/DEMO_SCRIPT.md`.
+
 # Security review — implementation review, not an independent audit
 
 Wallet login now builds explicit EIP-4361 messages with a cryptographically random 128-bit nonce, checked account/chain, domain, URI, issuance and expiry. It requests personal_sign through the connected wagmi wallet, checks the signature locally, and uses native Supabase Web3 authentication. Identity is derived from verified web3 Ethereum identity claims, never editable profile metadata. Session restore checks the server user and rejects mismatches. Real browser-wallet behavior remains unverified.

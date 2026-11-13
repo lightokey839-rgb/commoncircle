@@ -1,3 +1,5 @@
+> **HISTORICAL — LoanBook (Arc/EVM), October 2026.** This file describes the earlier LoanBook app this repository started from (tag `baseline-loanbook-port`). It is kept for the record and is **not** about CommonCircle on NEAR. Current documents: `README.md`, `STATUS.md`, `docs/VERIFICATION.md`, `docs/SHIP_CHECKLIST.md`, `docs/DEMO_SCRIPT.md`.
+
 # What is left
 
 1. Deploy the tested additive SQL upgrade to the existing Loanbook Supabase project; validate and deploy the receipt verifier.

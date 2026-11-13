@@ -437,3 +437,26 @@ Wallet: `254edye5v.testnet`, a Meteor testnet wallet created by the builder (1 t
 After: `passport_for(3, 254edye5v.testnet)` = Trusted, effective Trusted, on time 1, late 0 (row `f1-web-passport`); circle USDC balance still 0 (`f0-zero-balance`). Evidence rows added: `f0-web-request`, `f0-web-cancel`, `f0-web-fund`, `f0-web-repay`, `f1-web-join`, `f1-web-repay-tier`, `f1-web-passport`. `node contracts/scripts/build-evidence.mjs && npm run claims`: 32 rows, 0 FAIL, all three tracks PASS (2026-11-12 ~23:20 UTC).
 
 Earlier attempts by the same wallet, not claimed: `register_invite` failed twice (`8XLxTEdQN5b9ZSYn4Mt4Snyi9j1XKCRLpfLKPJ51959f`, `3neTPZviYjvzRX5xfXiQ5sVHsTKXAnKazUhpQec291Hx`: a Member cannot invite after `attach_dao`, E34); requests 8 and 9 asked `borrower3`, who holds no USDC, and lapsed or were cancelled.
+
+## Two-wallet test from the web app, both sides (2026-11-13)
+
+Borrower `254edye5v.testnet` (Meteor, Chrome profile A); lender `commoncircle-light-borrower.testnet` (Meteor, Chrome profile B; joined circle 3 by invite from `borrower3`, tx `8TfZY4Kew92ZbAGM7YcRBnodjcq9WnZiwzKQqtRzgqoS`). Both accounts are run by the builder: this shows two wallets, not two independent people. Every hash read by the lead with `node contracts/scripts/near-tx.mjs` over FastNEAR: FINAL, SUCCESS.
+
+| Step (all in the web app) | Tx | Receipts |
+| --- | --- | --- |
+| Request card posted in the chat with a reason ("school fees"), B offered to lend | none (sign-in server) | stored in `server/.data/requests.json`, linked to loan 19 after `get_loan` matched |
+| A picked B: `create_loan` | `FGBdYhzRHqh6YmyS197Farz8Vkm7tzfvx5QrLkxAmBLE` | `loan_created` loan 19, lender `commoncircle-light-borrower.testnet`, 1 USDC, 7 demo days |
+| B funded from its own browser | `FKSPKia8YGvc6jh8zv5rvesPjHQS4mrWqQb6qwYtDGt4` | `loan_funding_started`, `ft_transfer` contract → `254edye5v.testnet` 1 USDC, `loan_funded` |
+| A repaid | `nJTfax1q99ZNAHRBuoeJbKGDfCdfXLdwjW6qqwqnfWK` | `loan_repaid`, 1 USDC to B; `repaid_on_time: false` (due 00:29:24, repaid 00:29:50 UTC: 26 s late) |
+
+Rows `f0-web-peer-request`, `f0-web-peer-fund`, `f0-web-peer-repay`, `f0-web-peer-loan`. The passport of `254edye5v.testnet` now shows on time 1, late 1, still Trusted; so `f1-web-passport` no longer asserts `late_count` (documented in `contracts/scripts/build-evidence.mjs`). `npm run claims`: 36 rows, 0 FAIL. Earlier failed attempts in the same session (not claimed): `Fo3NUrTb…`, `GRvrbw7u…` (`E16_OPEN_LOAN_LIMIT`: two treasury requests were still open; the app now refuses before signing), and loans 15, 16, 18 created by retries before the link fix, then cancelled or lapsed.
+
+## Dashboard and evidence pages (2026-11-13)
+
+| Check | Result | How |
+| --- | --- | --- |
+| Overview stats from views only; loading and failure states never show a fake 0 | PASS | `tests/overview.test.ts`; browser pane: 5 members, 17 loans, 0 USDC in the loan contract, 2 USDC in the DAO, 2026-11-13 ~00:50 UTC |
+| Demo settings labelled (60 s days, 1 repayment, 1 lender, 60 min window) vs standard (3, 2, 1 day, 72 h) | PASS | `tests/overview.test.ts`; browser pane shows the note on circle 3 |
+| Evidence & Tracks renders `web/evidence-status.json`, written only by `npm run claims`; a track passes only if all its claims pass | PASS | `tests/overview.test.ts` (incl. every claim id in `evidence/evidence.json` present); browser pane: 7/7, 12/12, 13/13 at the time (36 rows after the peer rows) |
+| Repaying a lender who left USDC: optional registration (0.00125 NEAR, shown before signing), then the repayment | PASS (unit) / UNVERIFIED (live) | `tests/money.test.ts`; live needs a lender that unregisters, not done |
+| 375 px: no element wider than the viewport on any of the nine pages | PASS | browser pane, mobile preset |

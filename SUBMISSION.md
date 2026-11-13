@@ -1,3 +1,5 @@
+> **HISTORICAL — LoanBook (Arc/EVM), October 2026.** This file describes the earlier LoanBook app this repository started from (tag `baseline-loanbook-port`). It is kept for the record and is **not** about CommonCircle on NEAR. Current documents: `README.md`, `STATUS.md`, `docs/VERIFICATION.md`, `docs/SHIP_CHECKLIST.md`, `docs/DEMO_SCRIPT.md`.
+
 # Arc Microgrants submission draft
 
 LoanBook helps trusted groups arrange zero-interest USDC loans through private lending circles. Members chat, post requests, offer to lend and select a counterparty before creating a transparent Arc agreement. Funding and repayment move USDC directly between the lender and borrower. Private social coordination is combined with verifiable onchain records, without collateral or pooled custody.

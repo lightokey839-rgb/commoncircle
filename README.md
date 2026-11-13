@@ -11,7 +11,53 @@ borrower inside one transaction, and the contract's USDC balance is zero at rest
 
 > Loans are unsecured; repayment cannot be forced. Chat is access-controlled,
 > not end-to-end encrypted. Loan terms, account ids and passport history are
-> public on-chain.
+> public on-chain. **Testnet only: no mainnet funds.**
+
+## The problem
+
+In a rotating savings group (ajo, esusu, chama) you get money when it is your
+turn, not when you need it. Outside the group, people with no credit file have
+no way to show that they repay. CommonCircle turns actual repayment behaviour
+into reusable financial trust.
+
+## How it works
+
+1. A founder creates a circle; members join by a private invite link.
+2. A member asks for a loan: in the circle chat (amount, days and a reason;
+   any member can offer to lend and the borrower picks one) or directly to a
+   chosen member. The loan is created on-chain naming that lender.
+3. The lender funds it from the web app. The USDC goes from the lender, through
+   the contract's check, to the borrower **in the same transaction**.
+4. The borrower repays from the web app before the due time. The money goes
+   straight back to the lender.
+5. Qualifying on-time repayments are written into the borrower's passport NFT.
+   Enough of them (from enough different lenders) make it **Trusted**: a higher
+   limit, two open loans, the right to invite, and access to the circle's
+   Sputnik DAO treasury.
+
+### The loan lifecycle
+
+`Open` (waiting for the named lender, until the funding window ends) →
+`Funded` (money with the borrower; the due time starts) → `Repaid` (on time or
+late). A borrower can cancel an `Open` request; an unfunded request lapses.
+An overdue loan pauses Trusted perks until it is repaid or the DAO clears the
+flag by vote.
+
+### Why the passport NFT matters
+
+It is a non-transferable NEP-171 token (one per member per circle). Nobody can
+buy it or move it; only repayments change its tier. The tier sets the credit
+limit, the number of open loans, who may invite and who may borrow from the
+treasury. Its card art is drawn by the contract from the circle's theme and the
+member's record, so it changes in the wallet when the tier changes.
+
+### Why the loan contract holds no pooled money
+
+There is no pot to steal or mismanage. Funding is an `ft_transfer_call` that
+the contract forwards to the borrower at once; every failure path (borrower not
+set up for USDC, wrong lender, wrong token, wrong amount, too little gas)
+refunds the lender in the same transaction. The contract's USDC balance is 0
+at rest, and the web app's Overview shows that balance live.
 
 ## Status (testnet only)
 
@@ -23,7 +69,9 @@ borrower inside one transaction, and the contract's USDC balance is zero at rest
 | Code hash on chain | `J4X6efoAqFoKVYxaSNtpDYUTyKrKDzrqa2vPZxvMLxGr`: the reproducible Docker build that CI built **and** tested (run `43059776368`). The contract also publishes NEP-330 source metadata. |
 | Token | Circle testnet USDC `3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af` |
 | Upgradeability | **The builder can still upgrade this testnet contract.** Its account holds a full-access key until the keys are deleted at ship. Until then, nothing here claims "locked code". |
-| Demo circles | Labelled DEMO. They use 60-second "days" and need one on-time loan to reach Trusted (the defaults are 3 qualifying loans from 2 lenders). |
+| Demo circles | Labelled DEMO, and the app shows a "Demo settings" note on them: 60-second "days", a 1-hour funding window, and one on-time loan from one lender reaches Trusted. The standard rules (the contract defaults) are 3 qualifying loans from 2 different lenders, real days and a 72-hour window; the app's "new circle" form offers both, clearly labelled. |
+| Web app | `web/` (TypeScript, Vite), NEAR Wallet Selector 10.1.4 with Meteor and MyNearWallet. Pages: Overview, Chat, Loans, Direct loans, My Passport, Treasury, Members, Advanced tools, Evidence & Tracks. Runs locally; a hosted copy needs the repository to be public (ship day). |
+| Chat and loan requests | Run on the local sign-in server (`npm run auth`): NEP-413 sign-in, members-only (checked on-chain), not end-to-end encrypted, history in local files. Not hosted publicly yet; a public copy of the app says so and the rest keeps working. |
 
 ## Check it yourself, without a wallet
 
@@ -47,23 +95,42 @@ events, storage paid against storage used):
 node contracts/scripts/near-tx.mjs <tx_hash> <signer_account_id>
 ```
 
-To re-check every claim against the chain (32 rows across the three tracks),
+To re-check every claim against the chain (36 rows across the three tracks),
 re-read each transaction and view into `evidence/snapshots/`, then compare:
 
 ```bash
 node contracts/scripts/build-evidence.mjs && npm run claims
 ```
 
-The web app runs locally with `npm ci && npm run dev`, then
-`http://localhost:5173/`. It opens on circle 3 "The Dogs (DEMO)" with no wallet:
-member cards, the DAO trust check and the treasury's proposals, all read from
-testnet. With a MyNearWallet or Meteor testnet wallet, a Trusted member can ask
-the treasury and a steward can approve. On 12 Nov 2026 a new Meteor testnet
-wallet did the whole member loop from the web app: join by invite, sign in and
-chat, set up USDC, ask, cancel, ask again, repay on time, and its card turned
-Trusted (rows `f0-web-*` and `f1-web-*`; the lender funded from the CLI). A hosted copy (GitHub Pages) goes live
-when the repository is made public at ship; Pages cannot serve it while the
-repository is private.
+## Run the web app (Windows PowerShell)
+
+```powershell
+npm ci
+npm run build
+npm run preview          # http://localhost:5173/?circle_id=3
+# in a second PowerShell window:
+npm run auth             # sign-in, chat and loan requests on http://localhost:3001
+```
+
+It opens on circle 3 "The Dogs (DEMO)" with no wallet: live circle statistics,
+the loan contract's USDC balance (zero custody), any member's passport, the DAO
+and its proposals, and the Evidence & Tracks page, all read from testnet. Connect
+a Meteor or MyNearWallet **testnet** wallet (allow pop-ups) to join with an invite,
+ask, lend, repay, ask the treasury or approve as a steward.
+
+Done from the web app on testnet, verified over FastNEAR (`docs/VERIFICATION.md`):
+
+- 12 Nov 2026: a new Meteor wallet joined by invite, signed in, chatted, set up
+  USDC, asked, cancelled, asked again and repaid on time; its card turned Trusted
+  (rows `f0-web-*`, `f1-web-*`; that lender funded from the CLI).
+- 13 Nov 2026: **both sides in the web app**. The borrower posted a request card
+  in the chat, a second wallet offered and **funded from its own browser**, and
+  the borrower repaid (rows `f0-web-peer-*`). That repayment landed 26 seconds
+  after the due time, so it counts as late, and the passport's late count is 1.
+  Both wallets are run by the builder.
+
+A hosted copy (GitHub Pages) goes live when the repository is made public at
+ship; Pages cannot serve it while the repository is private.
 
 ## Do X, see Y
 
@@ -175,12 +242,27 @@ its rows in [`evidence/evidence.json`](evidence/evidence.json).
   repayments between members of one circle and never leaves that circle. Demo
   circles need one loan to reach Trusted; the defaults are 3 qualifying loans
   from 2 lenders.
-- **A lender can block repayment** by leaving the token. The borrower keeps
-  the money, and the stewards can clear the resulting late flag.
+- **A lender can block repayment** by leaving the token (unregistering from
+  USDC): the repayment would bounce back to the borrower. The web app checks
+  the lender's USDC registration before a repayment and, if it is missing,
+  offers to pay their registration (0.00125 NEAR, a NEP-145 storage deposit)
+  first, with that cost shown before signing; then it repays. No contract
+  change and no custody. If the borrower declines, the stewards can still clear
+  the resulting late flag.
 - **Card art is chosen by each circle** and is not moderated. Images are
   limited to 12 KiB raster files; SVG uploads are refused.
-- **Vault.** The circle trusts the pinned vault account to name the lender
-  honestly. The vault contract is not built yet.
+- **Vault, relayer, recovery.** The circle trusts the pinned vault account to
+  name the lender honestly; the vault contract is not built. The relayer in
+  `server/relayer.ts` has allowlist and cap logic with unit tests but does not
+  submit sponsored transactions, so there is no live gas sponsorship. Account
+  recovery is switched off in this build (`features.recovery = false`).
+- **Reputation can be farmed.** Two NEAR accounts are not two people. Repeated
+  loans between cooperating accounts raise each other's tier; the qualifying
+  minimums and `min_distinct_lenders` (2 by default) slow this but do not stop
+  it. There is no identity check and no Sybil resistance, by design.
+- **Chat and loan-request reasons** live on the sign-in server, not on-chain.
+  The server checks each linked loan against the chain, never signs anything
+  and never moves money.
 - **Testnet.** No real money has moved. The builder can upgrade the testnet
   contract until its keys are deleted at ship.
 
@@ -206,6 +288,14 @@ is in [`NEW_FILES.md`](NEW_FILES.md).
   - contracts: near-sdk 5.30.1, near-workspaces 0.24.0, cargo-near 0.23.0;
   - DAO: Sputnik DAO v2 (`sputnikdao2`), the global contract code on testnet;
   - web: Vite, NEAR Wallet Selector 10.1.4 (MyNearWallet, Meteor), `@near-js/transactions` 2.5.1.
+
+## Roadmap
+
+1. Ship: delete the contract's full-access key (after the builder approves; see
+   `docs/SHIP_CHECKLIST.md`), make the repository public, host the app.
+2. Host the sign-in server with durable storage for nonces, chat and requests.
+3. Build the vault and a live relayer for gas-free joining.
+4. Pilot a real circle with the standard rules.
 
 ## Risk and privacy
 

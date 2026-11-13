@@ -1,3 +1,5 @@
+> **HISTORICAL — LoanBook (Arc/EVM), October 2026.** This file describes the earlier LoanBook app this repository started from (tag `baseline-loanbook-port`). It is kept for the record and is **not** about CommonCircle on NEAR. Current documents: `README.md`, `STATUS.md`, `docs/VERIFICATION.md`, `docs/SHIP_CHECKLIST.md`, `docs/DEMO_SCRIPT.md`.
+
 # Current handover — 29 October 2026
 
 Read README.md and NEXT_STEPS.md first. The fresh schema is already installed remotely; do not rerun it. The additive 004 migration has passed local tests but is NOT deployed. No GitHub push, public frontend deployment or mainnet transaction was performed. The following Studio memory is historical provenance and may describe earlier states.
