@@ -92,6 +92,7 @@
             <button id="head-account" class="head-chip" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="account-menu" hidden></button>
             <div id="account-menu" class="account-menu" role="menu" hidden></div>
           </div>
+          <button id="theme-toggle" class="icon-btn" type="button" title="Dark / light theme" aria-label="Switch dark or light theme"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10z"/></svg></button>
           <button id="journey-refresh" class="icon-btn refresh-btn" type="button" title="Refresh from testnet" aria-label="Refresh from testnet">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/></svg>
           </button>
@@ -106,7 +107,8 @@
           <section class="view" id="view-home" data-title="Overview">
             <div class="hero" id="home-hero">
               <div class="hero-main">
-                <p class="eyebrow">Your circle</p>
+                <p class="eyebrow" id="hero-eyebrow">Your circle</p>
+                <p id="visitor-note" class="flag flag-warn" hidden></p>
                 <h1 id="circle-name"><span class="skeleton-line" aria-label="Loading circle"></span></h1>
                 <p class="hero-tag">Ajo pays you in turn. CommonCircle is for when it isn't your turn.</p>
                 <p class="hero-lede">People who already trust each other lend USDC straight to one another: no interest, no pooled pot. Repaying on time builds a passport that unlocks more.</p>
@@ -270,6 +272,11 @@
           <!-- INVITATIONS -->
           <section class="view" id="view-invites" data-title="Invitations" hidden>
             <div class="page-head"><div><p class="eyebrow">Your circle</p><h1>Invitations</h1><p class="muted">Each invite link works once. Its secret stays in your browser and is never sent to a server. Creating a link costs a small NEAR storage deposit.</p></div></div>
+            <div class="card">
+              <h2>Got an invite link? Join here</h2>
+              <p class="muted">Paste the whole link someone sent you (or just open it in this browser). Then connect the wallet it was made for and press "Join the circle".</p>
+              <div id="invites-paste"></div>
+            </div>
             <div id="members-invite" class="card"></div>
             <div id="home-invite" hidden></div>
           </section>

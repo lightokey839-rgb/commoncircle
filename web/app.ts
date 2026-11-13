@@ -303,12 +303,14 @@ function renderHeadAccount(): void {
   const chip = $('#head-account')
   chip.hidden = !accountId
   const bal = walletBal && walletBal.account === accountId ? walletBal : null
-  const balText = !bal ? '…' : `${bal.usdc === null ? '? ' : formatUsdc(bal.usdc)} USDC · ${bal.near === null ? '? ' : formatNear(bal.near)} NEAR`
+  const balText = !bal ? 'reading balance…' : `${bal.near === null ? '?' : formatNear(bal.near)} NEAR · ${bal.usdc === null ? '?' : formatUsdc(bal.usdc)} USDC`
   if (accountId) chip.replaceChildren(avatar(accountId, 'sm'), el('span', { className: 'head-chip-text' },
     el('span', { className: 'head-chip-name', textContent: memberLabel(accountId) }),
     el('span', { className: 'head-chip-bal', textContent: balText })))
-  chip.title = accountId ? `Signed in as ${accountId}${bal ? ` · wallet balance on testnet: ${balText}` : ''}` : ''
+  chip.title = accountId ? `Signed in as ${accountId}${bal ? ` · wallet balance on testnet: ${balText}. NEAR and USDC are two separate tokens: the USDC figure is your test-USDC, not the NEAR balance converted to dollars.` : ''}` : ''
 }
+
+let autoSwitched = ''
 
 /** The connected wallet's own balances (read-only views on testnet). null = could not read, never shown as 0. */
 let walletBal: { account: string; usdc: string | null; near: string | null } | null = null
@@ -1490,6 +1492,13 @@ async function refreshMe(): Promise<void> {
     const circles = await Promise.all(ids.map(async (id) => ({ id, name: (await readClient.getCircle(id).catch(() => null))?.name ?? `Circle ${id}` })))
     // The account (or circle) changed while we were reading: these answers belong to someone else.
     if (mine !== epoch || account !== accountId) return
+    // A wallet that belongs to circles but not to the one on screen opens its own circle (once).
+    if (!passport && circles.length && autoSwitched !== account && !inviteFields().inviteSecret) {
+      autoSwitched = account
+      $<HTMLInputElement>('#demo-circle-id').value = circles[0].id
+      window.setTimeout(() => void refreshAll().then(() => show(`Showing your own circle: ${circles[0].name}.`, 'ok')).catch(() => undefined), 0)
+      return
+    }
     me = {
       passport, registered: !!registration, signedIn: session()?.accountId === account, circles,
       loans: loans.filter((l) => l.circle_id === circleId),
@@ -1737,7 +1746,8 @@ function pasteInviteBox(): HTMLElement {
     hydrateInviteFields()
     if (invite.circleId !== (demo?.circleId ?? circleId)) await refreshAll()
     renderJourney()
-    show('Invite found. Press "Join the circle".', 'ok')
+    goView('home')
+    show('Invite found. Press "Join the circle" in your steps.', 'ok')
   })
   return el('div', { className: 'paste-box' }, input, use)
 }
@@ -1818,6 +1828,13 @@ function renderJourney(): void {
   }
   $('#invite-details').hidden = isMember
   $('#home-hero').classList.toggle('compact', isMember)
+  // A wallet that is not a member is only looking at this circle's public, on-chain history.
+  const visitor = !isMember && !!demo?.circle
+  $('#hero-eyebrow').textContent = isMember ? 'Your circle' : 'Viewing a circle'
+  $('#visitor-note').hidden = !visitor
+  $('#visitor-note').textContent = !accountId ? 'You are viewing as a visitor. This is the circle\'s public history on testnet, not yours.'
+    : `${memberLabel(accountId)} is not a member here. You are viewing this circle's public history on testnet; none of it is yours.`
+  if (!$('#invites-paste').firstChild) $('#invites-paste').replaceChildren(pasteInviteBox())
   $('#journey-sub').textContent = current === -1 ? 'All done: you joined, borrowed and repaid. Your card is on the right.' : 'Follow these in order. Each one updates from the blockchain by itself.'
   tickDue()
 }
@@ -2138,6 +2155,7 @@ function wire(): void {
   $<HTMLInputElement>('#new-circle-name').addEventListener('input', () => renderThemePreview('new-circle', $('#new-circle-preview'), $<HTMLInputElement>('#new-circle-name').value.trim() || 'New circle'))
   for (const id of ['#circle-id', '#invite-public-key', '#invite-secret']) $(id).addEventListener('input', () => renderJourney())
   window.setInterval(tickDue, 1000)
+  $('#theme-toggle').addEventListener('click', () => { const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = next; try { localStorage.setItem('commoncircle.theme', next) } catch { /* ignore */ } })
   // Keep the snapshot fresh while the page is visible (one refresh at a time; failures back off by themselves).
   window.setInterval(() => { if (document.visibilityState === 'visible' && !refreshing && (net.phase === 'connected' || net.phase === 'degraded')) void refreshAll().catch(() => undefined) }, 60_000)
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && isStale(net, Date.now())) void refreshAll().catch(() => undefined) })
@@ -2184,6 +2202,7 @@ function hydrateInviteFields(): void {
 }
 
 function boot(): void {
+  try { const t = localStorage.getItem('commoncircle.theme'); if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t } catch { /* ignore */ }
   hydrateInviteFields()
   wire()
   let start: View = 'home'
