@@ -14,7 +14,7 @@
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { ChatError, type AccessCheck } from './chat.ts'
+import { ChatError, pruneAccess, type AccessCheck } from './chat.ts'
 
 export type ChainLoan = { loan_id: string; circle_id: string; borrower_id: string; lender_id: string; principal: string; duration_days: number }
 export type LoanLookup = (loanId: string) => Promise<ChainLoan | null>
@@ -97,6 +97,7 @@ export class RequestService {
     let allowed = cached && cached.until > this.now() ? cached.allowed : undefined
     if (allowed === undefined) {
       allowed = (await this.deps.checkAccess(circleId, accountId)).allowed
+      pruneAccess(this.access, this.now())
       this.access.set(key, { allowed, until: this.now() + ACCESS_TTL_MS })
     }
     if (!allowed) throw new ChatError(403, 'CHAT_NOT_MEMBER', 'Only members with an active card in this circle can see its loan requests.')
@@ -161,12 +162,22 @@ export class RequestService {
     const r = this.find(circleId, id)
     if (r.borrower !== accountId) throw new ChatError(403, 'REQ_NOT_BORROWER', 'Only the person who asked can link the loan.')
     if (r.cancelled) throw new ChatError(409, 'REQ_CLOSED', 'This request was cancelled.')
+    // Once linked, a request keeps its loan and lender. Re-sending the same loan id (a retry
+    // after a dropped response) is a no-op; a different loan id is refused.
+    if (r.loan_id !== null) {
+      if (r.loan_id === loanIdInput) return r
+      throw new ChatError(409, 'REQ_ALREADY_LINKED', `This request is already linked to loan #${r.loan_id}.`)
+    }
     const loan = await this.chainLoan(loanIdInput)
     if (loan.borrower_id !== accountId || loan.circle_id !== circleId || loan.principal !== r.amount || loan.duration_days !== r.days) {
       throw new ChatError(409, 'REQ_MISMATCH', 'That on-chain loan does not match this request.')
     }
     if (!r.offers.includes(loan.lender_id)) throw new ChatError(409, 'REQ_LENDER', 'The loan names someone who did not offer to lend.')
     this.assertUnlinked(circleId, loan.loan_id, r.id)
+    // Re-check after the chain lookup: a concurrent link may have landed meanwhile.
+    if (r.loan_id !== null && r.loan_id !== loan.loan_id) {
+      throw new ChatError(409, 'REQ_ALREADY_LINKED', `This request is already linked to loan #${r.loan_id}.`)
+    }
     r.loan_id = loan.loan_id
     r.lender = loan.lender_id
     this.save()

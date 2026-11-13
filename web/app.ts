@@ -12,6 +12,8 @@ import { bindThemeForm, readThemeForm, renderThemePreview } from './theme'
 // The wallet library (~1.5 MB) loads only on Connect or when a session exists.
 import type { NearWalletController } from './near-wallet'
 import { assertCircleName } from './text-rules'
+import { checkCardSvg } from './card-safety'
+import { onRpcHealth } from './rpc'
 import { avatarFor, ChatApiError, ChatClient, dayLabel, timeLabel, type ChatMessage, type LoanRequestCard } from './chat'
 import {
   clearFlagProposal, DEMO_TREASURY_LOAN_DAYS, formatUsdc, loansNeedingProposal, proposalLoanId, repaymentNotice,
@@ -29,7 +31,8 @@ declare global {
 const config = {
   rpcUrl: 'https://test.rpc.fastnear.com',
   contractId: 'commoncircle-light.testnet',
-  authUrl: 'http://localhost:3001',
+  // Set VITE_AUTH_URL at build time to point a hosted copy at a hosted sign-in server.
+  authUrl: (import.meta.env.VITE_AUTH_URL as string | undefined) || 'http://localhost:3001',
   recipient: window.location.host,
   explorerUrl: 'https://testnet.nearblocks.io',
   ...window.COMMONCIRCLE_CONFIG,
@@ -99,7 +102,7 @@ function accountChip(account: string, label = account === accountId && accountId
   const chip = el('button', { className: 'acct', type: 'button', title: `${account} (click to copy)` }, el('span', { textContent: label }))
   chip.addEventListener('click', (event) => {
     event.stopPropagation()
-    void navigator.clipboard?.writeText(account).then(() => show(`Copied ${account}.`, 'ok'), () => show(account, 'info'))
+    void navigator.clipboard?.writeText(account).then(() => show(`${account} (copied)`, 'ok'), () => show(account, 'info'))
   })
   return chip
 }
@@ -112,6 +115,7 @@ let toastShown: { text: string; kind: ToastKind; next: NextAction } | null = nul
 function hideToast(): void {
   window.clearTimeout(toastTimer)
   $('#status').hidden = true
+  document.body.classList.remove('has-toast')
   toastShown = null
 }
 
@@ -128,6 +132,7 @@ function show(message: string, kind: ToastKind = 'info', next: NextAction = null
     $('#status-actions').replaceChildren(...actions)
     toast.className = `toast ${kind}`
     toast.hidden = false
+    document.body.classList.add('has-toast')
   }
   window.clearTimeout(toastTimer)
   toastTimer = window.setTimeout(hideToast, TOAST_MS[kind])
@@ -141,7 +146,36 @@ function errorText(error: unknown, context: 'wallet' | 'chat' | 'chain' = 'chain
 
 function showError(error: unknown, context: 'wallet' | 'chat' | 'chain' = 'chain', retry?: () => Promise<void>): void {
   const friendly = error instanceof ChatApiError ? { text: error.message, next: null } : friendlyError(error, context)
+  // Testnet being unreachable is shown once in the banner (with the last good data kept), not as a toast.
+  if (context === 'chain' && isNetworkText(friendly.text)) { netTrouble(); return }
   show(friendly.text, 'bad', friendly.next, retry)
+}
+
+const isNetworkText = (text: string) => /Could not reach NEAR testnet|NEAR testnet is busy/.test(text)
+
+/* ---------- testnet connection banner: keep the last good data, retry with backoff ---------- */
+
+let netRetryTimer = 0
+let netRetryStep = 0
+const NET_RETRY_MS = [10_000, 30_000, 60_000]
+
+function netTrouble(): void {
+  const banner = $('#net-banner')
+  const when = lastRefresh ? new Date(lastRefresh).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
+  $('#net-banner-text').textContent = demo
+    ? `Can't reach NEAR testnet right now. Showing data from ${when}; retrying by itself.`
+    : "Can't reach NEAR testnet right now. Retrying by itself."
+  banner.hidden = false
+  window.clearTimeout(netRetryTimer)
+  const delay = NET_RETRY_MS[Math.min(netRetryStep, NET_RETRY_MS.length - 1)]
+  netRetryStep++
+  netRetryTimer = window.setTimeout(() => void refreshAll().catch(() => netTrouble()), delay)
+}
+
+function netOk(): void {
+  window.clearTimeout(netRetryTimer)
+  netRetryStep = 0
+  $('#net-banner').hidden = true
 }
 
 async function run(b: HTMLButtonElement | null, action: () => Promise<void>, context: 'wallet' | 'chat' | 'chain' = 'chain'): Promise<void> {
@@ -183,12 +217,66 @@ async function afterTx(message: string): Promise<void> {
 function goView(next: View): void {
   view = next
   for (const v of VIEWS) $(`#view-${v}`).hidden = v !== next
-  for (const item of document.querySelectorAll<HTMLButtonElement>('.nav-item')) item.classList.toggle('active', item.dataset.view === next)
+  for (const item of document.querySelectorAll<HTMLButtonElement>('.nav-item')) {
+    item.classList.toggle('active', item.dataset.view === next)
+    if (item.dataset.view === next) item.setAttribute('aria-current', 'page')
+    else item.removeAttribute('aria-current')
+  }
   $('#crumb-view').textContent = $(`#view-${next}`).dataset.title ?? ''
-  $('#sidebar').classList.remove('open')
-  $('#panel').scrollTop = 0
+  closeDrawer()
+  window.scrollTo({ top: 0 })
   try { localStorage.setItem('commoncircle.view', next) } catch { /* ignore */ }
   if (next === 'chat') { void openRoom(chatRoom); startChatPolling() } else stopChatPolling()
+}
+
+/* ---------- drawer (phone) and account menu ---------- */
+
+function openDrawer(): void {
+  $('#sidebar').classList.add('open')
+  $('#scrim').hidden = false
+  $('#menu-btn').setAttribute('aria-expanded', 'true')
+}
+
+function closeDrawer(): void {
+  $('#sidebar').classList.remove('open')
+  $('#scrim').hidden = true
+  $('#menu-btn').setAttribute('aria-expanded', 'false')
+}
+
+function closeAccountMenu(): void {
+  $('#account-menu').hidden = true
+  $('#head-connect').setAttribute('aria-expanded', 'false')
+  $('#head-account').setAttribute('aria-expanded', 'false')
+}
+
+/** Header menu: wallet choices when disconnected; full account, copy, Switch, Disconnect when connected. */
+function toggleAccountMenu(trigger: HTMLElement): void {
+  const menu = $('#account-menu')
+  if (!menu.hidden) { closeAccountMenu(); return }
+  const item = (label: string, action: () => Promise<void>, context: 'wallet' | 'chain' = 'chain') => {
+    const b = el('button', { className: 'menu-item', type: 'button', textContent: label, role: 'menuitem' })
+    b.addEventListener('click', () => { closeAccountMenu(); void run(null, action, context) })
+    return b
+  }
+  menu.replaceChildren(...(accountId
+    ? [el('p', { className: 'menu-head' }, el('span', { className: 'small muted', textContent: 'Signed in as' }), el('strong', { className: 'menu-account', textContent: accountId })),
+      item('Copy account ID', async () => { await navigator.clipboard.writeText(accountId); show(`${accountId} (copied)`, 'ok') }),
+      item('Switch account', switchWallet, 'wallet'),
+      item('Disconnect', disconnectWallet)]
+    : [el('p', { className: 'menu-head small muted', textContent: 'Connect a NEAR testnet wallet' }),
+      item('Meteor (recommended)', () => connectWallet('meteor-wallet'), 'wallet'),
+      item('MyNearWallet', () => connectWallet('my-near-wallet'), 'wallet')]))
+  menu.hidden = false
+  trigger.setAttribute('aria-expanded', 'true')
+  ;(menu.querySelector('button') as HTMLButtonElement | null)?.focus()
+}
+
+function renderHeadAccount(): void {
+  $('#head-connect').hidden = !!accountId
+  const chip = $('#head-account')
+  chip.hidden = !accountId
+  if (accountId) chip.replaceChildren(avatar(accountId, 'sm'), el('span', { className: 'head-chip-name', textContent: memberLabel(accountId) }))
+  chip.title = accountId ? `Signed in as ${accountId}` : ''
 }
 
 /* ---------- wallet ---------- */
@@ -199,10 +287,11 @@ function onAccountChange(nextAccountId: string): void {
   $<HTMLInputElement>('#account-id').value = nextAccountId
   $('#profile-out').hidden = !!nextAccountId
   $('#profile-in').hidden = !nextAccountId
-  $('#wallet-account').textContent = nextAccountId
-  $('#wallet-state').textContent = nextAccountId ? `connected as ${memberLabel(nextAccountId)}` : 'wallet not connected'
-  $('#wallet-account').title = nextAccountId
+  $('#wallet-account').textContent = nextAccountId ? memberLabel(nextAccountId) : ''
+  $('#wallet-account').title = nextAccountId ? `${nextAccountId} (tap to copy)` : ''
   $('#profile-avatar').replaceWith(Object.assign(avatar(nextAccountId || '?'), { id: 'profile-avatar' }))
+  closeAccountMenu()
+  renderHeadAccount()
   // Re-render now so step 1 shows "Connected" at once; refreshMe() fills in the rest
   // after its testnet reads, which can take a few seconds.
   // A "connect your wallet" error is stale once an account is connected.
@@ -248,6 +337,7 @@ async function disconnectWallet(): Promise<void> {
   await walletController.disconnect()
   try { sessionStorage.removeItem(TOKEN_KEY) } catch { /* ignore */ }
   me = null
+  inviteResult = null
   renderAll()
   show('Wallet disconnected.')
 }
@@ -260,7 +350,7 @@ async function switchWallet(): Promise<void> {
 }
 
 function requireWallet(): void {
-  if (!window.commonCircleWallet || !accountId) throw new Error('Connect a wallet first (bottom left).')
+  if (!window.commonCircleWallet || !accountId) throw new Error('Connect a wallet first (Connect wallet, top right).')
 }
 
 /* ---------- sign-in token ---------- */
@@ -437,23 +527,30 @@ async function askToForgive(loan: LoanView): Promise<void> {
   await afterTx(`Asked the stewards to forgive the late mark on loan #${loan.loan_id}.`)
 }
 
-async function createInvite(): Promise<void> {
+/** The last invite link made in this tab. The secret is never stored or sent anywhere: copy it now, or make another. */
+let inviteResult: { circleId: string; link: string; qrSvg: string; inviteeId: string | null; expiresAt: number } | null = null
+
+async function qrSvg(text: string): Promise<string> {
+  const { default: QRCode } = await import('qrcode')
+  return QRCode.toString(text, { type: 'svg', margin: 1, errorCorrectionLevel: 'M', color: { dark: '#221c18', light: '#ffffff' } })
+}
+
+async function createInvite(inviteeText: string, hoursText: string): Promise<void> {
   requireWallet()
   const cid = circleId
-  const inviteeId = $<HTMLInputElement>('#invitee-account-id').value.trim() || null
-  const hoursText = $<HTMLInputElement>('#invite-expiry-hours').value.trim() || '24'
-  if (!/^\d+$/.test(hoursText) || hoursText === '0') throw new Error('Enter how many hours the link should work, for example 24.')
+  const inviteeId = inviteeText.trim() || null
+  const hoursValue = hoursText.trim() || '24'
+  if (!/^\d+$/.test(hoursValue) || hoursValue === '0') throw new Error('Enter how many hours the link should work, for example 24.')
   if (inviteeId && !/^[a-z0-9._-]+\.testnet$/.test(inviteeId)) throw new Error('Enter their testnet account, for example friend.testnet.')
-  const hours = BigInt(hoursText)
+  const hours = BigInt(hoursValue)
   const pair = await generateInviteKeyPair()
   const expiresAt = (BigInt(Date.now()) * 1_000_000n + hours * 3_600_000_000_000n).toString()
   const storage = await readClient.storageCosts()
   await client().registerInvite({ circleId: cid, invitePublicKey: pair.publicKey, expiresAt, inviteeId, deposit: storage.register_invite })
-  const box = $<HTMLTextAreaElement>('#invite-link')
-  box.value = buildInviteLink({ circleId: cid, invitePublicKey: pair.publicKey, inviteSecret: pair.secret })
-  box.hidden = false
-  $('#copy-invite').hidden = false
-  show(inviteeId ? `Invite created for ${inviteeId}. Copy the link and send it privately.` : 'Invite created. Copy the link and send it privately.', 'ok')
+  const link = buildInviteLink({ circleId: cid, invitePublicKey: pair.publicKey, inviteSecret: pair.secret })
+  inviteResult = { circleId: cid, link, qrSvg: await qrSvg(link).catch(() => ''), inviteeId, expiresAt: Date.now() + Number(hours) * 3_600_000 }
+  renderInvitePanels()
+  show(inviteeId ? `Invite created for ${inviteeId}. Copy the link or show the QR code.` : 'Invite created. Copy the link or show the QR code.', 'ok')
 }
 
 const testnetDemoParams: CircleParams = {
@@ -469,8 +566,22 @@ async function createCircle(): Promise<void> {
   const storage = await readClient.storageCosts()
   const standard = $<HTMLSelectElement>('#new-circle-preset').value === 'standard'
   const params: CircleParams = standard ? { ...testnetDemoParams, ...STANDARD_RULES, qualifying_min_days: 1, recovery_lock_sec: '259200' } : testnetDemoParams
-  await client().createCircle({ name, params, theme: readThemeForm('new-circle'), deposit: storage.create_circle })
+  const raw = await client().createCircle({ name, params, theme: readThemeForm('new-circle'), deposit: storage.create_circle })
+  // The new circle's number: from the circle_created event, else the newest passport this account holds.
+  const event = parseFtTransferCallOutcome(raw).events.find((e) => e.event === 'circle_created')
+  let newId = (event?.data[0] as { circle_id?: string } | undefined)?.circle_id ?? null
+  if (!newId) {
+    await wait(2500)
+    const tokens = await readClient.nftTokensForOwner(accountId, null, 100).catch(() => [])
+    newId = tokens.map((t) => t.token_id.split(':')[0]).sort((a, b) => Number(b) - Number(a))[0] ?? null
+  }
   show(standard ? 'Circle created with the standard rules.' : 'Circle created with demo settings (60-second days, 1 repayment to Trusted).', 'ok')
+  if (newId) {
+    $<HTMLInputElement>('#demo-circle-id').value = newId
+    await refreshAll()
+    goView('home')
+    show('Circle created. You are its founder: invite members on Overview.', 'ok')
+  }
 }
 
 async function saveDesign(): Promise<void> {
@@ -487,9 +598,14 @@ async function saveDesign(): Promise<void> {
 
 /* ---------- chat ---------- */
 
-function roomName(id: string): string {
-  return me?.circles.find((c) => c.id === id)?.name ?? (demo?.circle?.circle_id === id ? demo.circle.name : `Circle ${id}`)
+/** A room's name, or null while it is still loading (shown as a skeleton, never as "Circle 3"). */
+function knownRoomName(id: string): string | null {
+  return me?.circles.find((c) => c.id === id)?.name ?? (demo?.circle?.circle_id === id ? demo.circle.name : null)
 }
+function roomName(id: string): string {
+  return knownRoomName(id) ?? `Circle ${id}`
+}
+const skeleton = () => el('span', { className: 'skeleton-line', ariaLabel: 'Loading' })
 
 function tierOf(account: string): Tier | null {
   return demo?.passports.find((p) => p.owner_id === account)?.display_tier ?? null
@@ -498,15 +614,16 @@ function tierOf(account: string): Tier | null {
 function renderRooms(): void {
   const query = $<HTMLInputElement>('#chat-search').value.trim().toLowerCase()
   const ids = new Set<string>([...(me?.circles ?? []).map((c) => c.id), circleId])
-  const rooms = [...ids].filter((id) => roomName(id).toLowerCase().includes(query))
+  const rooms = [...ids].filter((id) => !query || (knownRoomName(id) ?? '').toLowerCase().includes(query))
   $('#room-list').replaceChildren(...(rooms.length ? rooms.map((id) => {
     const msgs = chatMessages.get(id) ?? []
     const last = msgs[msgs.length - 1]
     const unread = msgs.filter((m) => m.id > (chatSeen.get(id) ?? 0) && m.account_id !== accountId).length
     const item = el('button', { className: `room${id === chatRoom ? ' active' : ''}`, type: 'button' })
-    const icon = el('span', { className: 'avatar avatar-room', textContent: roomInitials(roomName(id)) })
+    const name = knownRoomName(id)
+    const icon = el('span', { className: 'avatar avatar-room', textContent: name ? roomInitials(name) : '' })
     item.append(icon, el('span', { className: 'room-main' },
-      el('span', { className: 'room-name' }, el('span', { textContent: roomName(id) }), last ? el('time', { textContent: timeLabel(last.at) }) : ''),
+      el('span', { className: 'room-name' }, name ? el('span', { textContent: name }) : skeleton(), last ? el('time', { textContent: timeLabel(last.at) }) : ''),
       el('span', { className: 'room-last', textContent: last ? `${last.account_id === accountId ? 'You' : memberLabel(last.account_id)}: ${last.text}` : chatAllowed || id !== chatRoom ? 'No messages yet' : 'Members only' }),
       unread && id !== chatRoom ? el('span', { className: 'room-new', textContent: `${unread} new message${unread > 1 ? 's' : ''}` }) : ''))
     item.addEventListener('click', () => void openRoom(id))
@@ -570,8 +687,9 @@ function setGate(text: string, actions: HTMLElement[] = []): void {
 async function openRoom(id: string): Promise<void> {
   chatRoom = id
   $<HTMLInputElement>('#chat-circle-id').value = id
-  $('#room-title').textContent = roomName(id)
-  $('#room-avatar').textContent = roomInitials(roomName(id))
+  const name = knownRoomName(id)
+  $('#room-title').replaceChildren(name ?? skeleton())
+  $('#room-avatar').textContent = name ? roomInitials(name) : ''
   const members = demo?.circle?.circle_id === id ? demo.circle.member_count : null
   $('#room-sub').textContent = `Circle room${members !== null ? ` · ${members} members` : ''} · members only`
   await checkChatAccess(true)
@@ -582,7 +700,7 @@ async function checkChatAccess(quiet = false): Promise<void> {
   // A public copy of the app (e.g. GitHub Pages) has no sign-in server unless one is configured.
   const local = (h: string) => /^(localhost|127\.0\.0\.1|\[::1\])$/.test(h)
   if (local(new URL(config.authUrl).hostname) && !local(window.location.hostname)) {
-    setGate('Chat and loan requests need the CommonCircle sign-in server, which is not hosted for this public copy. Run the app locally (npm run auth) to use them. Everything else here works.'); renderMessages(); return
+    setGate('Chat and chat loan requests are offline on this public copy: they need the CommonCircle sign-in server, which is not hosted yet. Joining, direct loans, the treasury and passports all work here. To try chat, run the app locally (npm run auth).', [button('Make a direct loan instead', async () => goView('direct'), 'soft')]); renderMessages(); return
   }
   if (!accountId) { setGate('Connect your wallet to open the chat.', connectButtons()); renderMessages(); return }
   const access = await readClient.checkAccess(chatRoom, accountId)
@@ -614,7 +732,8 @@ async function checkChatAccess(quiet = false): Promise<void> {
       try { sessionStorage.removeItem(TOKEN_KEY) } catch { /* ignore */ }
       setGate('Your sign-in expired. Sign in again to keep chatting.', [button('Sign in to chat', async () => { await signIn(); await checkChatAccess(true) })])
     } else {
-      setGate(errorText(error), [button('Try again', () => checkChatAccess(false), 'soft')])
+      setGate(error instanceof ChatApiError ? errorText(error) : 'The chat server is not answering right now, so chat and loan requests are paused. Direct loans still work.',
+        [button('Try again', () => checkChatAccess(false), 'soft'), button('Direct loan', async () => goView('direct'), 'ghost')])
     }
     renderMessages()
   }
@@ -820,17 +939,77 @@ function renderOpenRequests(): void {
   $('#open-requests-list').replaceChildren(...items)
 }
 
-/** Members: the invite box, for Trusted members only (the contract's rule after attach_dao). */
-function renderInvite(): void {
+/**
+ * Who may invite, by the frozen contract's rule (register_invite): an Active passport and
+ * either the founder while still admin, or effectively Trusted. A steward of a DAO circle
+ * who is not Trusted cannot invite; the contract refuses (E34), so the panel says so.
+ */
+function inviteRight(): { can: boolean; why: string } {
   const p = me?.passport
-  const can = !!p && p.status === 'Active' && p.effective_tier === 'Trusted'
-  $('#invite-form').hidden = !can
-  $('#invite-eligibility').textContent = !accountId ? 'Connect your wallet to invite a friend.'
-    : can ? 'Put in your friend\'s testnet account, make the link, copy it and send it privately. They open it, or paste it on Home.'
-      : 'Only Trusted members can invite in this circle. Repay one loan on time and your card turns Trusted.'
+  const circle = demo?.circle
+  if (!accountId) return { can: false, why: 'Connect your wallet to invite people.' }
+  if (!p || !circle) return { can: false, why: 'Join this circle first; then you can invite people once you are Trusted.' }
+  if (p.status !== 'Active') return { can: false, why: `Your card is ${p.status}, so you cannot invite right now.` }
+  const founderAdmin = circle.founder_id === accountId && circle.admin_id === accountId
+  if (founderAdmin) return { can: true, why: 'You founded this circle, so you can invite anyone.' }
+  if (p.effective_tier === 'Trusted') return { can: true, why: 'You are Trusted in this circle, so you can invite.' }
+  return { can: false, why: p.steward
+    ? 'This circle is run by its DAO, and the contract only lets Trusted members invite. Repay one loan on time to turn Trusted, or ask a Trusted member for a link.'
+    : 'Only the founder and Trusted members can invite in this circle. Repay one loan on time and your card turns Trusted.' }
+}
+
+function invitePanel(where: 'home' | 'members'): HTMLElement[] {
+  const right = inviteRight()
+  const nodes: HTMLElement[] = [el('div', { className: 'box-head' }, el('h2', { textContent: 'Invite members' }), el('p', { className: 'muted', textContent: right.why }))]
+  if (!right.can) return nodes
+  const result = inviteResult && inviteResult.circleId === circleId ? inviteResult : null
+  if (result) {
+    const link = el('textarea', { className: 'invite-link', rows: 3, readOnly: true, value: result.link, ariaLabel: 'Invite link' })
+    link.addEventListener('focus', () => link.select())
+    const qr = el('div', { className: 'invite-qr', ariaLabel: 'QR code of the invite link' })
+    if (result.qrSvg) qr.innerHTML = result.qrSvg // SVG generated locally by the qrcode library from our own link
+    const expires = new Date(result.expiresAt).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+    nodes.push(el('div', { className: 'invite-result' },
+      result.qrSvg ? qr : '',
+      el('div', { className: 'invite-result-main' },
+        el('p', { className: 'small', textContent: `${result.inviteeId ? `For ${result.inviteeId}. ` : 'Anyone with this link can join once. '}Works until ${expires}.` }),
+        link,
+        el('div', { className: 'btn-row' },
+          button('Copy link', async () => { await navigator.clipboard.writeText(result.link); show('Link copied. Send it privately.', 'ok') }),
+          ...(typeof navigator.share === 'function' ? [button('Share', async () => { await navigator.share({ title: 'Join my CommonCircle', url: result.link }) }, 'ghost')] : []),
+          button('Make another link', async () => { inviteResult = null; renderInvitePanels() }, 'ghost')),
+        el('p', { className: 'hint', textContent: 'The link holds a one-time secret that exists only on this screen: it is not saved anywhere. Copy it now; if you lose it, make another link (each costs a small NEAR storage deposit).' }))))
+    return nodes
+  }
+  const id = `inv-${where}`
+  const invitee = el('input', { id: `${id}-who`, autocomplete: 'off', placeholder: 'friend.testnet (optional)' })
+  const hours = el('input', { id: `${id}-hours`, inputMode: 'numeric', value: '24' })
+  const make = el('button', { className: 'btn btn-accent', type: 'button', textContent: 'Create invite link' })
+  make.addEventListener('click', () => void run(make, () => createInvite(invitee.value, hours.value)))
+  nodes.push(el('div', { className: 'field-row' },
+    el('div', {}, el('label', { htmlFor: invitee.id, textContent: 'Their NEAR testnet account' }), invitee, el('p', { className: 'hint', textContent: 'Leave empty for a link anyone can use once.' })),
+    el('div', {}, el('label', { htmlFor: hours.id, textContent: 'Link works for (hours)' }), hours)),
+  el('div', { className: 'btn-row' }, make))
+  return nodes
+}
+
+/** Home (members only) and Members: the same invite panel. */
+function renderInvitePanels(): void {
+  const member = !!me?.passport && me.passport.status === 'Active'
+  $('#home-invite').hidden = !member
+  if (member) $('#home-invite').replaceChildren(...invitePanel('home'))
+  $('#members-invite').replaceChildren(...invitePanel('members'))
 }
 
 /* ---------- overview, passport, evidence ---------- */
+
+/** A passport card picture, or a placeholder when its embedded image is unsafe to decode (red-team finding 1). */
+function cardImage(svg: string | null, alt: string): HTMLElement | null {
+  if (!svg) return null
+  const check = checkCardSvg(svg)
+  if (!check.ok) return el('p', { className: 'card-blocked', textContent: `Card picture not shown: ${check.reason}.` })
+  return el('img', { alt, src: URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' })) })
+}
 
 function tile(label: string, value: string, note = '', cls = ''): HTMLElement {
   return el('div', { className: `tile ${cls}` }, el('p', { className: 'tile-label', textContent: label }), el('p', { className: 'tile-value', textContent: value }), note ? el('p', { className: 'tile-note', textContent: note }) : '')
@@ -902,7 +1081,8 @@ function renderPassport(): void {
   const params = demo.circle.params
   const prog = trustedProgress(p, params)
   const art = el('figure', { className: 'pp-card' })
-  if (card?.svg) art.append(el('img', { alt: `${p.owner_id} passport card`, src: URL.createObjectURL(new Blob([card.svg], { type: 'image/svg+xml' })) }))
+  const picture = cardImage(card?.svg ?? null, `${p.owner_id} passport card`)
+  if (picture) art.append(picture)
   art.append(el('figcaption', { className: 'small muted', textContent: `Token ${p.token_id} · NEP-171 · cannot be transferred (nft_transfer always fails)` }))
   const statsList = el('dl', { className: 'pp-stats' },
     ...[['Account', p.owner_id], ['Tier', `${p.tier}${p.steward ? ' · Steward' : ''}`], ['Effective tier', p.effective_tier], ['Status', p.status],
@@ -966,7 +1146,9 @@ function renderEvidence(): void {
       const ref = c.reference as { explorer?: string; tx_hash?: string; method?: string; account_id?: string; report?: string; snapshot?: string }
       const what = c.kind === 'tx' && ref.explorer ? el('a', { href: ref.explorer, target: '_blank', rel: 'noopener', textContent: `tx ${ref.tx_hash?.slice(0, 8)}…` })
         : c.kind === 'view' ? el('span', { textContent: `view ${ref.method}(${ref.account_id ? memberLabel(ref.account_id) : ''})` }) : el('span', { textContent: `test report ${ref.report?.split('/').pop() ?? ''}` })
-      return el('tr', {}, el('td', { textContent: c.id }), el('td', {}, what), el('td', {}, el('span', { className: `state state-${c.status === 'PASS' ? 'Repaid' : 'Cancelled'}`, textContent: c.status })))
+      const cells = [el('td', { textContent: c.id }), el('td', {}, what), el('td', {}, el('span', { className: `state state-${c.status === 'PASS' ? 'Repaid' : 'Cancelled'}`, textContent: c.status }))]
+      cells.forEach((cell, i) => { cell.dataset.label = ['Claim', 'Evidence', 'Status'][i] })
+      return el('tr', {}, ...cells)
     })
     return el('section', { className: 'box track' },
       el('div', { className: 'track-head' },
@@ -1001,7 +1183,9 @@ async function refreshMe(): Promise<void> {
       lent: lent.filter((l) => l.circle_id === circleId),
     }
   } catch (error) {
-    show(`Could not read your account. ${errorText(error)}`, 'bad', 'retry', refreshMe)
+    const text = errorText(error)
+    if (isNetworkText(text)) netTrouble()
+    else show(`Could not read your account. ${text}`, 'bad', 'retry', refreshMe)
   }
   const chatForHome = chatClient()
   if (chatForHome && me?.passport) await loadRequests(chatForHome, circleId)
@@ -1029,7 +1213,7 @@ function renderAll(): void {
   renderEligibility()
   renderForYou()
   renderOpenRequests()
-  renderInvite()
+  renderInvitePanels()
   renderJourney()
   renderMembers()
   renderSidebar()
@@ -1037,9 +1221,10 @@ function renderAll(): void {
 }
 
 function renderSidebar(): void {
-  const ids = new Map<string, string>([[circleId, demo?.circle?.name ?? `Circle ${circleId}`]])
-  for (const c of me?.circles ?? []) ids.set(c.id, c.name)
-  $('#side-circles').replaceChildren(...[...ids].map(([id, name]) => {
+  // "Your circles" comes from the contract (nft_tokens_for_owner for the connected account), never from this browser.
+  const mine = me?.circles ?? []
+  const viewingOther = !mine.some((c) => c.id === circleId)
+  $('#side-circles').replaceChildren(...mine.map(({ id, name }) => {
     const item = el('button', { className: `circle-item${id === circleId ? ' active' : ''}`, type: 'button', title: name },
       el('span', { className: 'avatar avatar-sm avatar-room', textContent: roomInitials(name) }),
       el('span', { className: 'grow', textContent: name }))
@@ -1050,9 +1235,14 @@ function renderSidebar(): void {
     }))
     return item
   }))
+  const circleName = demo?.circle?.name ?? null
+  $('#side-circles-note').textContent = !accountId ? 'Connect a wallet to see the circles you belong to.'
+    : !me ? 'Reading your circles from testnet…'
+      : !mine.length ? `${memberLabel(accountId)} is not in any circle yet. Paste an invite link on Overview.`
+        : viewingOther && circleName ? `Now viewing ${circleName}, which you are not a member of.` : ''
   const tier = me?.passport ? `${me.passport.display_tier} · ${demo?.circle?.name ?? `circle ${circleId}`}` : accountId ? 'Not a member of this circle yet' : ''
   $('#profile-tier').textContent = tier
-  $('#crumb-circle').textContent = demo?.circle?.name ?? `Circle ${circleId}`
+  $('#crumb-circle').replaceChildren(demo?.circle?.name ?? skeleton())
   const funded = me?.loans.find((l) => l.state === 'Funded')
   $('#nav-loans-badge').hidden = !funded
   $('#nav-loans-badge').textContent = funded ? '1' : ''
@@ -1213,8 +1403,8 @@ function renderJourney(): void {
     isMember ? `You are a ${passport!.display_tier} of ${circleName}.`
       : passport ? `Your card is ${passport.status}. Ask the stewards for help.`
         : invite.inviteSecret ? 'You have an invite. Joining costs about 0.009 NEAR, which pays for storing your card.'
-          : 'You need an invite link from a Trusted member of this circle. Open it in this browser.',
-    invite.inviteSecret && !passport ? [button('Join the circle', joinInvite)] : !passport ? [pasteInviteBox()] : []))
+          : 'You need an invite link from the founder or a Trusted member. Paste it in "Have an invite link?" above.',
+    invite.inviteSecret && !passport ? [button('Join the circle', joinInvite)] : []))
   steps.push(step(3, stateOf(2), 'Sign in',
     me?.signedIn ? 'Signed in for this browser session. The chat is open to you.' : 'A free signature that proves the account is yours. It also opens the circle chat.',
     [button('Sign in', signIn)]))
@@ -1255,6 +1445,17 @@ function renderJourney(): void {
     steps.splice(0, folded, group)
   }
   $('#steps').replaceChildren(...steps)
+  // Not a member of this circle: the paste-invite box is always on Overview, on every screen size.
+  const joinBox = $('#join-box')
+  joinBox.hidden = isMember || !!passport
+  if (!joinBox.hidden) {
+    $('#join-text').textContent = invite.inviteSecret
+      ? (accountId ? 'Invite found. Press "Join the circle" in your steps below.' : 'Invite found. Connect your wallet (top right), then join.')
+      : `${accountId ? `${memberLabel(accountId)} is not a member of ${circleName} yet. ` : ''}Paste the invite link you were sent to join. Opening the link in this browser works too.`
+    if (invite.inviteSecret) $('#join-slot').replaceChildren()
+    else if (!$('#join-slot').firstChild) $('#join-slot').replaceChildren(pasteInviteBox())
+  }
+  $('#invite-details').hidden = isMember
   $('#home-hero').classList.toggle('compact', isMember)
   $('#journey-sub').textContent = current === -1 ? 'All done: you joined, borrowed and repaid. Your card is on the right.' : 'Follow these in order. Each one updates from the blockchain by itself.'
   tickDue()
@@ -1265,7 +1466,8 @@ function renderMembers(): void {
   grid.replaceChildren()
   for (const card of demo?.cards ?? []) {
     const fig = el('figure', { className: `member${card.passport.owner_id === accountId ? ' me' : ''}` })
-    if (card.svg) fig.append(el('img', { alt: `${card.passport.owner_id} passport card`, src: URL.createObjectURL(new Blob([card.svg], { type: 'image/svg+xml' })) }))
+    const picture = cardImage(card.svg, `${card.passport.owner_id} passport card`)
+    if (picture) fig.append(picture)
     fig.append(el('figcaption', {},
       el('span', { className: 'who' }, avatar(card.passport.owner_id, 'sm'), accountChip(card.passport.owner_id)), badge(card.passport.display_tier)),
       el('p', { className: 'member-counts', textContent: `On time ${card.passport.on_time_count} · late ${card.passport.late_count}` }))
@@ -1277,14 +1479,20 @@ function renderMembers(): void {
 
 function renderLoansTable(): void {
   const loans = (demo?.loans ?? []).slice().sort((a, b) => Number(b.loan_id) - Number(a.loan_id))
+  const td = (label: string, props: Partial<HTMLTableCellElement>, ...children: Array<Node | string>) => {
+    const cell = el('td', props, ...children)
+    cell.dataset.label = label
+    return cell
+  }
+  const reasonOf = (l: LoanView) => (chatRequests.get(l.circle_id) ?? []).find((c) => c.loan_id === l.loan_id)?.note ?? ''
   $('#circle-loans').replaceChildren(...(loans.length ? loans.map((l) => el('tr', {},
-    el('td', { textContent: l.loan_id }),
-    el('td', {}, who(l.borrower_id, l.borrower_id === accountId ? 'You' : memberLabel(l.borrower_id))),
-    el('td', {}, l.lender_is_treasury ? who(l.lender_id, 'Treasury (DAO)') : who(l.lender_id, l.lender_id === accountId ? 'You' : memberLabel(l.lender_id))),
-    el('td', { textContent: `${formatUsdc(l.principal)} USDC` }),
-    el('td', { className: 'reason', textContent: (chatRequests.get(l.circle_id) ?? []).find((c) => c.loan_id === l.loan_id)?.note ?? '' }),
-    el('td', {}, el('span', { className: `state state-${l.state}`, textContent: l.state === 'Repaid' && l.repaid_on_time === false ? (l.flag_cleared ? 'Repaid (late, forgiven)' : 'Repaid late') : l.state })),
-  )) : [el('tr', {}, el('td', { colSpan: 6, className: 'muted', textContent: 'No loans yet.' }))]))
+    td('Loan', { textContent: `#${l.loan_id}` }),
+    td('Borrower', {}, l.borrower_id === accountId ? who(l.borrower_id, 'You') : el('span', { className: 'who' }, avatar(l.borrower_id, 'sm'), accountChip(l.borrower_id))),
+    td('Lender', {}, l.lender_is_treasury ? who(l.lender_id, 'Treasury (DAO)') : l.lender_id === accountId ? who(l.lender_id, 'You') : el('span', { className: 'who' }, avatar(l.lender_id, 'sm'), accountChip(l.lender_id))),
+    td('Amount', { textContent: `${formatUsdc(l.principal)} USDC` }),
+    td('Reason', { className: 'reason', textContent: reasonOf(l) || '—', title: reasonOf(l) }),
+    td('Status', {}, el('span', { className: `state state-${l.state}`, textContent: l.state === 'Repaid' && l.repaid_on_time === false ? (l.flag_cleared ? 'Repaid (late, forgiven)' : 'Repaid late') : l.state })),
+  )) : [el('tr', {}, el('td', { colSpan: 6, className: 'muted', textContent: demo ? 'No loans in this circle yet.' : 'Loading…' }))]))
 }
 
 function tickDue(): void {
@@ -1306,7 +1514,9 @@ async function loadMyCard(): Promise<void> {
   }
   const passport = me.passport
   const [svg, token] = await Promise.all([readClient.cardSvg(passport.token_id), readClient.nftToken(passport.token_id)])
-  if (svg) { image.src = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' })); image.hidden = false }
+  const check = svg ? checkCardSvg(svg) : null
+  if (svg && check?.ok) { image.src = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' })); image.hidden = false }
+  else image.hidden = true
   $('#load-my-card').hidden = false
   $('#my-card-title').textContent = `${token?.metadata?.title ?? passportTokenTitle(demo?.circle?.name ?? '')} · ${passport.display_tier} · on time ${passport.on_time_count}, late ${passport.late_count}`
 }
@@ -1437,13 +1647,14 @@ async function loadDemo(): Promise<void> {
   balances = { contract: contractBal, dao: daoBal }
   lastRefresh = Date.now()
   loadError = ''
+  netOk()
   const diffs = snapshot.circle ? demoDifferences(snapshot.circle.params) : []
   $('#demo-flag').hidden = !diffs.length
   $('#demo-flag').textContent = diffs.length ? `Demo settings: ${diffs.join('; ')}.` : ''
   const dao = $('#dao-status')
   if (snapshot.dao) {
-    dao.textContent = snapshot.dao.verified ? '✓ DAO verified by frontend trust checks: pinned Sputnik code, no access keys. Only steward votes move its money.' : '⚠ The treasury account failed the app\'s DAO trust checks. Treasury buttons are hidden.'
-    dao.title = `${snapshot.dao.daoId} · code ${snapshot.dao.codeHash ?? 'unknown'} · keys ${snapshot.dao.accessKeyCount ?? 'unknown'}`
+    dao.textContent = snapshot.dao.verified ? '✓ DAO verified by this app: pinned Sputnik code, no access keys, and its voting rules need both stewards.' : `⚠ ${snapshot.dao.message} Treasury buttons are hidden.`
+    dao.title = `${snapshot.dao.daoId} · code ${snapshot.dao.codeHash ?? 'unknown'} · keys ${snapshot.dao.accessKeyCount ?? 'unknown'} · voting: ${snapshot.dao.policyReason}`
     dao.className = `dao-status ${snapshot.dao.verified ? 'trusted' : ''}`
   } else {
     dao.textContent = 'No DAO yet: the founder runs this circle.'
@@ -1453,7 +1664,7 @@ async function loadDemo(): Promise<void> {
   renderAll()
   renderEvidence()
   renderLoansTable()
-  await renderTreasury().catch((error) => show(`Treasury: ${errorText(error)}`, 'bad'))
+  await renderTreasury().catch((error) => { const text = errorText(error); if (isNetworkText(text)) netTrouble(); else show(`Treasury: ${text}`, 'bad') })
 }
 
 /* ---------- wiring ---------- */
@@ -1465,17 +1676,25 @@ function on(selector: string, action: () => Promise<void> | void, context: 'wall
 
 function wire(): void {
   for (const item of document.querySelectorAll<HTMLButtonElement>('.nav-item')) item.addEventListener('click', () => goView(item.dataset.view as View))
-  $('#menu-btn').addEventListener('click', (event) => { event.stopPropagation(); $('#sidebar').classList.toggle('open') })
-  // Phone: a tap outside the slide-out menu closes it.
+  $('#menu-btn').addEventListener('click', (event) => { event.stopPropagation(); if ($('#sidebar').classList.contains('open')) closeDrawer(); else openDrawer() })
+  // Phone: a tap on the backdrop (or anywhere outside the drawer) closes it; so does Escape.
+  $('#scrim').addEventListener('click', closeDrawer)
   document.addEventListener('click', (event) => {
-    const sidebar = $('#sidebar')
-    if (sidebar.classList.contains('open') && !sidebar.contains(event.target as Node)) sidebar.classList.remove('open')
+    const target = event.target as Node
+    if ($('#sidebar').classList.contains('open') && !$('#sidebar').contains(target)) closeDrawer()
+    if (!$('#account-menu').hidden && !(target instanceof Element && target.closest('.head-account'))) closeAccountMenu()
   })
+  document.addEventListener('keydown', (event) => { if (event.key === 'Escape') { closeDrawer(); closeAccountMenu() } })
+  $('#head-connect').addEventListener('click', (event) => { event.stopPropagation(); toggleAccountMenu($('#head-connect')) })
+  $('#head-account').addEventListener('click', (event) => { event.stopPropagation(); toggleAccountMenu($('#head-account')) })
+  on('#switch-wallet', switchWallet, 'wallet')
+  $('#wallet-account').addEventListener('click', () => { if (accountId) void navigator.clipboard?.writeText(accountId).then(() => show(`${accountId} (copied)`, 'ok'), () => show(accountId, 'info')) })
+  on('#net-banner-retry', async () => { await refreshAll() })
+  onRpcHealth((h) => { if (h.ok && !$('#net-banner').hidden && demo) netOk() })
   on('#connect-meteor', () => connectWallet('meteor-wallet'), 'wallet')
   on('#connect-wallet', () => connectWallet('my-near-wallet'), 'wallet')
   $('#status-close').addEventListener('click', hideToast)
   $<HTMLSelectElement>('#pp-account').addEventListener('change', (event) => { passportAccount = (event.target as HTMLSelectElement).value; renderPassport() })
-  on('#copy-invite', async () => { await navigator.clipboard.writeText($<HTMLTextAreaElement>('#invite-link').value); show('Link copied. Send it privately.', 'ok') })
   $('#go-ask-chat').addEventListener('click', () => { goView('chat'); $('#ask-panel').hidden = false; checkAsk() })
   $('#go-direct').addEventListener('click', () => goView('direct'))
   $('#open-chat-requests').addEventListener('click', () => goView('chat'))
@@ -1486,7 +1705,6 @@ function wire(): void {
   on('#disconnect-wallet', disconnectWallet)
   on('#sign-in', signIn)
   on('#join-invite', joinInvite)
-  on('#create-invite', createInvite)
   on('#create-circle', createCircle)
   on('#save-design', saveDesign)
   on('#load-positions', refreshMe)
@@ -1565,7 +1783,14 @@ function boot(): void {
   if (inviteFields().inviteSecret) start = 'home'
   goView(start)
   renderAll()
-  void loadDemo().catch((error) => { loadError = errorText(error); renderStats(); showError(error, 'chain', refreshAll) })
+  renderHeadAccount()
+  void loadDemo().catch((error) => {
+    const text = errorText(error)
+    if (isNetworkText(text)) { netTrouble(); return }
+    loadError = text
+    renderStats()
+    showError(error, 'chain', refreshAll)
+  })
   void restoreWallet().catch(() => { /* no saved wallet session */ })
 }
 

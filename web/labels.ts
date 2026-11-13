@@ -4,15 +4,30 @@
 
 const NETWORK_SUFFIX = /\.(testnet|near)$/
 
+const MAX = 16
+
 /**
- * First 6 and last 6 characters of the account name. The network suffix (".testnet")
- * is dropped first, because every account in the app has it and "…estnet" says nothing.
- *   "commoncircle-light-lender.testnet" -> "common…lender"
- *   "254edye5v.testnet"                 -> "254edye5v"
+ * A readable name for an account. The network suffix (".testnet") is dropped, because
+ * every account in the app has it. Short names stay whole. A sub-account shows its own
+ * first part. A long hyphenated name keeps its last whole words, which are the part
+ * people tell apart. Anything else keeps its start and end.
+ *   "254edye5v.testnet"                    -> "254edye5v"
+ *   "commoncircle-light-lender.testnet"    -> "…light-lender"
+ *   "dogs-dao.commoncircle-light.testnet"  -> "dogs-dao"
+ *   64-hex implicit account                -> "3e2210e1…fcb8af"
  */
 export function memberLabel(accountId: string): string {
   const name = accountId.replace(NETWORK_SUFFIX, '')
-  return name.length > 13 ? `${name.slice(0, 6)}…${name.slice(-6)}` : name
+  if (name.length <= MAX) return name
+  const first = name.split('.')[0]
+  if (first !== name && first.length >= 3 && first.length <= MAX) return first
+  const words = first.split('-')
+  if (words.length > 1) {
+    let tail = words[words.length - 1]
+    for (let i = words.length - 2; i >= 0 && `${words[i]}-${tail}`.length <= MAX - 1; i--) tail = `${words[i]}-${tail}`
+    if (tail.length >= 4) return `…${tail.slice(-(MAX - 1))}`
+  }
+  return `${name.slice(0, 8)}…${name.slice(-6)}`
 }
 
 export type Tier = 'Member' | 'Trusted' | 'Steward'

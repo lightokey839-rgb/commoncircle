@@ -2,7 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#24150f" />
     <title>CommonCircle</title>
     <meta name="description" content="Zero-interest loans and a members-only chat for people who already trust each other, on NEAR testnet." />
     <link rel="stylesheet" href="./styles.css" />
@@ -15,6 +16,28 @@
           <span class="brand-mark" aria-hidden="true"></span>
           <span>CommonCircle</span>
         </a>
+
+        <div class="profile" id="profile">
+          <div id="profile-out" class="profile-out">
+            <p class="profile-hint">Connect a NEAR testnet wallet to join, borrow and chat.</p>
+            <button id="connect-meteor" class="btn btn-accent btn-block">Connect Meteor</button>
+            <button id="connect-wallet" class="btn btn-glass btn-block">MyNearWallet</button>
+          </div>
+          <div id="profile-in" class="profile-in" hidden>
+            <p class="profile-label">Signed in as</p>
+            <div class="profile-row">
+              <span id="profile-avatar" class="avatar"></span>
+              <div class="profile-text">
+                <button id="wallet-account" class="profile-name" type="button" title="Show and copy the full account"></button>
+                <p id="profile-tier" class="profile-tier">Not a member yet</p>
+              </div>
+            </div>
+            <div class="profile-actions">
+              <button id="switch-wallet" class="btn btn-glass btn-sm" type="button">Switch</button>
+              <button id="disconnect-wallet" class="btn btn-glass btn-sm" type="button">Disconnect</button>
+            </div>
+          </div>
+        </div>
 
         <p class="side-label">Menu</p>
         <nav class="nav" aria-label="Main">
@@ -61,39 +84,33 @@
 
         <p class="side-label">Your circles</p>
         <div id="side-circles" class="side-circles"></div>
+        <p id="side-circles-note" class="side-note"></p>
 
-        <div class="profile" id="profile">
-          <div id="profile-out" class="profile-out">
-            <p class="profile-hint">Connect a NEAR testnet wallet to join, borrow and chat.</p>
-            <button id="connect-meteor" class="btn btn-accent btn-block">Connect Meteor</button>
-            <button id="connect-wallet" class="btn btn-glass btn-block">MyNearWallet</button>
-          </div>
-          <div id="profile-in" class="profile-in" hidden>
-            <span id="profile-avatar" class="avatar"></span>
-            <div class="profile-text">
-              <p id="wallet-account" class="profile-name"></p>
-              <p id="profile-tier" class="profile-tier">Not a member yet</p>
-            </div>
-            <button id="disconnect-wallet" class="icon-btn" title="Disconnect wallet" aria-label="Disconnect wallet">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
-            </button>
-          </div>
-        </div>
       </aside>
+      <div class="scrim" id="scrim" hidden></div>
 
       <!-- WORKSPACE -->
       <section class="workspace">
         <header class="topbar">
-          <button class="icon-btn menu-btn" id="menu-btn" aria-label="Open menu" aria-controls="sidebar">
+          <button class="icon-btn menu-btn" id="menu-btn" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
           </button>
-          <p class="crumbs"><span id="crumb-circle">The Dogs (DEMO)</span><span class="crumb-sep">/</span><strong id="crumb-view">Home</strong></p>
-          <span class="topbar-meta"><span id="net-label">NEAR testnet</span> · <span id="wallet-state">wallet not connected</span> · <span id="refresh-time">loading…</span></span>
-          <span class="chip-testnet" title="Everything here uses NEAR testnet: no real money.">TESTNET ONLY — NO MAINNET FUNDS</span>
-          <button id="journey-refresh" class="icon-btn" title="Refresh from testnet" aria-label="Refresh from testnet">
+          <p class="crumbs"><span id="crumb-circle" class="crumb-circle"><span class="skeleton-line" aria-label="Loading circle"></span></span><span class="crumb-sep">/</span><strong id="crumb-view">Overview</strong></p>
+          <span class="topbar-meta"><span id="refresh-time">loading…</span></span>
+          <span class="chip-testnet" tabindex="0" title="Everything here runs on NEAR testnet: no real money, no mainnet funds.">TESTNET</span>
+          <div class="head-account">
+            <button id="head-connect" class="btn btn-accent btn-sm head-connect" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="account-menu"><span class="label-long">Connect wallet</span><span class="label-short">Connect</span></button>
+            <button id="head-account" class="head-chip" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="account-menu" hidden></button>
+            <div id="account-menu" class="account-menu" role="menu" hidden></div>
+          </div>
+          <button id="journey-refresh" class="icon-btn refresh-btn" title="Refresh from testnet" aria-label="Refresh from testnet">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/></svg>
           </button>
         </header>
+        <div id="net-banner" class="net-banner" role="status" hidden>
+          <span id="net-banner-text"></span>
+          <button id="net-banner-retry" class="btn btn-soft btn-sm" type="button">Retry now</button>
+        </div>
 
         <main class="panel" id="panel">
           <!-- HOME -->
@@ -105,16 +122,24 @@
                 <p class="lede">Members lend USDC straight to each other, with no interest and no pooled pot. Every on-time repayment is written into a passport NFT that cannot be sold or sent; it turns <strong>Trusted</strong>, which raises your limit and opens the circle's DAO treasury.</p>
               </div>
               <div class="snapshot">
-                <p id="circle-name" class="snapshot-name">Loading circle…</p>
+                <p id="circle-name" class="snapshot-name"><span class="skeleton-line" aria-label="Loading circle"></span></p>
                 <p id="demo-flag" class="demo-flag" hidden></p>
                 <p id="dao-status" class="dao-status">Checking the circle's DAO…</p>
               </div>
+            </div>
+
+            <div id="join-box" class="box join-box" hidden>
+              <h2>Have an invite link?</h2>
+              <p id="join-text" class="muted">Paste it here to join this circle. Opening the link in this browser works too.</p>
+              <div id="join-slot"></div>
             </div>
 
             <section class="stats-wrap" aria-label="Circle statistics from testnet">
               <div id="stats-grid" class="stats-grid"></div>
               <div id="custody" class="custody"></div>
             </section>
+
+            <div id="home-invite" class="box invite-box" hidden></div>
 
             <div id="for-you" class="box for-you" hidden>
               <h2>Requests for you</h2>
@@ -190,8 +215,8 @@
               <header class="room-head">
                 <span id="room-avatar" class="avatar avatar-room"></span>
                 <div>
-                  <p id="room-title" class="room-title">The Dogs (DEMO)</p>
-                  <p id="room-sub" class="room-sub">Circle room</p>
+                  <p id="room-title" class="room-title"><span class="skeleton-line" aria-label="Loading room"></span></p>
+                  <p id="room-sub" class="room-sub">&nbsp;</p>
                 </div>
                 <input id="chat-circle-id" type="hidden" value="3" />
                 <button id="check-chat-access" class="icon-btn icon-btn-light" title="Check my access again" aria-label="Check my access again">
@@ -333,21 +358,7 @@
 
           <!-- MEMBERS -->
           <section class="view" id="view-members" data-title="Members" hidden>
-            <div class="box invite-box">
-              <h2>Invite a friend</h2>
-              <p id="invite-eligibility" class="muted">Trusted members can invite. Make a link, copy it and send it privately; the friend opens it, or pastes it on Home.</p>
-              <div id="invite-form" hidden>
-                <div class="field-row">
-                  <div><label for="invitee-account-id">Their NEAR testnet account</label><input id="invitee-account-id" autocomplete="off" placeholder="friend.testnet" /></div>
-                  <div><label for="invite-expiry-hours">Link works for (hours)</label><input id="invite-expiry-hours" inputmode="numeric" value="24" /></div>
-                </div>
-                <div class="btn-row">
-                  <button id="create-invite" class="btn btn-accent" type="button">Create invite link</button>
-                  <button id="copy-invite" class="btn btn-ghost" type="button" hidden>Copy link</button>
-                </div>
-                <textarea id="invite-link" rows="2" readonly placeholder="The link appears here" hidden></textarea>
-              </div>
-            </div>
+            <div id="members-invite" class="box invite-box"></div>
             <div class="box">
               <h2>Members and their cards</h2>
               <p class="muted">Each card belongs to one member. It cannot be sold or sent, and it changes when they repay on time.</p>

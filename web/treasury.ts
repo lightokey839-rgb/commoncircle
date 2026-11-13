@@ -1,4 +1,5 @@
 import type { FtTransferCallOutcome, LoanView, NearWallet, U128, U64 } from './circle-client'
+import { viewFunction } from './rpc'
 
 // Sputnik DAO v2 (sputnikdao2) treasury helpers. The JSON matches what ran on
 // testnet with contracts/scripts/testnet-dao.sh (proposals 0-3 on
@@ -143,16 +144,8 @@ export class SputnikDaoClient {
   constructor(readonly rpcUrl: string, readonly daoId: string, readonly wallet?: NearWallet) {}
 
   async view<T>(methodName: string, args: Record<string, unknown> = {}): Promise<T> {
-    const response = await fetch(this.rpcUrl, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0', id: `dao-${methodName}`, method: 'query',
-        params: { request_type: 'call_function', finality: 'final', account_id: this.daoId, method_name: methodName, args_base64: encodeBase64(JSON.stringify(args)) },
-      }),
-    })
-    const body = await response.json() as { result?: { result?: number[] }; error?: unknown }
-    if (!response.ok || body.error || !body.result?.result) throw new Error(`DAO view ${methodName} failed`)
+    const { ok, payload: body } = await viewFunction(this.rpcUrl, this.daoId, methodName, encodeBase64(JSON.stringify(args)))
+    if (!ok || body.error || !body.result?.result) throw new Error(`DAO view ${methodName} failed`)
     return JSON.parse(new TextDecoder().decode(new Uint8Array(body.result.result))) as T
   }
 

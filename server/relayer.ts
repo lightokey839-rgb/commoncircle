@@ -13,12 +13,33 @@ export const DEFAULT_RELAYER_ALLOWLIST: RelayerAllowlist = {
   usdc: ['storage_deposit'],
 }
 
+/** Default per-call gas ceiling the relayer will sponsor (300 Tgas). */
+export const DEFAULT_MAX_GAS_PER_CALL = '300000000000000'
+
+/** Atomic, durable spend counters shared by every relayer instance (e.g. a SQL row
+ * updated in one transaction). Required in live mode; not built in this repo. */
+export type RelayerSpendStore = {
+  /** Atomically add `cost` to today's counters unless a cap would be exceeded. */
+  reserve(input: { day: string; accountId: string; cost: bigint; perAccountCap: bigint; totalCap: bigint }):
+    Promise<{ ok: true; accountSpent: bigint; totalSpent: bigint } | { ok: false; code: 'RELAYER_ACCOUNT_CAP' | 'RELAYER_TOTAL_CAP' }>
+}
+
 export type RelayerConfig = {
   contractId: string
   receivers: { circle: string; vault: string; usdc: string }
   perAccountDailyCap: U128
   totalDailyCap: U128
+  /** Highest gas price (yoctoNEAR per gas) the relayer budgets for. Cost is gas x this + deposit. */
+  maxGasPrice: U128
+  /** Per-call gas ceiling; defaults to DEFAULT_MAX_GAS_PER_CALL. */
+  maxGasPerCall?: U64
+  /** Attached deposit (yoctoNEAR) the relayer may pay, per method. Unlisted methods: none. */
+  maxDepositByMethod?: Readonly<Record<string, U128>>
   allowlist?: RelayerAllowlist
+  /** 'dry-run' (default) keeps counters in memory: they reset on restart and are per process,
+   * so they are NOT a spending limit. 'live' refuses to start without a durable `store`. */
+  mode?: 'dry-run' | 'live'
+  store?: RelayerSpendStore
 }
 
 export type RelayerRequest = {
@@ -26,7 +47,12 @@ export type RelayerRequest = {
   circleId: U64
   receiverId: string
   methodName: string
-  estimatedCost: U128
+  /** Prepaid gas of the call to sponsor. The charged cost is computed from this, server-side. */
+  gas: U64
+  /** Attached deposit in yoctoNEAR (default '0'). */
+  deposit?: U128
+  /** Caller's estimate: informational only. It can raise the charged cost, never lower it. */
+  estimatedCost?: U128
   invitePublicKey?: string
   inviteSignature?: string
 }
@@ -57,6 +83,11 @@ export class RelayerError extends Error {
 
 function parseBudget(value: string, field: string): bigint {
   if (!/^\d+$/.test(value)) throw new Error(`${field} must be a decimal U128 string.`)
+  return BigInt(value)
+}
+
+function parseRequestAmount(value: unknown, field: string): bigint {
+  if (typeof value !== 'string' || !/^\d{1,39}$/.test(value)) throw new RelayerError('RELAYER_COST', `${field} must be a decimal string`)
   return BigInt(value)
 }
 
@@ -111,6 +142,10 @@ function validInvite(invite: InviteView | null, request: RelayerRequest, nowMs: 
   }
 }
 
+/** Authorization and daily budget for sponsored calls. It does not hold a key or submit
+ * transactions (see README). In the default 'dry-run' mode the spend counters live in this
+ * process only: a restart or a second instance resets them, so they must not guard real
+ * funds. Construct with mode 'live' only together with a durable, atomic `store`. */
 export class RelayerGuard {
   private readonly config: RelayerConfig
   private readonly clock: () => number
@@ -119,7 +154,11 @@ export class RelayerGuard {
   private readonly accountSpent = new Map<string, bigint>()
   private readonly perAccountCap: bigint
   private readonly totalCap: bigint
+  private readonly maxGasPrice: bigint
+  private readonly maxGasPerCall: bigint
+  private readonly maxDeposits: Map<string, bigint>
   private readonly allowlist: RelayerAllowlist
+  private readonly store: RelayerSpendStore | null
 
   constructor(config: RelayerConfig, clock: () => number = () => Date.now()) {
     this.config = config
@@ -127,7 +166,16 @@ export class RelayerGuard {
     this.perAccountCap = parseBudget(config.perAccountDailyCap, 'perAccountDailyCap')
     this.totalCap = parseBudget(config.totalDailyCap, 'totalDailyCap')
     if (this.perAccountCap === 0n || this.totalCap === 0n) throw new Error('relayer caps must be positive')
+    this.maxGasPrice = parseBudget(config.maxGasPrice ?? '', 'maxGasPrice')
+    if (this.maxGasPrice === 0n) throw new Error('maxGasPrice must be positive')
+    this.maxGasPerCall = parseBudget(config.maxGasPerCall ?? DEFAULT_MAX_GAS_PER_CALL, 'maxGasPerCall')
+    this.maxDeposits = new Map(Object.entries(config.maxDepositByMethod ?? {}).map(([method, value]) => [method, parseBudget(value, `maxDepositByMethod.${method}`)]))
     this.allowlist = config.allowlist ?? DEFAULT_RELAYER_ALLOWLIST
+    const mode = config.mode ?? 'dry-run'
+    if (mode !== 'dry-run' && mode !== 'live') throw new Error(`unknown relayer mode ${String(mode)}`)
+    // Fail closed: in-memory counters are not a spending limit for a relayer that pays.
+    if (mode === 'live' && !config.store) throw new Error('relayer live mode requires a durable spend store (config.store); refusing to start with in-memory counters')
+    this.store = config.store ?? null
   }
 
   async authorize(request: RelayerRequest, reader: RelayerReader): Promise<RelayerReservation> {
@@ -136,8 +184,7 @@ export class RelayerGuard {
     if (!this.allowlist[receiver].includes(request.methodName)) {
       throw new RelayerError('RELAYER_METHOD', `${request.methodName} is not allowed for ${receiver}`)
     }
-    const cost = parseBudget(request.estimatedCost, 'estimatedCost')
-    if (cost === 0n) throw new RelayerError('RELAYER_COST', 'estimatedCost must be positive')
+    const cost = this.cost(request)
 
     const nowMs = this.clock()
     const invite = request.invitePublicKey ? await reader.getInvite(request.invitePublicKey) : null
@@ -165,6 +212,22 @@ export class RelayerGuard {
     return this.reserve(receiver, request.accountId, cost, nowMs)
   }
 
+  /** Worst-case cost of the call, computed here: prepaid gas x maxGasPrice + attached deposit.
+   * The caller's estimatedCost is never trusted to lower it. */
+  private cost(request: RelayerRequest): bigint {
+    const gas = parseRequestAmount(request.gas, 'gas')
+    if (gas === 0n) throw new RelayerError('RELAYER_GAS', 'gas must be positive')
+    if (gas > this.maxGasPerCall) throw new RelayerError('RELAYER_GAS', `gas above the ${this.maxGasPerCall} per-call limit`)
+    const deposit = parseRequestAmount(request.deposit ?? '0', 'deposit')
+    if (deposit > (this.maxDeposits.get(request.methodName) ?? 0n)) {
+      throw new RelayerError('RELAYER_DEPOSIT', `the relayer does not sponsor this deposit for ${request.methodName}`)
+    }
+    const computed = gas * this.maxGasPrice + deposit
+    if (request.estimatedCost === undefined) return computed
+    const estimate = parseRequestAmount(request.estimatedCost, 'estimatedCost')
+    return estimate > computed ? estimate : computed
+  }
+
   private receiverKind(receiverId: string): RelayerReceiver | null {
     if (receiverId === this.config.receivers.circle) return 'circle'
     if (receiverId === this.config.receivers.vault) return 'vault'
@@ -172,8 +235,20 @@ export class RelayerGuard {
     return null
   }
 
-  private reserve(receiver: RelayerReceiver, accountId: string, cost: bigint, nowMs: number): RelayerReservation {
+  private async reserve(receiver: RelayerReceiver, accountId: string, cost: bigint, nowMs: number): Promise<RelayerReservation> {
     const currentDay = dayKey(nowMs)
+    if (this.store) {
+      const result = await this.store.reserve({ day: currentDay, accountId, cost, perAccountCap: this.perAccountCap, totalCap: this.totalCap })
+      if (!result.ok) throw new RelayerError(result.code, result.code === 'RELAYER_ACCOUNT_CAP' ? 'account daily cap exceeded' : 'relayer total daily cap exceeded')
+      return {
+        day: currentDay,
+        receiver,
+        accountId,
+        cost: cost.toString(),
+        accountRemaining: (this.perAccountCap - result.accountSpent).toString(),
+        totalRemaining: (this.totalCap - result.totalSpent).toString(),
+      }
+    }
     if (this.currentDay !== currentDay) {
       this.currentDay = currentDay
       this.totalSpent = 0n

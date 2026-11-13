@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url'
 import { ChatError, ChatService, rpcAccessCheck } from './chat.ts'
 import { RequestService, rpcLoanLookup } from './requests.ts'
 import { hasFullAccessKey, verifyNep413Signature } from './nep413.ts'
+import { ChallengeStore, FixedWindowLimiter, MAX_BODY_BYTES, readJsonBody } from './limits.ts'
 
 const PORT = Number(process.env.AUTH_PORT ?? 3001)
 const APP_DOMAIN = process.env.APP_DOMAIN ?? 'localhost:5173'
@@ -42,13 +43,28 @@ function localSecret(): string {
 const JWT_SECRET = process.env.AUTH_JWT_SECRET ?? localSecret()
 const chat = new ChatService({ checkAccess: rpcAccessCheck(NEAR_RPC_URL, CONTRACT_ID), storePath: join(DATA_DIR, 'chat.json') })
 const requests = new RequestService({ checkAccess: rpcAccessCheck(NEAR_RPC_URL, CONTRACT_ID), getLoan: rpcLoanLookup(NEAR_RPC_URL, CONTRACT_ID), storePath: join(DATA_DIR, 'requests.json') })
-const challenges = new Map<string, {
+// Unauthenticated callers can create challenges, so the store is capped (503 when full),
+// swept of expired entries on every /nonce, and each challenge is deleted once used.
+const challenges = new ChallengeStore<{
   accountId: string
   message: string
   recipient: string
   expiresAt: number
-  used: boolean
-}>()
+}>(Number(process.env.AUTH_MAX_CHALLENGES ?? 10_000))
+// Per-IP fixed windows on the unauthenticated sign-in routes.
+const nonceLimiter = new FixedWindowLimiter({ limit: 20, windowMs: 60_000 })
+const verifyLimiter = new FixedWindowLimiter({ limit: 20, windowMs: 60_000 })
+// Behind a reverse proxy every client shares the proxy's address; set AUTH_TRUST_PROXY=1
+// to key the limit on the last X-Forwarded-For hop (the one the proxy itself added).
+const TRUST_PROXY = process.env.AUTH_TRUST_PROXY === '1'
+
+function clientKey(request: Request, peer: string | undefined): string {
+  if (TRUST_PROXY) {
+    const hops = (request.headers.get('x-forwarded-for') ?? '').split(',').map((h) => h.trim()).filter(Boolean)
+    if (hops.length) return hops[hops.length - 1]
+  }
+  return peer ?? 'unknown'
+}
 
 function allowedOrigins(): Set<string> {
   const origins = new Set(['http://localhost:5173', 'http://127.0.0.1:5173'])
@@ -152,16 +168,13 @@ async function requestRoute(request: Request, circleId: string, rest: string, or
   }
 }
 
-async function body(request: Request): Promise<Record<string, unknown> | null> {
-  try {
-    const value = await request.json()
-    return value && typeof value === 'object' ? value as Record<string, unknown> : null
-  } catch {
-    return null
-  }
+/** JSON body, capped at 16 KiB on both the Bun and the Node path (413 when larger). */
+function body(request: Request): Promise<Record<string, unknown> | null> {
+  return readJsonBody(request, MAX_BODY_BYTES)
 }
 
-async function nonce(request: Request, origin: string | null): Promise<Response> {
+async function nonce(request: Request, origin: string | null, client: string): Promise<Response> {
+  if (!nonceLimiter.allow(client)) return json({ error: 'Too many sign-in attempts. Wait a minute and try again.' }, 429, origin)
   const input = await body(request)
   const accountId = input?.accountId
   const recipient = input?.recipient ?? AUTH_RECIPIENT
@@ -179,11 +192,14 @@ async function nonce(request: Request, origin: string | null): Promise<Response>
     `Expires: ${new Date(expiresAt).toISOString()}`,
     `Nonce: ${nonceValue}`,
   ].join('\n')
-  challenges.set(nonceValue, { accountId, message, recipient, expiresAt, used: false })
+  if (!challenges.add(nonceValue, { accountId, message, recipient, expiresAt })) {
+    return json({ error: 'Sign-in is busy right now. Try again in a few minutes.' }, 503, origin)
+  }
   return json({ accountId, message, nonce: nonceValue, recipient, expiresAt: new Date(expiresAt).toISOString() }, 200, origin)
 }
 
-async function verifyLogin(request: Request, origin: string | null): Promise<Response> {
+async function verifyLogin(request: Request, origin: string | null, client: string): Promise<Response> {
+  if (!verifyLimiter.allow(client)) return json({ error: 'Too many sign-in attempts. Wait a minute and try again.' }, 429, origin)
   const input = await body(request)
   const accountId = input?.accountId
   const publicKey = input?.publicKey
@@ -196,13 +212,13 @@ async function verifyLogin(request: Request, origin: string | null): Promise<Res
     return json({ error: 'invalid NEP-413 verification payload' }, 400, origin)
   }
 
-  const challenge = challenges.get(nonceValue)
-  if (!challenge || challenge.used || challenge.expiresAt <= Date.now() || challenge.accountId !== accountId ||
+  const challenge = challenges.get(nonceValue) // null if unknown, used (deleted) or expired
+  if (!challenge || challenge.accountId !== accountId ||
       challenge.message !== message || challenge.recipient !== recipient) {
     return json({ error: 'invalid or expired sign-in challenge' }, 401, origin)
   }
   // Consume before any await so two concurrent requests cannot reuse the nonce.
-  challenge.used = true
+  challenges.delete(nonceValue)
 
   try {
     const ok = verifyNep413Signature({
@@ -224,15 +240,20 @@ async function verifyLogin(request: Request, origin: string | null): Promise<Res
   return json({ accountId, token: signJwt(accountId) }, 200, origin)
 }
 
-async function handle(request: Request): Promise<Response> {
+async function handle(request: Request, peer?: string): Promise<Response> {
   const url = new URL(request.url)
   const origin = request.headers.get('origin')
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(origin) })
   if (url.pathname === '/health' && request.method === 'GET') {
     return json({ ok: true, auth: 'NEP-413', fullAccessKeyLookup: Boolean(NEAR_RPC_URL) }, 200, origin)
   }
-  if (url.pathname === '/nonce' && request.method === 'POST') return nonce(request, origin)
-  if (url.pathname === '/verify' && request.method === 'POST') return verifyLogin(request, origin)
+  try {
+    if (url.pathname === '/nonce' && request.method === 'POST') return await nonce(request, origin, clientKey(request, peer))
+    if (url.pathname === '/verify' && request.method === 'POST') return await verifyLogin(request, origin, clientKey(request, peer))
+  } catch (error) {
+    if (error instanceof ChatError) return json({ error: error.message, code: error.code }, error.status, origin)
+    throw error
+  }
   const room = url.pathname.match(/^\/chat\/(\d{1,19})\/messages$/)
   if (room && (request.method === 'GET' || request.method === 'POST')) return chatRoute(request, room[1], origin)
   const req = url.pathname.match(/^\/chat\/(\d{1,19})\/requests((?:\/[a-z0-9]+)*)$/)
@@ -240,9 +261,14 @@ async function handle(request: Request): Promise<Response> {
   return json({ error: 'Not found' }, 404, origin)
 }
 
-const bun = (globalThis as { Bun?: { serve(options: { port: number; fetch(request: Request): Promise<Response> }): { port: number } } }).Bun
+type BunServer = { port: number; requestIP(request: Request): { address: string } | null }
+const bun = (globalThis as { Bun?: { serve(options: { port: number; maxRequestBodySize: number; fetch(request: Request, server: BunServer): Promise<Response> }): BunServer } }).Bun
 if (bun) {
-  const server = bun.serve({ port: PORT, fetch: handle })
+  const server = bun.serve({
+    port: PORT,
+    maxRequestBodySize: MAX_BODY_BYTES, // Bun's own cap; body() also checks the bytes it reads.
+    fetch: (request, srv) => handle(request, srv.requestIP(request)?.address),
+  })
   console.log(`[auth] CommonCircle NEP-413 server (Bun) listening on http://localhost:${server.port}`)
 } else {
   // Node: adapt node:http to the same fetch-style handler. Bodies are capped at 16 KiB.
@@ -252,7 +278,7 @@ if (bun) {
       let size = 0
       for await (const chunk of req) {
         size += (chunk as Buffer).length
-        if (size > 16 * 1024) { res.writeHead(413).end(); return }
+        if (size > MAX_BODY_BYTES) { res.writeHead(413).end(); return }
         chunks.push(chunk as Buffer)
       }
       const method = req.method ?? 'GET'
@@ -261,7 +287,7 @@ if (bun) {
         headers: req.headers as Record<string, string>,
         body: method === 'GET' || method === 'HEAD' || method === 'OPTIONS' ? undefined : Buffer.concat(chunks),
       })
-      const response = await handle(request)
+      const response = await handle(request, req.socket.remoteAddress)
       res.writeHead(response.status, Object.fromEntries(response.headers))
       res.end(Buffer.from(await response.arrayBuffer()))
     } catch (error) {

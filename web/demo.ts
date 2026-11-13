@@ -37,6 +37,8 @@ export async function loadReadOnlyDemo(circleId: string = TESTNET_DEMO.circleId)
     passport,
     svg: await client.cardSvg(passport.token_id).catch(() => null),
   })))
-  const dao = circle.treasury_id ? await loadDaoTrust(TESTNET_DEMO.rpcUrl, circle.treasury_id) : null
+  // The DAO's voting group must be exactly the circle's active stewards (read from their passports).
+  const stewards = passports.filter((p) => p.steward && p.status === 'Active').map((p) => p.owner_id)
+  const dao = circle.treasury_id ? await loadDaoTrust(TESTNET_DEMO.rpcUrl, circle.treasury_id, stewards) : null
   return { ...TESTNET_DEMO, circleId, config, circle, loans, passports, cards, dao }
 }

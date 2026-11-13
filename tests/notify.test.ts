@@ -61,11 +61,15 @@ describe('toasts', () => {
 })
 
 describe('member labels and badges (P0-5)', () => {
-  it('drops .testnet, keeps short names and shortens long ones to first 6 + last 6', () => {
+  it('drops .testnet, keeps short names whole and keeps the readable part of long ones (bug 7)', () => {
     expect(memberLabel('254edye5v.testnet')).toBe('254edye5v')
     expect(memberLabel('bob.testnet')).toBe('bob')
-    expect(memberLabel('commoncircle-light-lender.testnet')).toBe('common…lender')
-    expect(memberLabel('dogs-dao.commoncircle-light.testnet')).toBe('dogs-d…-light')
+    expect(memberLabel('coolarena8690.testnet')).toBe('coolarena8690')
+    expect(memberLabel('commoncircle-light-lender.testnet')).toBe('…light-lender')
+    expect(memberLabel('commoncircle-light-borrower2.testnet')).toBe('…light-borrower2')
+    expect(memberLabel('dogs-dao.commoncircle-light.testnet')).toBe('dogs-dao')
+    expect(memberLabel('3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af')).toBe('3e2210e1…fcb8af')
+    for (const id of ['a-very-long-account-name-with-many-words-here.testnet', 'x'.repeat(60)]) expect(memberLabel(id).length).toBeLessThanOrEqual(16)
   })
 
   it('gives every tier the same badge component', () => {

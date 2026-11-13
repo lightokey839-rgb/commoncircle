@@ -50,7 +50,45 @@ describe('loan request cards in the circle chat', () => {
     await expect(s.link('ben.testnet', '3', r.id, '22')).rejects.toMatchObject({ code: 'REQ_NOT_BORROWER' })
     expect(await s.link('amy.testnet', '3', r.id, '22')).toMatchObject({ loan_id: '22', lender: 'ben.testnet' })
     await expect(s.cancel('amy.testnet', '3', r.id)).rejects.toMatchObject({ code: 'REQ_LINKED' })
+    await expect(s.link('amy.testnet', '3', r.id, '99')).rejects.toMatchObject({ code: 'REQ_ALREADY_LINKED' })
+  })
+
+  it('an unknown loan number is refused on an unlinked request', async () => {
+    const s = service()
+    const r = await s.create('amy.testnet', '3', ask)
     await expect(s.link('amy.testnet', '3', r.id, '99')).rejects.toMatchObject({ code: 'REQ_LOAN' })
+  })
+
+  it('a linked request keeps its loan and lender: same id is an idempotent retry, another id is refused', async () => {
+    const s = service()
+    const r = await s.create('amy.testnet', '3', ask)
+    await s.offer('ben.testnet', '3', r.id)
+    await s.offer('cat.testnet', '3', r.id)
+    chain.set('40', { loan_id: '40', circle_id: '3', borrower_id: 'amy.testnet', lender_id: 'ben.testnet', principal: '1000000', duration_days: 7 })
+    chain.set('41', { loan_id: '41', circle_id: '3', borrower_id: 'amy.testnet', lender_id: 'cat.testnet', principal: '1000000', duration_days: 7 })
+    expect(await s.link('amy.testnet', '3', r.id, '40')).toMatchObject({ loan_id: '40', lender: 'ben.testnet' })
+    expect(await s.link('amy.testnet', '3', r.id, '40')).toMatchObject({ loan_id: '40', lender: 'ben.testnet' })
+    await expect(s.link('amy.testnet', '3', r.id, '41')).rejects.toMatchObject({ code: 'REQ_ALREADY_LINKED', status: 409 })
+    expect((await s.list('amy.testnet', '3'))[0]).toMatchObject({ loan_id: '40', lender: 'ben.testnet' })
+  })
+
+  it('two concurrent links with different loans cannot both win', async () => {
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const slowLoan = vi.fn(async (id: string) => { await gate; return chain.get(id) ?? null })
+    const s = new RequestService({ checkAccess, getLoan: slowLoan, now: () => 1000, retryMs: 0 })
+    const r = await s.create('amy.testnet', '3', ask)
+    await s.offer('ben.testnet', '3', r.id)
+    await s.offer('cat.testnet', '3', r.id)
+    chain.set('50', { loan_id: '50', circle_id: '3', borrower_id: 'amy.testnet', lender_id: 'ben.testnet', principal: '1000000', duration_days: 7 })
+    chain.set('51', { loan_id: '51', circle_id: '3', borrower_id: 'amy.testnet', lender_id: 'cat.testnet', principal: '1000000', duration_days: 7 })
+    const first = s.link('amy.testnet', '3', r.id, '50')
+    const second = s.link('amy.testnet', '3', r.id, '51')
+    release()
+    const results = await Promise.allSettled([first, second])
+    expect(results[0]).toMatchObject({ status: 'fulfilled' })
+    expect(results[1]).toMatchObject({ status: 'rejected', reason: { code: 'REQ_ALREADY_LINKED' } })
+    expect((await s.list('amy.testnet', '3'))[0]).toMatchObject({ loan_id: '50', lender: 'ben.testnet' })
   })
 
   it('records the reason of a direct loan, once, for its borrower only', async () => {

@@ -29,6 +29,15 @@ export const MAX_ROOM = 500
 export const RATE_WINDOW_MS = 30_000
 export const RATE_MAX = 8
 const ACCESS_TTL_MS = 20_000
+export const MAX_ACCESS_CACHE = 10_000
+
+/** The membership cache is keyed by any circle id a signed-in caller names: keep it bounded.
+ * Once it is full, drop expired entries, and clear it if that is not enough (it is only a cache). */
+export function pruneAccess(cache: Map<string, { until: number }>, now: number, max = MAX_ACCESS_CACHE): void {
+  if (cache.size < max) return
+  for (const [key, value] of cache) if (value.until <= now) cache.delete(key)
+  if (cache.size >= max) cache.clear()
+}
 
 // Same rule as the contract's names (control and direction-changing characters),
 // except that line breaks are allowed in chat.
@@ -80,6 +89,7 @@ export class ChatService {
     let allowed = cached && cached.until > this.now() ? cached.allowed : undefined
     if (allowed === undefined) {
       allowed = (await this.deps.checkAccess(circleId, accountId)).allowed
+      pruneAccess(this.access, this.now())
       this.access.set(key, { allowed, until: this.now() + ACCESS_TTL_MS })
     }
     if (!allowed) throw new ChatError(403, 'CHAT_NOT_MEMBER', 'Only members with an active card in this circle can use its chat.')

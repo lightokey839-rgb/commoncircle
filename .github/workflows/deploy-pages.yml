@@ -19,6 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VITE_BASE_PATH: /commoncircle/
+      # Optional: a hosted sign-in/chat server (server/auth.ts). Empty = the page shows chat as offline.
+      VITE_AUTH_URL: ${{ vars.COMMONCIRCLE_AUTH_URL }}
     steps:
       - name: Check out release candidate
         uses: actions/checkout@v4

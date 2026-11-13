@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { evaluateDaoTrust, SPUTNIK_GLOBAL_HASH } from '../web/dao'
+import { evaluateDaoPolicy, evaluateDaoTrust, requiredApprovals, SPUTNIK_GLOBAL_HASH, type PolicyJson } from '../web/dao'
 import {
   clearFlagProposal, formatUsdc, loansNeedingProposal, proposalLoanId, repaymentNotice, stewardsOf, treasuryFundProposal,
   usdcToBaseUnits, SputnikDaoClient, type SputnikPolicy, type SputnikProposal,
@@ -11,34 +11,81 @@ const DAO = 'dogs-dao.commoncircle-light.testnet'
 const CIRCLE = 'commoncircle-light.testnet'
 const USDC = '3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af'
 
+// The live dogs-dao policy (get_policy on testnet, 13 Nov 2026) and circle 3's two stewards.
+const STEWARDS = ['commoncircle-light-steward.testnet', 'commoncircle-light-lender.testnet']
+const LIVE_POLICY: PolicyJson = {
+  roles: [
+    { name: 'stewards', kind: { Group: [...STEWARDS] }, permissions: ['*:*'], vote_policy: {} },
+    { name: 'members-may-ask', kind: 'Everyone', permissions: ['call:AddProposal', 'transfer:AddProposal'], vote_policy: {} },
+  ],
+  default_vote_policy: { weight_kind: 'RoleWeight', quorum: '0', threshold: [1, 2] },
+}
+const GOOD = { daoId: DAO, account: { code_hash: '11111111111111111111111111111111', global_contract_hash: SPUTNIK_GLOBAL_HASH }, accessKeys: { keys: [] }, policy: LIVE_POLICY, stewards: STEWARDS }
+
 describe('F-06 DAO trust check', () => {
-  it('passes only a Sputnik global-hash DAO with no keys (the live demo DAO)', () => {
-    const ok = evaluateDaoTrust({
-      daoId: DAO,
-      account: { code_hash: '11111111111111111111111111111111', global_contract_hash: SPUTNIK_GLOBAL_HASH },
-      accessKeys: { keys: [] },
-    })
+  it('passes the live demo DAO: Sputnik global hash, no keys, both stewards must approve', () => {
+    const ok = evaluateDaoTrust(GOOD)
     expect(ok.verified).toBe(true)
-    expect(ok.message).toBe('Sputnik DAO · no keys')
+    expect(ok.policyOk).toBe(true)
+    expect(ok.message).toBe('Sputnik DAO · no keys · every approval needs all 2 stewards')
   })
 
   it('accepts the same code deployed locally (code_hash)', () => {
-    expect(evaluateDaoTrust({ daoId: DAO, account: { code_hash: SPUTNIK_GLOBAL_HASH }, accessKeys: { keys: [] } }).verified).toBe(true)
+    expect(evaluateDaoTrust({ ...GOOD, account: { code_hash: SPUTNIK_GLOBAL_HASH } }).verified).toBe(true)
   })
 
   it('fails when the account still has a key, even with the right code', () => {
-    const r = evaluateDaoTrust({ daoId: DAO, account: { global_contract_hash: SPUTNIK_GLOBAL_HASH }, accessKeys: { keys: [{ public_key: 'ed25519:x' }] } })
+    const r = evaluateDaoTrust({ ...GOOD, accessKeys: { keys: [{ public_key: 'ed25519:x' }] } })
     expect(r.verified).toBe(false)
     expect(r.accessKeyCount).toBe(1)
   })
 
   it('fails for a plain account or different code', () => {
-    expect(evaluateDaoTrust({ daoId: DAO, account: { code_hash: '11111111111111111111111111111111' }, accessKeys: { keys: [] } }).verified).toBe(false)
-    expect(evaluateDaoTrust({ daoId: DAO, account: { code_hash: 'SomethingElse' }, accessKeys: { keys: [] } }).verified).toBe(false)
+    expect(evaluateDaoTrust({ ...GOOD, account: { code_hash: '11111111111111111111111111111111' } }).verified).toBe(false)
+    expect(evaluateDaoTrust({ ...GOOD, account: { code_hash: 'SomethingElse' } }).verified).toBe(false)
   })
 
-  it('fails closed when RPC data is missing', () => {
+  it('fails closed when RPC data or the voting rules are missing', () => {
     expect(evaluateDaoTrust({ daoId: DAO, account: null, accessKeys: null }).verified).toBe(false)
+    // Right code, no keys, but nobody checked the policy: not verified.
+    expect(evaluateDaoTrust({ ...GOOD, policy: null }).verified).toBe(false)
+  })
+})
+
+describe('F-06b DAO voting rules (red-team finding 4)', () => {
+  it('Sputnik threshold maths: [1,2] of 2 needs 2, of 3 needs 2; weight 1 needs 1', () => {
+    expect(requiredApprovals({ threshold: [1, 2], quorum: '0' }, 2)).toBe(2)
+    expect(requiredApprovals({ threshold: [1, 2], quorum: '0' }, 3)).toBe(2)
+    expect(requiredApprovals({ threshold: '1', quorum: '0' }, 2)).toBe(1)
+    expect(requiredApprovals({ threshold: [1, 2], quorum: '3' }, 3)).toBe(3)
+  })
+
+  it('refuses a permissive DAO: one steward vote is enough', () => {
+    const r = evaluateDaoTrust({ ...GOOD, policy: { ...LIVE_POLICY, default_vote_policy: { weight_kind: 'RoleWeight', quorum: '0', threshold: '1' } } })
+    expect(r.verified).toBe(false)
+    expect(r.message).toContain('pass with 1 of 2')
+  })
+
+  it('refuses a per-kind override that lets transfers pass with one vote', () => {
+    const roles = [{ ...LIVE_POLICY.roles[0], vote_policy: { transfer: { weight_kind: 'RoleWeight', quorum: '0', threshold: '1' } } }, LIVE_POLICY.roles[1]]
+    expect(evaluateDaoPolicy({ ...LIVE_POLICY, roles }, STEWARDS).ok).toBe(false)
+  })
+
+  it('refuses a voting group that is not exactly the circle stewards', () => {
+    const extra = [{ ...LIVE_POLICY.roles[0], kind: { Group: [...STEWARDS, 'outsider.testnet'] } }, LIVE_POLICY.roles[1]]
+    expect(evaluateDaoPolicy({ ...LIVE_POLICY, roles: extra }, STEWARDS).ok).toBe(false)
+    const other = [{ ...LIVE_POLICY.roles[0], kind: { Group: ['a.testnet', 'b.testnet'] } }, LIVE_POLICY.roles[1]]
+    expect(evaluateDaoPolicy({ ...LIVE_POLICY, roles: other }, STEWARDS).ok).toBe(false)
+  })
+
+  it('refuses when Everyone (or a token role) can vote, or token-weighted votes', () => {
+    const everyone = [LIVE_POLICY.roles[0], { ...LIVE_POLICY.roles[1], permissions: ['*:VoteApprove'] }]
+    expect(evaluateDaoPolicy({ ...LIVE_POLICY, roles: everyone }, STEWARDS).ok).toBe(false)
+    expect(evaluateDaoPolicy({ ...LIVE_POLICY, default_vote_policy: { weight_kind: 'TokenWeight', quorum: '0', threshold: [1, 2] } }, STEWARDS).ok).toBe(false)
+  })
+
+  it('refuses a circle with fewer than two stewards', () => {
+    expect(evaluateDaoPolicy(LIVE_POLICY, [STEWARDS[0]]).ok).toBe(false)
   })
 })
 

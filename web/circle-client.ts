@@ -1,3 +1,4 @@
+import { viewFunction } from './rpc'
 /** Typed, read-first client for docs/CIRCLE_INTERFACE.md 1.1.0. */
 
 export type U64 = string
@@ -355,16 +356,9 @@ export class CircleClient {
 
   async view<T>(methodName: string, args: Record<string, unknown> = {}): Promise<T> {
     const encoded = encodeBase64(new TextEncoder().encode(JSON.stringify(args)))
-    const response = await fetch(this.rpcUrl, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0', id: `${methodName}-${Date.now()}`, method: 'query',
-        params: { request_type: 'call_function', finality: 'final', account_id: this.contractId, method_name: methodName, args_base64: encoded },
-      }),
-    })
-    const payload = await response.json() as { result?: { result?: number[] }; error?: { cause?: { name?: string }; data?: string } }
-    if (!response.ok || payload.error || !payload.result?.result) throw new ContractError(payload.error?.data ?? 'NEAR RPC view failed')
+    // Primary RPC plus verified fallbacks, with retry and backoff (web/rpc.ts).
+    const { ok, payload } = await viewFunction(this.rpcUrl, this.contractId, methodName, encoded)
+    if (!ok || payload.error || !payload.result?.result) throw new ContractError(payload.error?.data ?? 'NEAR RPC view failed')
     return JSON.parse(new TextDecoder().decode(new Uint8Array(payload.result.result))) as T
   }
 
