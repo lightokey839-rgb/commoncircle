@@ -575,3 +575,10 @@ button.room:hover { background: var(--surface); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* wallet balance in the top bar */
+.head-chip { height: 40px; }
+.head-chip-text { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.1; min-width: 0; }
+.head-chip-bal { font-size: 0.72rem; font-weight: 600; color: var(--accent-strong); white-space: nowrap; }
+.head-chip { max-width: 260px; }
+@media (max-width: 640px) { .head-chip { max-width: 150px; } .head-chip-bal { font-size: 0.66rem; } }

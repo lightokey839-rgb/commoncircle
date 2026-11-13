@@ -13,7 +13,7 @@ import { bindThemeForm, readThemeForm, renderThemePreview } from './theme'
 import type { NearWalletController } from './near-wallet'
 import { assertCircleName } from './text-rules'
 import { checkCardSvg } from './card-safety'
-import { onRpcHealth, rpcHealth, TESTNET_RPCS } from './rpc'
+import { onRpcHealth, rpcHealth, rpcPost, TESTNET_RPCS } from './rpc'
 import { describeNet, initialNet, isStale, netFailed, netSucceeded, retryDelay, type NetState } from './net-state'
 import { avatarFor, ChatApiError, ChatClient, chatServerHealth, dayLabel, mergeMessages, timeLabel, type ChatMessage, type LoanRequestCard } from './chat'
 import {
@@ -302,8 +302,35 @@ function renderHeadAccount(): void {
   $('#head-connect').hidden = !!accountId
   const chip = $('#head-account')
   chip.hidden = !accountId
-  if (accountId) chip.replaceChildren(avatar(accountId, 'sm'), el('span', { className: 'head-chip-name', textContent: memberLabel(accountId) }))
-  chip.title = accountId ? `Signed in as ${accountId}` : ''
+  const bal = walletBal && walletBal.account === accountId ? walletBal : null
+  const balText = !bal ? '…' : `${bal.usdc === null ? '? ' : formatUsdc(bal.usdc)} USDC · ${bal.near === null ? '? ' : formatNear(bal.near)} NEAR`
+  if (accountId) chip.replaceChildren(avatar(accountId, 'sm'), el('span', { className: 'head-chip-text' },
+    el('span', { className: 'head-chip-name', textContent: memberLabel(accountId) }),
+    el('span', { className: 'head-chip-bal', textContent: balText })))
+  chip.title = accountId ? `Signed in as ${accountId}${bal ? ` · wallet balance on testnet: ${balText}` : ''}` : ''
+}
+
+/** The connected wallet's own balances (read-only views on testnet). null = could not read, never shown as 0. */
+let walletBal: { account: string; usdc: string | null; near: string | null } | null = null
+
+/** yoctoNEAR -> "12.34" (BigInt, no floating point). */
+function formatNear(yocto: string): string {
+  const v = BigInt(yocto)
+  const whole = v / 10n ** 24n
+  const cents = (v % 10n ** 24n) / 10n ** 22n
+  return `${whole}.${cents.toString().padStart(2, '0')}`
+}
+
+async function loadWalletBalance(account: string): Promise<void> {
+  const usdc = new CircleClient(config.rpcUrl, await getUsdcId())
+  const [u, n] = await Promise.all([
+    usdc.view<string>('ft_balance_of', { account_id: account }).catch(() => null),
+    rpcPost<{ result?: { amount?: string } }>(config.rpcUrl, { jsonrpc: '2.0', id: 'bal', method: 'query', params: { request_type: 'view_account', finality: 'final', account_id: account } })
+      .then((r) => r.payload.result?.amount ?? null).catch(() => null),
+  ])
+  if (account !== accountId) return
+  walletBal = { account, usdc: u, near: n }
+  renderHeadAccount()
 }
 
 /* ---------- wallet ---------- */
@@ -1451,6 +1478,7 @@ async function refreshMe(): Promise<void> {
   const account = accountId
   try {
     const usdc = new CircleClient(config.rpcUrl, await getUsdcId())
+    void loadWalletBalance(account).catch(() => undefined)
     const [passport, registration, loans, lent, tokens] = await Promise.all([
       readClient.passportFor(circleId, account),
       usdc.view<unknown>('storage_balance_of', { account_id: account }),
