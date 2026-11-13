@@ -5,7 +5,7 @@
   "args": {
     "loan_id": "19"
   },
-  "block_height": 277439663,
+  "block_height": 277497837,
   "result": {
     "loan_id": "19",
     "circle_id": "3",
@@ -31,5 +31,5 @@
     "flag_cleared": false
   },
   "rpc": "https://test.rpc.fastnear.com",
-  "read_at": "2026-11-13T00:56:34.822Z"
+  "read_at": "2026-11-13T10:28:36.731Z"
 }

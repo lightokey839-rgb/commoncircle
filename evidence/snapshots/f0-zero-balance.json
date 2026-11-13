@@ -5,8 +5,8 @@
   "args": {
     "account_id": "commoncircle-light.testnet"
   },
-  "block_height": 277439634,
+  "block_height": 277497782,
   "result": "0",
   "rpc": "https://test.rpc.fastnear.com",
-  "read_at": "2026-11-13T00:56:18.412Z"
+  "read_at": "2026-11-13T10:28:07.338Z"
 }

@@ -5,7 +5,7 @@
   "args": {
     "circle_id": "3"
   },
-  "block_height": 277439677,
+  "block_height": 277497977,
   "result": {
     "circle_id": "3",
     "name": "The Dogs (DEMO)",
@@ -44,5 +44,5 @@
     }
   },
   "rpc": "https://test.rpc.fastnear.com",
-  "read_at": "2026-11-13T00:56:43.384Z"
+  "read_at": "2026-11-13T10:30:02.210Z"
 }

@@ -6,7 +6,7 @@
     "circle_id": "3",
     "account_id": "254edye5v.testnet"
   },
-  "block_height": 277439652,
+  "block_height": 277497822,
   "result": {
     "token_id": "3:254edye5v.testnet",
     "circle_id": "3",
@@ -29,5 +29,5 @@
     "recovery": null
   },
   "rpc": "https://test.rpc.fastnear.com",
-  "read_at": "2026-11-13T00:56:28.738Z"
+  "read_at": "2026-11-13T10:28:28.188Z"
 }

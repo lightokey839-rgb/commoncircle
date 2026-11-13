@@ -29,21 +29,34 @@ if (!hash || !sender) {
   process.exit(2);
 }
 const RPC = process.env.NEAR_RPC_URL ?? "https://test.rpc.fastnear.com";
+// Regular RPC nodes keep only the last few epochs; older transactions and blocks answer
+// TIMEOUT / NOT_OBSERVED / UNKNOWN_*. Then the same read goes to an archival node.
+const ARCHIVAL = process.env.NEAR_ARCHIVAL_RPC_URL ?? "https://archival-rpc.testnet.fastnear.com";
+const FORGOTTEN = /TIMEOUT|NOT_OBSERVED|UNKNOWN_TRANSACTION|UNKNOWN_BLOCK|GARBAGE_COLLECTED|garbage collected/i;
 
-async function rpc(method, params) {
+async function rpcAt(url, method, params, tries) {
   for (let attempt = 1; ; attempt++) {
-    const res = await fetch(RPC, {
+    const res = await fetch(url, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ jsonrpc: "2.0", id: "cc", method, params }),
     });
     const body = await res.json();
-    if (body.error && attempt < 4 && /TIMEOUT|UNKNOWN_TRANSACTION/i.test(JSON.stringify(body.error))) {
+    if (body.error && attempt < tries && FORGOTTEN.test(JSON.stringify(body.error))) {
       await new Promise((r) => setTimeout(r, 2000 * attempt));
       continue;
     }
     if (body.error) throw new Error(`${method}: ${JSON.stringify(body.error)}`);
     return body.result;
+  }
+}
+
+async function rpc(method, params) {
+  try {
+    return await rpcAt(RPC, method, params, 2);
+  } catch (error) {
+    if (!ARCHIVAL || ARCHIVAL === RPC || !FORGOTTEN.test(String(error))) throw error;
+    return rpcAt(ARCHIVAL, method, params, 3);
   }
 }
 
