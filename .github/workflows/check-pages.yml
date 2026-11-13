@@ -1,0 +1,23 @@
+name: Check the live demo
+
+# Manual: fetch the GitHub Pages site from a GitHub runner (outside the builder's
+# network) and check the page and its script load. Read-only.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch the page and its assets
+        run: |
+          set -euo pipefail
+          url="https://lightokey839-rgb.github.io/commoncircle/"
+          curl -sS -o page.html -w "page HTTP %{http_code} in %{time_total}s\n" "$url"
+          grep -o '<title>[^<]*' page.html
+          for a in $(grep -oE '(src|href)="/commoncircle/assets/[^"]+' page.html | sed -E 's/^(src|href)="//'); do
+            curl -sS -o /dev/null -w "asset $a HTTP %{http_code}\n" "https://lightokey839-rgb.github.io$a"
+          done
