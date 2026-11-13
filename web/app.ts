@@ -1,8 +1,10 @@
 import { CircleClient, parseFtTransferCallOutcome, passportTokenTitle, type CircleParams, type LoanView, type PassportView } from './circle-client'
 import { friendlyError, isRepeat, TOAST_MS, type NextAction, type ToastKind } from './notify'
 import { badgeFor, memberLabel, type Tier } from './labels'
+import { circleStats, demoDifferences, privileges, recentActivity, STANDARD_RULES, trackSummaries, treasuryEligibility, type EvidenceStatus } from './overview'
+import evidenceFile from './evidence-status.json'
 import { borrowLimit, canCancel, countdown, formatDuration, isWaiting, loanLengthText, openLimitMessage, requestsForLender, trustedProgress, validateLoanInput } from './loan-rules'
-import { explorerTxUrl, moneySummary, runMoney, type MoneyDeps, type MoneyKind } from './money'
+import { explorerTxUrl, moneySummary, runMoney, type MoneyDeps, type MoneyKind, type MoneyOptions } from './money'
 import { signInWithNep413 } from './nep413'
 import { buildInviteLink, generateInviteKeyPair, parseInviteLink, signInviteWithSecret } from './invite'
 import { loadReadOnlyDemo, type ReadOnlyDemoSnapshot } from './demo'
@@ -35,7 +37,7 @@ const config = {
 const readClient = new CircleClient(config.rpcUrl, config.contractId)
 const client = () => new CircleClient(config.rpcUrl, config.contractId, window.commonCircleWallet)
 const TOKEN_KEY = 'commoncircle.session'
-const VIEWS = ['home', 'chat', 'loans', 'direct', 'treasury', 'members', 'tools'] as const
+const VIEWS = ['home', 'chat', 'loans', 'direct', 'passport', 'treasury', 'members', 'tools', 'evidence'] as const
 type View = (typeof VIEWS)[number]
 
 /** loans: as borrower in this circle; lent: as lender in this circle. */
@@ -48,6 +50,11 @@ let demo: ReadOnlyDemoSnapshot | null = null
 let me: Me | null = null
 let usdcId = ''
 let view: View = 'home'
+/** USDC balances read from testnet: the loan contract (zero custody) and the DAO treasury. null = not read. */
+let balances: { contract: string | null; dao: string | null } = { contract: null, dao: null }
+let lastRefresh = 0
+let loadError = ''
+let passportAccount = ''
 
 // chat state
 let chatRoom = '3'
@@ -193,6 +200,7 @@ function onAccountChange(nextAccountId: string): void {
   $('#profile-out').hidden = !!nextAccountId
   $('#profile-in').hidden = !nextAccountId
   $('#wallet-account').textContent = nextAccountId
+  $('#wallet-state').textContent = nextAccountId ? `connected as ${memberLabel(nextAccountId)}` : 'wallet not connected'
   $('#wallet-account').title = nextAccountId
   $('#profile-avatar').replaceWith(Object.assign(avatar(nextAccountId || '?'), { id: 'profile-avatar' }))
   // Re-render now so step 1 shows "Connected" at once; refreshMe() fills in the rest
@@ -360,6 +368,7 @@ function moneyDeps(): MoneyDeps {
     cancelLoan: (loanId) => c.cancelLoan(loanId),
     getLoan: (loanId) => readClient.getLoan(loanId),
     isRegistered: async (account) => !!(await new CircleClient(config.rpcUrl, await getUsdcId()).view<unknown>('storage_balance_of', { account_id: account })),
+    registerAccount: async (account) => c.registerWithToken({ tokenId: await getUsdcId(), accountId: account }),
   }
 }
 
@@ -367,7 +376,10 @@ function moneyDeps(): MoneyDeps {
 async function money(kind: MoneyKind, loan: LoanView): Promise<void> {
   requireWallet()
   const dialog = $<HTMLDialogElement>('#money-dialog')
-  const summary = moneySummary(kind, loan, memberLabel, demo?.circle?.params.day_length_sec ?? '86400')
+  // Repaying a lender who left USDC would bounce: offer to pay their USDC registration first (F-09 route).
+  const options: MoneyOptions = {}
+  if (kind === 'repay' && !loan.lender_is_treasury) options.registerLender = !(await moneyDeps().isRegistered(loan.lender_id).catch(() => true))
+  const summary = moneySummary(kind, loan, memberLabel, demo?.circle?.params.day_length_sec ?? '86400', options)
   const state = $('#money-state')
   const confirm = $<HTMLButtonElement>('#money-confirm')
   const back = $<HTMLButtonElement>('#money-back')
@@ -387,7 +399,7 @@ async function money(kind: MoneyKind, loan: LoanView): Promise<void> {
     confirm.classList.add('busy')
     state.hidden = false
     state.textContent = 'Waiting for you to approve it in your wallet window…'
-    const result = await runMoney(kind, loan, moneyDeps(), await getUsdcId().catch(() => ''), memberLabel)
+    const result = await runMoney(kind, loan, moneyDeps(), await getUsdcId().catch(() => ''), memberLabel, options)
     confirm.classList.remove('busy')
     state.className = `money-state ${result.ok ? 'ok' : 'bad'}`
     state.replaceChildren(result.text, ...(result.txHash ? [' ', el('a', { href: explorerTxUrl(config.explorerUrl, result.txHash), target: '_blank', rel: 'noopener', textContent: 'View the transaction' })] : []))
@@ -455,8 +467,10 @@ async function createCircle(): Promise<void> {
   const name = $<HTMLInputElement>('#new-circle-name').value
   assertCircleName(name)
   const storage = await readClient.storageCosts()
-  await client().createCircle({ name, params: testnetDemoParams, theme: readThemeForm('new-circle'), deposit: storage.create_circle })
-  show('Circle created with the short testnet settings.', 'ok')
+  const standard = $<HTMLSelectElement>('#new-circle-preset').value === 'standard'
+  const params: CircleParams = standard ? { ...testnetDemoParams, ...STANDARD_RULES, qualifying_min_days: 1, recovery_lock_sec: '259200' } : testnetDemoParams
+  await client().createCircle({ name, params, theme: readThemeForm('new-circle'), deposit: storage.create_circle })
+  show(standard ? 'Circle created with the standard rules.' : 'Circle created with demo settings (60-second days, 1 repayment to Trusted).', 'ok')
 }
 
 async function saveDesign(): Promise<void> {
@@ -565,6 +579,11 @@ async function openRoom(id: string): Promise<void> {
 }
 
 async function checkChatAccess(quiet = false): Promise<void> {
+  // A public copy of the app (e.g. GitHub Pages) has no sign-in server unless one is configured.
+  const local = (h: string) => /^(localhost|127\.0\.0\.1|\[::1\])$/.test(h)
+  if (local(new URL(config.authUrl).hostname) && !local(window.location.hostname)) {
+    setGate('Chat and loan requests need the CommonCircle sign-in server, which is not hosted for this public copy. Run the app locally (npm run auth) to use them. Everything else here works.'); renderMessages(); return
+  }
   if (!accountId) { setGate('Connect your wallet to open the chat.', connectButtons()); renderMessages(); return }
   const access = await readClient.checkAccess(chatRoom, accountId)
   if (!access.allowed) {
@@ -811,6 +830,156 @@ function renderInvite(): void {
       : 'Only Trusted members can invite in this circle. Repay one loan on time and your card turns Trusted.'
 }
 
+/* ---------- overview, passport, evidence ---------- */
+
+function tile(label: string, value: string, note = '', cls = ''): HTMLElement {
+  return el('div', { className: `tile ${cls}` }, el('p', { className: 'tile-label', textContent: label }), el('p', { className: 'tile-value', textContent: value }), note ? el('p', { className: 'tile-note', textContent: note }) : '')
+}
+
+/** Overview tiles, all from testnet views. Loading and failure states never show a misleading 0. */
+function renderStats(): void {
+  const grid = $('#stats-grid')
+  const custody = $('#custody')
+  if (loadError) {
+    grid.replaceChildren(el('div', { className: 'tile tile-error' }, el('p', { textContent: `Could not read testnet: ${loadError}` }), button('Retry', refreshAll, 'soft')))
+    custody.replaceChildren()
+    return
+  }
+  if (!demo?.circle) {
+    grid.replaceChildren(...Array.from({ length: 8 }, () => el('div', { className: 'tile skeleton' }, el('p', { className: 'tile-label', textContent: 'Loading…' }), el('p', { className: 'tile-value', textContent: '…' }))))
+    custody.replaceChildren()
+    return
+  }
+  const st = circleStats(demo.loans, demo.passports)
+  const capped = demo.loans.length >= 50 ? ' (first 50)' : ''
+  const usd = (v: string | null) => (v === null ? 'unavailable' : `${formatUsdc(v)} USDC`)
+  grid.replaceChildren(
+    tile('Members', String(st.members), `${st.trusted} Trusted`),
+    tile('Loans', `${st.totalLoans}${capped}`, `${st.funded} funded`),
+    tile('Repaid', String(st.repaid), 'money back to the lender'),
+    tile('Active now', String(st.active), `${formatUsdc(st.outstanding)} USDC outstanding`),
+    tile('Overdue', String(st.overdue), st.overdue ? 'Trusted perks paused' : 'none', st.overdue ? 'warn' : ''),
+    tile('DAO treasury', usd(balances.dao), demo.circle.treasury_id ? memberLabel(demo.circle.treasury_id) : 'no DAO'),
+  )
+  const zero = balances.contract === '0'
+  custody.className = `custody ${balances.contract === null ? '' : zero ? 'ok' : 'warn'}`
+  custody.replaceChildren(
+    el('div', {}, el('p', { className: 'tile-label', textContent: 'Loan contract USDC balance (zero custody)' }),
+      el('p', { className: 'custody-value', textContent: usd(balances.contract) })),
+    el('p', { className: 'custody-text', textContent: balances.contract === null ? 'Could not read the balance right now.'
+      : zero ? `The lending contract holds no USDC. Funding goes from the lender straight to the borrower in one transaction, and every failed path refunds the lender. Live balance of ${config.contractId}, separate from the DAO treasury.`
+        : 'The lending contract holds USDC right now. It should be 0 at rest: a transfer may be in flight. Refresh in a moment.' }))
+}
+
+function renderActivity(): void {
+  $<HTMLAnchorElement>('#activity-link').href = `${config.explorerUrl}/address/${config.contractId}`
+  const items = demo ? recentActivity(demo.loans, demo.passports, formatUsdc, memberLabel) : []
+  $('#activity').replaceChildren(...(items.length ? items.map((a) => el('li', { className: `act act-${a.kind}` },
+    el('time', { textContent: new Date(a.at).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) }),
+    el('span', { textContent: a.text }))) : [el('li', { className: 'muted', textContent: demo ? 'No activity yet.' : 'Loading…' })]))
+}
+
+function renderEligibility(): void {
+  const box = $('#my-eligibility')
+  if (!accountId || !demo?.circle) { box.hidden = true; return }
+  const e = treasuryEligibility(me?.passport ?? null, demo.circle.treasury_lending_enabled, !!demo.dao?.verified)
+  box.hidden = false
+  box.className = `eligibility ${e.eligible ? 'ok' : ''}`
+  box.textContent = `Treasury: ${e.reason}`
+}
+
+/** My Passport: the connected member's card, or any member's (read-only) so a judge can see one without a wallet. */
+function renderPassport(): void {
+  const select = $<HTMLSelectElement>('#pp-account')
+  const passports = demo?.passports ?? []
+  const mine = accountId && passports.some((p) => p.owner_id === accountId) ? accountId : ''
+  if (!passportAccount || !passports.some((p) => p.owner_id === passportAccount)) passportAccount = mine || passports.find((p) => p.display_tier === 'Trusted')?.owner_id || passports[0]?.owner_id || ''
+  select.replaceChildren(...passports.map((p) => el('option', { value: p.owner_id, selected: p.owner_id === passportAccount, textContent: `${p.owner_id === accountId ? 'You · ' : ''}${memberLabel(p.owner_id)} · ${p.display_tier}` })))
+  const body = $('#passport-body')
+  const p = passports.find((x) => x.owner_id === passportAccount)
+  const card = demo?.cards.find((c) => c.passport.owner_id === passportAccount)
+  if (!p || !demo?.circle) { body.replaceChildren(el('p', { className: 'muted', textContent: demo ? 'No passports in this circle yet.' : 'Loading…' })); return }
+  const params = demo.circle.params
+  const prog = trustedProgress(p, params)
+  const art = el('figure', { className: 'pp-card' })
+  if (card?.svg) art.append(el('img', { alt: `${p.owner_id} passport card`, src: URL.createObjectURL(new Blob([card.svg], { type: 'image/svg+xml' })) }))
+  art.append(el('figcaption', { className: 'small muted', textContent: `Token ${p.token_id} · NEP-171 · cannot be transferred (nft_transfer always fails)` }))
+  const statsList = el('dl', { className: 'pp-stats' },
+    ...[['Account', p.owner_id], ['Tier', `${p.tier}${p.steward ? ' · Steward' : ''}`], ['Effective tier', p.effective_tier], ['Status', p.status],
+      ['On-time repayments', String(p.on_time_count)], ['Late repayments', String(p.late_count)], ['Counted toward Trusted', String(p.qualifying_count)],
+      ['Different lenders', String(p.distinct_lenders)], ['Open loans', String(p.open_loans)], ['Overdue loans', String(p.overdue_loans)]]
+      .map(([k, v]) => el('div', {}, el('dt', { textContent: k }), el('dd', { textContent: v }))))
+  const need = prog.trusted ? null : [
+    `${prog.qualifying} of ${prog.threshold} on-time repayment${prog.threshold === 1 ? '' : 's'} that count`,
+    `${prog.lenders} of ${prog.minLenders} different lender${prog.minLenders === 1 ? '' : 's'}`,
+    `a loan counts if it is at least ${formatUsdc(params.qualifying_min_amount)} USDC for ${params.qualifying_min_days}+ day${params.qualifying_min_days === 1 ? '' : 's'}, repaid by its due time`,
+  ]
+  const diffs = demoDifferences(params)
+  const elig = treasuryEligibility(p, demo.circle.treasury_lending_enabled, !!demo.dao?.verified)
+  const side = el('div', { className: 'pp-side' },
+    el('div', { className: 'box' }, el('h2', {}, 'Reputation ', badge(p.display_tier)), statsList),
+    el('div', { className: 'box' }, el('h2', { textContent: prog.trusted ? 'Trusted' : 'Road to Trusted' }),
+      prog.trusted ? el('p', { textContent: p.perks_paused ? 'Trusted, but perks are paused by an overdue loan until it is repaid or the stewards clear the flag.' : 'Earned by on-time repayments. The tier never goes down; an overdue loan only pauses its perks.' })
+        : el('ul', { className: 'pp-need' }, ...need!.map((t) => el('li', { textContent: t }))),
+      progressNode(p) ?? '',
+      diffs.length ? el('p', { className: 'demo-flag', textContent: `This is a demo circle: ${diffs.join('; ')}.` }) : ''),
+    el('div', { className: 'box' }, el('h2', { textContent: 'What this passport unlocks' }),
+      el('ul', { className: 'pp-need' }, ...privileges(p, params, demo.config.hard_loan_cap, formatUsdc).map((t) => el('li', { textContent: t }))),
+      el('p', { className: `eligibility ${elig.eligible ? 'ok' : ''}`, textContent: `Treasury: ${elig.reason}` })))
+  body.replaceChildren(art, side)
+}
+
+const TRACKS: Array<{ track: string; heading: string; problem: string; does: string; tests: string; reproduce: string; limits: string }> = [
+  {
+    track: 'NFTs That Do Something', heading: 'Your repayment history becomes your financial passport.',
+    problem: 'People with no credit file have no way to carry proof that they repay.',
+    does: 'Each member holds a non-transferable NEP-171 passport. On-time repayments that qualify move it from Member to Trusted; an overdue loan pauses Trusted perks. The tier sets the loan limit, the number of open loans, who may invite, and treasury access. The card art is drawn on-chain from the circle theme and the record.',
+    tests: 'readme_checks::try_nft_transfer_on_a_passport, readme_checks::create_a_loan_naming_a_non_member (CI report)',
+    reproduce: 'Open My Passport; or rows f1-tier-flip and f1-web-repay-tier: the repayment transaction emits tier_changed Member → Trusted.',
+    limits: 'Reputation is local to one circle. Cooperating accounts can lend to each other to farm it; min_distinct_lenders and the qualifying minimums slow that down but are not Sybil resistance.',
+  },
+  {
+    track: 'Social Money', heading: 'Borrow when you need it. Build trust when you repay.',
+    problem: 'Rotating savings pay you on a schedule, not when you need the money.',
+    does: 'Members ask the circle (with a reason) in the chat, any member can offer to lend, and loans go straight between them. A Sputnik DAO is the circle\'s treasury: a Trusted, non-steward member asks, both stewards approve, the DAO funds, and repayment returns to the DAO. Stewards cannot borrow from it; the DAO can forgive a late flag by vote.',
+    tests: 'sandbox_sputnik (2 tests), readme_checks::treasury_loan_for_a_steward_or_with_fewer_than_two_stewards, redteam::rt_dao_cannot_take_a_passport_or_count_as_steward',
+    reproduce: 'Open Treasury for proposals 0–3, or rows f2-proposal-funds-loan and f2-treasury-repaid.',
+    limits: 'The app, not the contract, checks that the treasury is a keyless Sputnik DAO. Both steward accounts are run by the same testnet operator, so the votes do not prove two people. Two NEAR accounts are not two humans.',
+  },
+  {
+    track: 'Open Innovation', heading: 'Loans move directly between people. The lending contract does not hold a pooled pot.',
+    problem: 'A shared pot is a honeypot and needs a custodian.',
+    does: 'The lender sends USDC with ft_transfer_call; the contract checks the loan, forwards the money to the borrower in the same transaction and records it. If anything fails (borrower not set up for USDC, wrong lender, wrong token, wrong amount, too little gas) the lender is refunded. The contract\'s USDC balance is 0 at rest.',
+    tests: 'sandbox_f0 (refund proofs), readme_checks::fund_to_an_unregistered_borrower, redteam::rt_contract_never_subsidises_storage (CI report)',
+    reproduce: 'The live balance above; rows f0-refund (loan_funding_failed, lender refunded), f0-low-gas-real-usdc (E60, refunded), f0-zero-balance.',
+    limits: 'Testnet only, unsecured loans: repayment cannot be forced. The contract account still has a full-access key until ship, so its code can still be upgraded.',
+  },
+]
+
+function renderEvidence(): void {
+  const status = evidenceFile as unknown as EvidenceStatus
+  $('#evidence-generated').textContent = `Last run: ${new Date(status.generated_at).toLocaleString()}.`
+  const zero = balances.contract === null ? 'unavailable' : `${formatUsdc(balances.contract)} USDC`
+  $('#tracks').replaceChildren(...trackSummaries(status, TRACKS.map((t) => t.track)).map((sum) => {
+    const t = TRACKS.find((x) => x.track === sum.track)!
+    const rows = sum.claims.map((c) => {
+      const ref = c.reference as { explorer?: string; tx_hash?: string; method?: string; account_id?: string; report?: string; snapshot?: string }
+      const what = c.kind === 'tx' && ref.explorer ? el('a', { href: ref.explorer, target: '_blank', rel: 'noopener', textContent: `tx ${ref.tx_hash?.slice(0, 8)}…` })
+        : c.kind === 'view' ? el('span', { textContent: `view ${ref.method}(${ref.account_id ? memberLabel(ref.account_id) : ''})` }) : el('span', { textContent: `test report ${ref.report?.split('/').pop() ?? ''}` })
+      return el('tr', {}, el('td', { textContent: c.id }), el('td', {}, what), el('td', {}, el('span', { className: `state state-${c.status === 'PASS' ? 'Repaid' : 'Cancelled'}`, textContent: c.status })))
+    })
+    return el('section', { className: 'box track' },
+      el('div', { className: 'track-head' },
+        el('div', {}, el('p', { className: 'eyebrow', textContent: sum.track }), el('h2', { className: 'big', textContent: t.heading })),
+        el('div', { className: `track-status ${sum.status === 'PASS' ? 'ok' : 'bad'}` }, el('strong', { textContent: sum.status }), el('span', { textContent: `${sum.pass} of ${sum.total} claims pass${sum.fail ? ` · ${sum.fail} fail` : ''}` }))),
+      sum.track === 'Open Innovation' ? el('p', { className: `custody-inline ${balances.contract === '0' ? 'ok' : ''}`, textContent: `Live now: the loan contract holds ${zero}.` }) : '',
+      el('dl', { className: 'track-facts' },
+        ...[['Problem', t.problem], ['What CommonCircle does', t.does], ['Automated tests', t.tests], ['Reproduce', t.reproduce], ['Limits we disclose', t.limits]]
+          .map(([k, v]) => el('div', {}, el('dt', { textContent: k }), el('dd', { textContent: v })))),
+      el('div', { className: 'table-wrap' }, el('table', { className: 'loans' }, el('thead', {}, el('tr', {}, el('th', { textContent: 'Claim' }), el('th', { textContent: 'Evidence' }), el('th', { textContent: 'Status' }))), el('tbody', {}, ...rows))))
+  }))
+}
+
 /* ---------- reading state ---------- */
 
 async function refreshMe(): Promise<void> {
@@ -854,6 +1023,10 @@ async function refreshAll(): Promise<void> {
 /* ---------- rendering ---------- */
 
 function renderAll(): void {
+  renderStats()
+  renderActivity()
+  renderPassport()
+  renderEligibility()
   renderForYou()
   renderOpenRequests()
   renderInvite()
@@ -1115,6 +1288,8 @@ function renderLoansTable(): void {
 }
 
 function tickDue(): void {
+  const age = lastRefresh ? Math.round((Date.now() - lastRefresh) / 1000) : -1
+  $('#refresh-time').textContent = loadError ? 'testnet unavailable' : age < 0 ? 'loading…' : `updated ${new Date(lastRefresh).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}${age > 120 ? ' (stale: press refresh)' : ''}`
   for (const node of document.querySelectorAll<HTMLElement>('[data-until]')) {
     const left = countdown(node.dataset.until || null, Date.now())
     node.textContent = left ? `${node.dataset.prefix ?? ''}${left}` : (node.dataset.after ?? '')
@@ -1174,7 +1349,7 @@ async function loadPositions(): Promise<void> {
 async function renderTreasury(): Promise<void> {
   const panel = $('#treasury-actions')
   const none = $('#treasury-none')
-  if (!demo?.circle?.treasury_id || !demo.dao?.verified) { panel.hidden = true; none.hidden = false; $('#stat-treasury').textContent = 'none'; return }
+  if (!demo?.circle?.treasury_id || !demo.dao?.verified) { panel.hidden = true; none.hidden = false; return }
   panel.hidden = false
   none.hidden = true
   const daoId = demo.circle.treasury_id
@@ -1184,7 +1359,6 @@ async function renderTreasury(): Promise<void> {
   const [policy, proposals, balance] = await Promise.all([dao.getPolicy(), dao.recentProposals(10), usdc.view<string>('ft_balance_of', { account_id: daoId })])
   const stewards = stewardsOf(policy)
   const bondNear = (Number(BigInt(policy.proposal_bond) / 10n ** 18n) / 1e6).toString()
-  $('#stat-treasury').textContent = `${formatUsdc(balance)} USDC`
   $('#treasury-summary').replaceChildren(
     el('span', { className: 'muted small', textContent: 'Holds' }), el('b', { textContent: `${formatUsdc(balance)} USDC` }),
     el('span', {}, 'Stewards: ', ...stewards.flatMap((s, i) => (i ? [' and ', accountChip(s)] : [accountChip(s)]))),
@@ -1255,11 +1429,20 @@ async function loadDemo(): Promise<void> {
   }
   $('#demo-output').textContent = lines.join('\n')
   $('#circle-name').textContent = snapshot.circle ? snapshot.circle.name : `Circle ${snapshot.circleId} does not exist`
-  $('#stat-members').textContent = snapshot.circle ? String(snapshot.circle.member_count) : '–'
-  $('#stat-loans').textContent = snapshot.circle ? String(snapshot.circle.loan_count) : '–'
+  const usdc = new CircleClient(config.rpcUrl, snapshot.config.usdc_id)
+  const [contractBal, daoBal] = await Promise.all([
+    usdc.view<string>('ft_balance_of', { account_id: snapshot.contractId }).catch(() => null),
+    snapshot.circle?.treasury_id ? usdc.view<string>('ft_balance_of', { account_id: snapshot.circle.treasury_id }).catch(() => null) : Promise.resolve(null),
+  ])
+  balances = { contract: contractBal, dao: daoBal }
+  lastRefresh = Date.now()
+  loadError = ''
+  const diffs = snapshot.circle ? demoDifferences(snapshot.circle.params) : []
+  $('#demo-flag').hidden = !diffs.length
+  $('#demo-flag').textContent = diffs.length ? `Demo settings: ${diffs.join('; ')}.` : ''
   const dao = $('#dao-status')
   if (snapshot.dao) {
-    dao.textContent = snapshot.dao.verified ? '✓ Run by a real Sputnik DAO with no keys: only votes move its money.' : '⚠ The treasury account failed the DAO safety check. Treasury buttons are hidden.'
+    dao.textContent = snapshot.dao.verified ? '✓ DAO verified by frontend trust checks: pinned Sputnik code, no access keys. Only steward votes move its money.' : '⚠ The treasury account failed the app\'s DAO trust checks. Treasury buttons are hidden.'
     dao.title = `${snapshot.dao.daoId} · code ${snapshot.dao.codeHash ?? 'unknown'} · keys ${snapshot.dao.accessKeyCount ?? 'unknown'}`
     dao.className = `dao-status ${snapshot.dao.verified ? 'trusted' : ''}`
   } else {
@@ -1268,6 +1451,7 @@ async function loadDemo(): Promise<void> {
   }
   if (!chatMessages.size) chatRoom = circleId
   renderAll()
+  renderEvidence()
   renderLoansTable()
   await renderTreasury().catch((error) => show(`Treasury: ${errorText(error)}`, 'bad'))
 }
@@ -1290,6 +1474,7 @@ function wire(): void {
   on('#connect-meteor', () => connectWallet('meteor-wallet'), 'wallet')
   on('#connect-wallet', () => connectWallet('my-near-wallet'), 'wallet')
   $('#status-close').addEventListener('click', hideToast)
+  $<HTMLSelectElement>('#pp-account').addEventListener('change', (event) => { passportAccount = (event.target as HTMLSelectElement).value; renderPassport() })
   on('#copy-invite', async () => { await navigator.clipboard.writeText($<HTMLTextAreaElement>('#invite-link').value); show('Link copied. Send it privately.', 'ok') })
   $('#go-ask-chat').addEventListener('click', () => { goView('chat'); $('#ask-panel').hidden = false; checkAsk() })
   $('#go-direct').addEventListener('click', () => goView('direct'))
@@ -1380,7 +1565,7 @@ function boot(): void {
   if (inviteFields().inviteSecret) start = 'home'
   goView(start)
   renderAll()
-  void loadDemo().catch((error) => show(`Could not load testnet data: ${errorText(error)}`, 'bad'))
+  void loadDemo().catch((error) => { loadError = errorText(error); renderStats(); showError(error, 'chain', refreshAll) })
   void restoreWallet().catch(() => { /* no saved wallet session */ })
 }
 

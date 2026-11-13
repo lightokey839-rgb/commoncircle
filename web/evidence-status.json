@@ -1,0 +1,519 @@
+{
+  "generated_at": "2026-11-13T00:57:44.401Z",
+  "source": "evidence/evidence.json",
+  "claims": [
+    {
+      "id": "f0-code-hash",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "kind": "view",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f0-code-hash.json",
+      "reference": {
+        "account_id": "commoncircle-light.testnet",
+        "method": "view_account",
+        "args": {},
+        "snapshot": "evidence/snapshots/f0-code-hash.json"
+      }
+    },
+    {
+      "id": "f0-interface",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "kind": "view",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f0-interface.json",
+      "reference": {
+        "account_id": "commoncircle-light.testnet",
+        "method": "get_config",
+        "args": {},
+        "snapshot": "evidence/snapshots/f0-interface.json"
+      }
+    },
+    {
+      "id": "f0-refund",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "kind": "tx",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f0-refund.json",
+      "reference": {
+        "tx_hash": "9eRRis9rGq1QFjYWdAr7E627HXvtHvEjmnQEwjJQ9B2K",
+        "signer_id": "commoncircle-light-lender.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/9eRRis9rGq1QFjYWdAr7E627HXvtHvEjmnQEwjJQ9B2K",
+        "snapshot": "evidence/snapshots/f0-refund.json"
+      }
+    },
+    {
+      "id": "f0-fund",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "kind": "tx",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f0-fund.json",
+      "reference": {
+        "tx_hash": "CyYFrPZW2P8iaWKKzFEa3e6wrYfsJJT8HDzzjtRnDxKn",
+        "signer_id": "commoncircle-light-lender.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/CyYFrPZW2P8iaWKKzFEa3e6wrYfsJJT8HDzzjtRnDxKn",
+        "snapshot": "evidence/snapshots/f0-fund.json"
+      }
+    },
+    {
+      "id": "f0-repay",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "kind": "tx",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f0-repay.json",
+      "reference": {
+        "tx_hash": "2d42VciE6yCvsXmZ4SPBkrGqnezaseEgv8eYHn8HJv1Q",
+        "signer_id": "commoncircle-light-borrower3.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/2d42VciE6yCvsXmZ4SPBkrGqnezaseEgv8eYHn8HJv1Q",
+        "snapshot": "evidence/snapshots/f0-repay.json"
+      }
+    },
+    {
+      "id": "f0-storage-charged",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "kind": "tx",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f0-storage-charged.json",
+      "reference": {
+        "tx_hash": "9bR1fvUPNYqvAgg18uuYhpiNSNt4akvcGygxVjuHAzr8",
+        "signer_id": "commoncircle-light-lender.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/9bR1fvUPNYqvAgg18uuYhpiNSNt4akvcGygxVjuHAzr8",
+        "snapshot": "evidence/snapshots/f0-storage-charged.json"
+      }
+    },
+    {
+      "id": "f0-low-gas-real-usdc",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "kind": "tx",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f0-low-gas-real-usdc.json",
+      "reference": {
+        "tx_hash": "DiMweYz7TbTGGVdraXFcjZm3y7352J2LBFPop3hsMuNj",
+        "signer_id": "commoncircle-light-lender.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/DiMweYz7TbTGGVdraXFcjZm3y7352J2LBFPop3hsMuNj",
+        "snapshot": "evidence/snapshots/f0-low-gas-real-usdc.json"
+      }
+    },
+    {
+      "id": "f0-zero-balance",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "kind": "view",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f0-zero-balance.json",
+      "reference": {
+        "account_id": "3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af",
+        "method": "ft_balance_of",
+        "args": {
+          "account_id": "commoncircle-light.testnet"
+        },
+        "snapshot": "evidence/snapshots/f0-zero-balance.json"
+      }
+    },
+    {
+      "id": "f0-sandbox",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "kind": "test",
+      "status": "PASS",
+      "reason": "expected value matches evidence/reports/ci-43108982043-rust.json",
+      "reference": {
+        "report": "evidence/reports/ci-43108982043-rust.json"
+      }
+    },
+    {
+      "id": "f0-web-request",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "kind": "tx",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f0-web-request.json",
+      "reference": {
+        "tx_hash": "9TDk7xsPm7NpunmeFvZDfTUJLXep4kVzxwt2LXbrgLfG",
+        "signer_id": "254edye5v.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/9TDk7xsPm7NpunmeFvZDfTUJLXep4kVzxwt2LXbrgLfG",
+        "snapshot": "evidence/snapshots/f0-web-request.json"
+      }
+    },
+    {
+      "id": "f0-web-cancel",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "kind": "tx",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f0-web-cancel.json",
+      "reference": {
+        "tx_hash": "6ZcAoR3sqGV2rGti41t8Ug3RuNKyUp9HwokZDJGmmoS9",
+        "signer_id": "254edye5v.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/6ZcAoR3sqGV2rGti41t8Ug3RuNKyUp9HwokZDJGmmoS9",
+        "snapshot": "evidence/snapshots/f0-web-cancel.json"
+      }
+    },
+    {
+      "id": "f0-web-fund",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "kind": "tx",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f0-web-fund.json",
+      "reference": {
+        "tx_hash": "DZV3Kbm551wgjsHhjgWU8PMh1nKRsQGoLtP6n267dLHq",
+        "signer_id": "commoncircle-light-lender.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/DZV3Kbm551wgjsHhjgWU8PMh1nKRsQGoLtP6n267dLHq",
+        "snapshot": "evidence/snapshots/f0-web-fund.json"
+      }
+    },
+    {
+      "id": "f0-web-repay",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "kind": "tx",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f0-web-repay.json",
+      "reference": {
+        "tx_hash": "FVVgaWmNE8fYwLbUNJSDTr55bWDbTVgcN93fPH5pU7vw",
+        "signer_id": "254edye5v.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/FVVgaWmNE8fYwLbUNJSDTr55bWDbTVgcN93fPH5pU7vw",
+        "snapshot": "evidence/snapshots/f0-web-repay.json"
+      }
+    },
+    {
+      "id": "f1-web-join",
+      "track": "NFTs That Do Something",
+      "feature": "Passport NFT written by repayments; gates credit",
+      "kind": "tx",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f1-web-join.json",
+      "reference": {
+        "tx_hash": "D6cK74PYcv82p5Kxb5i91rneoAwK74z2ZWN65jnLr4vA",
+        "signer_id": "254edye5v.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/D6cK74PYcv82p5Kxb5i91rneoAwK74z2ZWN65jnLr4vA",
+        "snapshot": "evidence/snapshots/f1-web-join.json"
+      }
+    },
+    {
+      "id": "f1-web-repay-tier",
+      "track": "NFTs That Do Something",
+      "feature": "Passport NFT written by repayments; gates credit",
+      "kind": "tx",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f1-web-repay-tier.json",
+      "reference": {
+        "tx_hash": "FVVgaWmNE8fYwLbUNJSDTr55bWDbTVgcN93fPH5pU7vw",
+        "signer_id": "254edye5v.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/FVVgaWmNE8fYwLbUNJSDTr55bWDbTVgcN93fPH5pU7vw",
+        "snapshot": "evidence/snapshots/f1-web-repay-tier.json"
+      }
+    },
+    {
+      "id": "f1-web-passport",
+      "track": "NFTs That Do Something",
+      "feature": "Passport NFT written by repayments; gates credit",
+      "kind": "view",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f1-web-passport.json",
+      "reference": {
+        "account_id": "commoncircle-light.testnet",
+        "method": "passport_for",
+        "args": {
+          "circle_id": "3",
+          "account_id": "254edye5v.testnet"
+        },
+        "snapshot": "evidence/snapshots/f1-web-passport.json"
+      }
+    },
+    {
+      "id": "f0-web-peer-request",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "kind": "tx",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f0-web-peer-request.json",
+      "reference": {
+        "tx_hash": "FGBdYhzRHqh6YmyS197Farz8Vkm7tzfvx5QrLkxAmBLE",
+        "signer_id": "254edye5v.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/FGBdYhzRHqh6YmyS197Farz8Vkm7tzfvx5QrLkxAmBLE",
+        "snapshot": "evidence/snapshots/f0-web-peer-request.json"
+      }
+    },
+    {
+      "id": "f0-web-peer-fund",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "kind": "tx",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f0-web-peer-fund.json",
+      "reference": {
+        "tx_hash": "FKSPKia8YGvc6jh8zv5rvesPjHQS4mrWqQb6qwYtDGt4",
+        "signer_id": "commoncircle-light-borrower.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/FKSPKia8YGvc6jh8zv5rvesPjHQS4mrWqQb6qwYtDGt4",
+        "snapshot": "evidence/snapshots/f0-web-peer-fund.json"
+      }
+    },
+    {
+      "id": "f0-web-peer-repay",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "kind": "tx",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f0-web-peer-repay.json",
+      "reference": {
+        "tx_hash": "nJTfax1q99ZNAHRBuoeJbKGDfCdfXLdwjW6qqwqnfWK",
+        "signer_id": "254edye5v.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/nJTfax1q99ZNAHRBuoeJbKGDfCdfXLdwjW6qqwqnfWK",
+        "snapshot": "evidence/snapshots/f0-web-peer-repay.json"
+      }
+    },
+    {
+      "id": "f0-web-peer-loan",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "kind": "view",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f0-web-peer-loan.json",
+      "reference": {
+        "account_id": "commoncircle-light.testnet",
+        "method": "get_loan",
+        "args": {
+          "loan_id": "19"
+        },
+        "snapshot": "evidence/snapshots/f0-web-peer-loan.json"
+      }
+    },
+    {
+      "id": "f1-tier-flip",
+      "track": "NFTs That Do Something",
+      "feature": "Passport NFT written by repayments; gates credit",
+      "kind": "tx",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f1-tier-flip.json",
+      "reference": {
+        "tx_hash": "2d42VciE6yCvsXmZ4SPBkrGqnezaseEgv8eYHn8HJv1Q",
+        "signer_id": "commoncircle-light-borrower3.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/2d42VciE6yCvsXmZ4SPBkrGqnezaseEgv8eYHn8HJv1Q",
+        "snapshot": "evidence/snapshots/f1-tier-flip.json"
+      }
+    },
+    {
+      "id": "f1-passport",
+      "track": "NFTs That Do Something",
+      "feature": "Passport NFT written by repayments; gates credit",
+      "kind": "view",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f1-passport.json",
+      "reference": {
+        "account_id": "commoncircle-light.testnet",
+        "method": "passport_for",
+        "args": {
+          "circle_id": "3",
+          "account_id": "commoncircle-light-borrower3.testnet"
+        },
+        "snapshot": "evidence/snapshots/f1-passport.json"
+      }
+    },
+    {
+      "id": "f1-card",
+      "track": "NFTs That Do Something",
+      "feature": "Passport NFT written by repayments; gates credit",
+      "kind": "view",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f1-card.json",
+      "reference": {
+        "account_id": "commoncircle-light.testnet",
+        "method": "nft_token",
+        "args": {
+          "token_id": "3:commoncircle-light-borrower3.testnet"
+        },
+        "snapshot": "evidence/snapshots/f1-card.json"
+      }
+    },
+    {
+      "id": "f1-gates",
+      "track": "NFTs That Do Something",
+      "feature": "Passport NFT written by repayments; gates credit",
+      "kind": "test",
+      "status": "PASS",
+      "reason": "expected value matches evidence/reports/ci-43108982043-rust.json",
+      "reference": {
+        "report": "evidence/reports/ci-43108982043-rust.json"
+      }
+    },
+    {
+      "id": "f2-dao-by-hash-locked",
+      "track": "Social Money",
+      "feature": "Sputnik DAO treasury lends to Trusted members by proposal",
+      "kind": "view",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f2-dao-by-hash-locked.json",
+      "reference": {
+        "account_id": "dogs-dao.commoncircle-light.testnet",
+        "method": "view_account",
+        "args": {},
+        "snapshot": "evidence/snapshots/f2-dao-by-hash-locked.json"
+      }
+    },
+    {
+      "id": "f2-dao-council",
+      "track": "Social Money",
+      "feature": "Sputnik DAO treasury lends to Trusted members by proposal",
+      "kind": "view",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f2-dao-council.json",
+      "reference": {
+        "account_id": "dogs-dao.commoncircle-light.testnet",
+        "method": "get_policy",
+        "args": {},
+        "snapshot": "evidence/snapshots/f2-dao-council.json"
+      }
+    },
+    {
+      "id": "f2-attach",
+      "track": "Social Money",
+      "feature": "Sputnik DAO treasury lends to Trusted members by proposal",
+      "kind": "tx",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f2-attach.json",
+      "reference": {
+        "tx_hash": "2zYZ7zxQw8S9w121k1hHvYjcG3vLaz68iipNv4M5iduR",
+        "signer_id": "commoncircle-light-lender.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/2zYZ7zxQw8S9w121k1hHvYjcG3vLaz68iipNv4M5iduR",
+        "snapshot": "evidence/snapshots/f2-attach.json"
+      }
+    },
+    {
+      "id": "f2-circle",
+      "track": "Social Money",
+      "feature": "Sputnik DAO treasury lends to Trusted members by proposal",
+      "kind": "view",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f2-circle.json",
+      "reference": {
+        "account_id": "commoncircle-light.testnet",
+        "method": "get_circle",
+        "args": {
+          "circle_id": "3"
+        },
+        "snapshot": "evidence/snapshots/f2-circle.json"
+      }
+    },
+    {
+      "id": "f2-steward-refused",
+      "track": "Social Money",
+      "feature": "Sputnik DAO treasury lends to Trusted members by proposal",
+      "kind": "tx",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f2-steward-refused.json",
+      "reference": {
+        "tx_hash": "J7XZHt17De96uBniiMWwHdzoA8tSc2X7cDJ8PxdRmuMd",
+        "signer_id": "commoncircle-light-lender.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/J7XZHt17De96uBniiMWwHdzoA8tSc2X7cDJ8PxdRmuMd",
+        "snapshot": "evidence/snapshots/f2-steward-refused.json"
+      }
+    },
+    {
+      "id": "f2-proposal-funds-loan",
+      "track": "Social Money",
+      "feature": "Sputnik DAO treasury lends to Trusted members by proposal",
+      "kind": "tx",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f2-proposal-funds-loan.json",
+      "reference": {
+        "tx_hash": "3dYZEiVpvXFGRPjte9TvCFsKPhPstqJTS4th8Cv8je1r",
+        "signer_id": "commoncircle-light-steward.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/3dYZEiVpvXFGRPjte9TvCFsKPhPstqJTS4th8Cv8je1r",
+        "snapshot": "evidence/snapshots/f2-proposal-funds-loan.json"
+      }
+    },
+    {
+      "id": "f2-proposal",
+      "track": "Social Money",
+      "feature": "Sputnik DAO treasury lends to Trusted members by proposal",
+      "kind": "view",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f2-proposal.json",
+      "reference": {
+        "account_id": "dogs-dao.commoncircle-light.testnet",
+        "method": "get_proposal",
+        "args": {
+          "id": 3
+        },
+        "snapshot": "evidence/snapshots/f2-proposal.json"
+      }
+    },
+    {
+      "id": "f2-treasury-repaid",
+      "track": "Social Money",
+      "feature": "Sputnik DAO treasury lends to Trusted members by proposal",
+      "kind": "tx",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f2-treasury-repaid.json",
+      "reference": {
+        "tx_hash": "BtakkTRfz1iEgJEHoz4YRG39K4PBrJVMfKwzG1C3xC5r",
+        "signer_id": "commoncircle-light-borrower3.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/BtakkTRfz1iEgJEHoz4YRG39K4PBrJVMfKwzG1C3xC5r",
+        "snapshot": "evidence/snapshots/f2-treasury-repaid.json"
+      }
+    },
+    {
+      "id": "f2-treasury-loan",
+      "track": "Social Money",
+      "feature": "Sputnik DAO treasury lends to Trusted members by proposal",
+      "kind": "view",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f2-treasury-loan.json",
+      "reference": {
+        "account_id": "commoncircle-light.testnet",
+        "method": "get_loan",
+        "args": {
+          "loan_id": "6"
+        },
+        "snapshot": "evidence/snapshots/f2-treasury-loan.json"
+      }
+    },
+    {
+      "id": "f2-approved-but-not-trusted",
+      "track": "Social Money",
+      "feature": "Sputnik DAO treasury lends to Trusted members by proposal",
+      "kind": "tx",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f2-approved-but-not-trusted.json",
+      "reference": {
+        "tx_hash": "AmBADVeLJJqM66KSP1eRjGhqH8cHQD5zRNz5WPv3qpvQ",
+        "signer_id": "commoncircle-light-steward.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/AmBADVeLJJqM66KSP1eRjGhqH8cHQD5zRNz5WPv3qpvQ",
+        "snapshot": "evidence/snapshots/f2-approved-but-not-trusted.json"
+      }
+    },
+    {
+      "id": "f2-dao-clears-flag",
+      "track": "Social Money",
+      "feature": "Sputnik DAO treasury lends to Trusted members by proposal",
+      "kind": "tx",
+      "status": "PASS",
+      "reason": "expected value matches evidence/snapshots/f2-dao-clears-flag.json",
+      "reference": {
+        "tx_hash": "43mAx3pTTjTDFDVfpZrGBVwfDSJZHZ12xoUDuA3HVtTk",
+        "signer_id": "commoncircle-light-steward.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/43mAx3pTTjTDFDVfpZrGBVwfDSJZHZ12xoUDuA3HVtTk",
+        "snapshot": "evidence/snapshots/f2-dao-clears-flag.json"
+      }
+    },
+    {
+      "id": "f2-sandbox",
+      "track": "Social Money",
+      "feature": "Sputnik DAO treasury lends to Trusted members by proposal",
+      "kind": "test",
+      "status": "PASS",
+      "reason": "expected value matches evidence/reports/ci-43108982043-rust.json",
+      "reference": {
+        "report": "evidence/reports/ci-43108982043-rust.json"
+      }
+    }
+  ]
+}

@@ -3,14 +3,14 @@
   "account_id": "dogs-dao.commoncircle-light.testnet",
   "method": "view_account",
   "args": {},
-  "block_height": 277429846,
+  "block_height": 277439671,
   "result": {
     "code_hash": "11111111111111111111111111111111",
     "global_contract_hash": "Ea8tHXFSQVszVwGASyzAfLq65DjcRDhkfab4FcPaRpgD",
-    "storage_usage": 3573,
+    "storage_usage": 4231,
     "key_count": 0,
     "full_access_key_count": 0
   },
   "rpc": "https://test.rpc.fastnear.com",
-  "read_at": "2026-11-12T23:19:24.033Z"
+  "read_at": "2026-11-13T00:56:40.047Z"
 }

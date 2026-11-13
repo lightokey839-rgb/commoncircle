@@ -1,7 +1,7 @@
 {
   "schema_version": "A9",
   "project": "CommonCircle",
-  "generated_at": "2026-11-12T23:19:40.308Z",
+  "generated_at": "2026-11-13T00:56:53.013Z",
   "claims": [
     {
       "id": "f0-code-hash",
@@ -318,8 +318,91 @@
           "tier": "Trusted",
           "effective_tier": "Trusted",
           "status": "Active",
-          "on_time_count": 1,
-          "late_count": 0
+          "on_time_count": 1
+        }
+      }
+    },
+    {
+      "id": "f0-web-peer-request",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "network": "testnet",
+      "kind": "tx",
+      "reference": {
+        "tx_hash": "FGBdYhzRHqh6YmyS197Farz8Vkm7tzfvx5QrLkxAmBLE",
+        "signer_id": "254edye5v.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/FGBdYhzRHqh6YmyS197Farz8Vkm7tzfvx5QrLkxAmBLE",
+        "snapshot": "evidence/snapshots/f0-web-peer-request.json"
+      },
+      "expected": {
+        "final_execution_status": "FINAL",
+        "status": "success",
+        "has_event": {
+          "loan_created": true
+        }
+      }
+    },
+    {
+      "id": "f0-web-peer-fund",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "network": "testnet",
+      "kind": "tx",
+      "reference": {
+        "tx_hash": "FKSPKia8YGvc6jh8zv5rvesPjHQS4mrWqQb6qwYtDGt4",
+        "signer_id": "commoncircle-light-borrower.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/FKSPKia8YGvc6jh8zv5rvesPjHQS4mrWqQb6qwYtDGt4",
+        "snapshot": "evidence/snapshots/f0-web-peer-fund.json"
+      },
+      "expected": {
+        "final_execution_status": "FINAL",
+        "status": "success",
+        "has_event": {
+          "loan_funded": true
+        }
+      }
+    },
+    {
+      "id": "f0-web-peer-repay",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "network": "testnet",
+      "kind": "tx",
+      "reference": {
+        "tx_hash": "nJTfax1q99ZNAHRBuoeJbKGDfCdfXLdwjW6qqwqnfWK",
+        "signer_id": "254edye5v.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/nJTfax1q99ZNAHRBuoeJbKGDfCdfXLdwjW6qqwqnfWK",
+        "snapshot": "evidence/snapshots/f0-web-peer-repay.json"
+      },
+      "expected": {
+        "final_execution_status": "FINAL",
+        "status": "success",
+        "has_event": {
+          "loan_repaid": true
+        }
+      }
+    },
+    {
+      "id": "f0-web-peer-loan",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "network": "testnet",
+      "kind": "view",
+      "reference": {
+        "account_id": "commoncircle-light.testnet",
+        "method": "get_loan",
+        "args": {
+          "loan_id": "19"
+        },
+        "snapshot": "evidence/snapshots/f0-web-peer-loan.json"
+      },
+      "expected": {
+        "result": {
+          "borrower_id": "254edye5v.testnet",
+          "lender_id": "commoncircle-light-borrower.testnet",
+          "state": "Repaid",
+          "repaid_on_time": false,
+          "funded_via": "Lender"
         }
       }
     },

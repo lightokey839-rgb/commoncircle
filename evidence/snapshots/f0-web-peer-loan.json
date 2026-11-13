@@ -1,0 +1,35 @@
+{
+  "network": "testnet",
+  "account_id": "commoncircle-light.testnet",
+  "method": "get_loan",
+  "args": {
+    "loan_id": "19"
+  },
+  "block_height": 277439663,
+  "result": {
+    "loan_id": "19",
+    "circle_id": "3",
+    "borrower_id": "254edye5v.testnet",
+    "lender_id": "commoncircle-light-borrower.testnet",
+    "lender_is_treasury": false,
+    "principal": "1000000",
+    "total_repaid": "1000000",
+    "outstanding": "0",
+    "duration_days": 7,
+    "duration_sec": "420",
+    "created_at": "1794529241612667607",
+    "funding_deadline": "1794532841612667607",
+    "funded_at": "1794529344238430597",
+    "due_at": "1794529764238430597",
+    "repaid_at": "1794529793068700503",
+    "state": "Repaid",
+    "cancel_reason": null,
+    "funded_via": "Lender",
+    "overdue": false,
+    "repaid_on_time": false,
+    "qualifying": false,
+    "flag_cleared": false
+  },
+  "rpc": "https://test.rpc.fastnear.com",
+  "read_at": "2026-11-13T00:56:34.822Z"
+}

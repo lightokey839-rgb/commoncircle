@@ -16,14 +16,22 @@ export type MoneyDeps = {
   getLoan(loanId: string): Promise<LoanView | null>
   /** NEP-145: is the account registered with USDC (can it receive)? */
   isRegistered(accountId: string): Promise<boolean>
+  /** NEP-145 storage_deposit for another account, paid by the signer (0.00125 NEAR). Optional. */
+  registerAccount?(accountId: string): Promise<unknown>
 }
+
+/** Options the dialog collects before signing. */
+export type MoneyOptions = { registerLender?: boolean }
+
+/** The USDC storage deposit for one account (NEP-145, registration_only), in NEAR, shown before signing. */
+export const USDC_REGISTRATION_NEAR = '0.00125'
 
 export type MoneyResult = { ok: boolean; text: string; txHash: string | null }
 
 export type MoneySummary = { title: string; lines: string[]; confirm: string }
 
 /** What will happen, in plain words: who pays whom, how much, due when. */
-export function moneySummary(kind: MoneyKind, loan: LoanView, label: (account: string) => string, dayLengthSec: string): MoneySummary {
+export function moneySummary(kind: MoneyKind, loan: LoanView, label: (account: string) => string, dayLengthSec: string, options: MoneyOptions = {}): MoneySummary {
   const amount = `${formatUsdc(kind === 'repay' ? loan.outstanding : loan.principal)} USDC`
   const length = loanLengthText(loan.duration_days, dayLengthSec)
   if (kind === 'fund') {
@@ -43,8 +51,9 @@ export function moneySummary(kind: MoneyKind, loan: LoanView, label: (account: s
       lines: [
         `You pay ${amount} back to ${loan.lender_is_treasury ? 'the circle treasury (DAO)' : label(loan.lender_id)}.`,
         loan.overdue ? 'This loan is past its due time, so it will count as late.' : 'Paying before the due time counts as on time.',
+        ...(options.registerLender ? [`${label(loan.lender_id)} is no longer set up to receive USDC, so a repayment would bounce back to you. First you pay ${USDC_REGISTRATION_NEAR} NEAR to set up their USDC account (a storage deposit), then the repayment. That is two wallet approvals.`] : []),
       ],
-      confirm: `Pay ${amount}`,
+      confirm: options.registerLender ? `Set up their USDC (${USDC_REGISTRATION_NEAR} NEAR), then pay ${amount}` : `Pay ${amount}`,
     }
   }
   return {
@@ -55,7 +64,7 @@ export function moneySummary(kind: MoneyKind, loan: LoanView, label: (account: s
 }
 
 /** Run one money action and turn every outcome into a plain result. Never throws. */
-export async function runMoney(kind: MoneyKind, loan: LoanView, deps: MoneyDeps, usdcId: string, label: (account: string) => string): Promise<MoneyResult> {
+export async function runMoney(kind: MoneyKind, loan: LoanView, deps: MoneyDeps, usdcId: string, label: (account: string) => string, options: MoneyOptions = {}): Promise<MoneyResult> {
   try {
     if (kind === 'fund') {
       if (!(await deps.isRegistered(loan.borrower_id))) {
@@ -68,6 +77,10 @@ export async function runMoney(kind: MoneyKind, loan: LoanView, deps: MoneyDeps,
       return { ok: true, txHash: outcome.txHash, text: `Sent ${formatUsdc(loan.principal)} USDC to ${label(loan.borrower_id)}. The repayment clock has started.` }
     }
     if (kind === 'repay') {
+      if (options.registerLender) {
+        if (!deps.registerAccount) return { ok: false, txHash: null, text: 'This wallet connection cannot set up the lender’s USDC account.' }
+        await deps.registerAccount(loan.lender_id)
+      }
       const outcome = await deps.repayLoan({ usdcId, loanId: loan.loan_id, amount: loan.outstanding })
       const after = await deps.getLoan(loan.loan_id).catch(() => null)
       if (outcome.repaymentFailed.length) return { ok: false, txHash: outcome.txHash, text: repaymentNotice(outcome, after) ?? 'Your repayment bounced and the money came back to you.' }

@@ -20,6 +20,7 @@ const USDC = "3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af";
 const LENDER = "commoncircle-light-lender.testnet";
 const STEWARD = "commoncircle-light-steward.testnet";
 const B3 = "commoncircle-light-borrower3.testnet";
+const PEER = "commoncircle-light-borrower.testnet"; // second wallet in the two-wallet web test (same operator)
 const WEB = "254edye5v.testnet"; // the builder's Meteor testnet wallet (Gate 2 web-app test)
 const CI = "evidence/reports/ci-43108982043-rust.json";
 const SPUTNIK = "Ea8tHXFSQVszVwGASyzAfLq65DjcRDhkfab4FcPaRpgD";
@@ -62,7 +63,16 @@ const rows = [
     { ...ok, has_event: { nft_mint: true, invite_redeemed: true }, storage_verdict: "deposit covers storage growth" }),
   tx("f1-web-repay-tier", NFT, F1, "FVVgaWmNE8fYwLbUNJSDTr55bWDbTVgcN93fPH5pU7vw", WEB, { ...ok, has_event: { tier_changed: true } }),
   view("f1-web-passport", NFT, F1, C, "passport_for", { circle_id: "3", account_id: WEB },
-    { result: { tier: "Trusted", effective_tier: "Trusted", status: "Active", on_time_count: 1, late_count: 0 } }),
+    // late_count is not asserted: loan 19 (two-wallet test, 13 Nov) was repaid 26 s late, so it is 1 since then.
+    { result: { tier: "Trusted", effective_tier: "Trusted", status: "Active", on_time_count: 1 } }),
+
+  // Two-wallet web test (2026-11-13): both sides in the web app. The borrower posted a request card in the
+  // circle chat, the second wallet offered and funded from its own browser; repaid 26 s after the due time (late).
+  tx("f0-web-peer-request", OI, F0, "FGBdYhzRHqh6YmyS197Farz8Vkm7tzfvx5QrLkxAmBLE", WEB, { ...ok, has_event: { loan_created: true } }),
+  tx("f0-web-peer-fund", OI, F0, "FKSPKia8YGvc6jh8zv5rvesPjHQS4mrWqQb6qwYtDGt4", PEER, { ...ok, has_event: { loan_funded: true } }),
+  tx("f0-web-peer-repay", OI, F0, "nJTfax1q99ZNAHRBuoeJbKGDfCdfXLdwjW6qqwqnfWK", WEB, { ...ok, has_event: { loan_repaid: true } }),
+  view("f0-web-peer-loan", OI, F0, C, "get_loan", { loan_id: "19" },
+    { result: { borrower_id: WEB, lender_id: PEER, state: "Repaid", repaid_on_time: false, funded_via: "Lender" } }),
 
   // NFTs That Do Something: F1
   tx("f1-tier-flip", NFT, F1, "2d42VciE6yCvsXmZ4SPBkrGqnezaseEgv8eYHn8HJv1Q", B3, { ...ok, has_event: { tier_changed: true } }),

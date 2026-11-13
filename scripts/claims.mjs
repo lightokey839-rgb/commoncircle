@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import process from "node:process";
 
@@ -117,6 +118,14 @@ if (results.length === 0) {
   }
 }
 await writeFile(outputPath, `${evidenceLines.join("\n")}\n`);
+// Same results, machine-readable, for the web app's "Evidence & Tracks" view. The UI never
+// computes or hand-writes a status: it renders this file, which only this script writes.
+const webStatus = {
+  generated_at: new Date().toISOString(),
+  source: evidencePath,
+  claims: results.map((r) => ({ id: r.claim.id, track: r.claim.track, feature: r.claim.feature, kind: r.claim.kind, status: r.status, reason: r.reason, reference: r.claim.reference })),
+};
+if (evidencePath === "evidence/evidence.json" && existsSync("web")) await writeFile("web/evidence-status.json", `${JSON.stringify(webStatus, null, 2)}\n`);
 
 console.log(evidenceLines.join("\n"));
 if (failures.length > 0 || results.some((result) => result.status !== "PASS")) {

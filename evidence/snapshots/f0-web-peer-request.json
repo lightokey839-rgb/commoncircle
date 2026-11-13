@@ -1,0 +1,59 @@
+{
+  "network": "testnet",
+  "tx_hash": "FGBdYhzRHqh6YmyS197Farz8Vkm7tzfvx5QrLkxAmBLE",
+  "signer_id": "254edye5v.testnet",
+  "receiver_id": "commoncircle-light.testnet",
+  "final_execution_status": "FINAL",
+  "status": "success",
+  "error": null,
+  "attached_deposit": "14560000000000000000000",
+  "refunded_to_signer": "7810000000000000000000",
+  "storage_kept": "6750000000000000000000",
+  "storage_growth": {
+    "account": "commoncircle-light.testnet",
+    "bytes": 419,
+    "cost_yocto": "4190000000000000000000",
+    "note": "other txs in the same blocks would also count"
+  },
+  "storage_verdict": "deposit covers storage growth",
+  "has_event": {
+    "loan_created": true
+  },
+  "error_codes": {},
+  "refund_memo": false,
+  "gas_at_tgas": {
+    "create_loan": 50
+  },
+  "function_calls": [
+    {
+      "receiver": "commoncircle-light.testnet",
+      "predecessor": "254edye5v.testnet",
+      "method": "create_loan",
+      "gas_tgas": 50,
+      "ok": true
+    }
+  ],
+  "receipt_failures": [],
+  "events": [
+    {
+      "standard": "commoncircle",
+      "version": "1.0.0",
+      "event": "loan_created",
+      "data": [
+        {
+          "loan_id": "19",
+          "circle_id": "3",
+          "borrower_id": "254edye5v.testnet",
+          "lender_id": "commoncircle-light-borrower.testnet",
+          "lender_is_treasury": false,
+          "principal": "1000000",
+          "duration_days": 7,
+          "duration_sec": "420",
+          "funding_deadline": "1794532841612667607"
+        }
+      ]
+    }
+  ],
+  "rpc": "https://test.rpc.fastnear.com",
+  "read_at": "2026-11-13T00:56:30.990Z"
+}

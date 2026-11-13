@@ -90,6 +90,20 @@ describe('repay (P0-2)', () => {
     expect(r.text).toMatch(/bounced/)
   })
 
+  it('sets up an unregistered lender’s USDC first, only when the borrower confirmed it, then repays', async () => {
+    const registerAccount = vi.fn(async () => ({}))
+    const d = deps({ registerAccount })
+    const summary = moneySummary('repay', loan({ state: 'Funded' }), label, '60', { registerLender: true })
+    expect(summary.confirm).toBe('Set up their USDC (0.00125 NEAR), then pay 1 USDC')
+    expect(summary.lines.join(' ')).toMatch(/no longer set up to receive USDC/)
+    const r = await runMoney('repay', loan({ state: 'Funded' }), d, 'usdc', label, { registerLender: true })
+    expect(r.ok).toBe(true)
+    expect(registerAccount).toHaveBeenCalledWith('le.testnet')
+    expect(registerAccount.mock.invocationCallOrder[0]).toBeLessThan((d.repayLoan as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0])
+    await runMoney('repay', loan({ state: 'Funded' }), deps({ registerAccount }), 'usdc', label)
+    expect(registerAccount).toHaveBeenCalledTimes(1) // never without the option
+  })
+
   it('reports an RPC failure', async () => {
     const r = await runMoney('repay', loan({ state: 'Funded' }), deps({ repayLoan: vi.fn(async () => { throw new Error('NEAR RPC view failed') }) }), 'usdc', label)
     expect(r.text).toBe('NEAR testnet is busy and did not answer. Try again in a moment.')
