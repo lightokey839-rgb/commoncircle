@@ -1,7 +1,7 @@
 {
   "schema_version": "A9",
   "project": "CommonCircle",
-  "generated_at": "2026-11-12T09:44:47.490Z",
+  "generated_at": "2026-11-12T23:19:40.308Z",
   "claims": [
     {
       "id": "f0-code-hash",
@@ -172,6 +172,154 @@
           "readme_checks::fund_to_an_unregistered_borrower": "ok",
           "sandbox_f0::f0_low_gas_fails_early_and_is_refunded": "ok",
           "redteam::rt_contract_never_subsidises_storage": "ok"
+        }
+      }
+    },
+    {
+      "id": "f0-web-request",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "network": "testnet",
+      "kind": "tx",
+      "reference": {
+        "tx_hash": "9TDk7xsPm7NpunmeFvZDfTUJLXep4kVzxwt2LXbrgLfG",
+        "signer_id": "254edye5v.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/9TDk7xsPm7NpunmeFvZDfTUJLXep4kVzxwt2LXbrgLfG",
+        "snapshot": "evidence/snapshots/f0-web-request.json"
+      },
+      "expected": {
+        "final_execution_status": "FINAL",
+        "status": "success",
+        "has_event": {
+          "loan_created": true
+        },
+        "storage_verdict": "deposit covers storage growth"
+      }
+    },
+    {
+      "id": "f0-web-cancel",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "network": "testnet",
+      "kind": "tx",
+      "reference": {
+        "tx_hash": "6ZcAoR3sqGV2rGti41t8Ug3RuNKyUp9HwokZDJGmmoS9",
+        "signer_id": "254edye5v.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/6ZcAoR3sqGV2rGti41t8Ug3RuNKyUp9HwokZDJGmmoS9",
+        "snapshot": "evidence/snapshots/f0-web-cancel.json"
+      },
+      "expected": {
+        "final_execution_status": "FINAL",
+        "status": "success",
+        "has_event": {
+          "loan_cancelled": true
+        }
+      }
+    },
+    {
+      "id": "f0-web-fund",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "network": "testnet",
+      "kind": "tx",
+      "reference": {
+        "tx_hash": "DZV3Kbm551wgjsHhjgWU8PMh1nKRsQGoLtP6n267dLHq",
+        "signer_id": "commoncircle-light-lender.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/DZV3Kbm551wgjsHhjgWU8PMh1nKRsQGoLtP6n267dLHq",
+        "snapshot": "evidence/snapshots/f0-web-fund.json"
+      },
+      "expected": {
+        "final_execution_status": "FINAL",
+        "status": "success",
+        "has_event": {
+          "loan_funded": true
+        }
+      }
+    },
+    {
+      "id": "f0-web-repay",
+      "track": "Open Innovation",
+      "feature": "Loans that never rest in the contract; every failure refunds",
+      "network": "testnet",
+      "kind": "tx",
+      "reference": {
+        "tx_hash": "FVVgaWmNE8fYwLbUNJSDTr55bWDbTVgcN93fPH5pU7vw",
+        "signer_id": "254edye5v.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/FVVgaWmNE8fYwLbUNJSDTr55bWDbTVgcN93fPH5pU7vw",
+        "snapshot": "evidence/snapshots/f0-web-repay.json"
+      },
+      "expected": {
+        "final_execution_status": "FINAL",
+        "status": "success",
+        "has_event": {
+          "loan_repaid": true
+        }
+      }
+    },
+    {
+      "id": "f1-web-join",
+      "track": "NFTs That Do Something",
+      "feature": "Passport NFT written by repayments; gates credit",
+      "network": "testnet",
+      "kind": "tx",
+      "reference": {
+        "tx_hash": "D6cK74PYcv82p5Kxb5i91rneoAwK74z2ZWN65jnLr4vA",
+        "signer_id": "254edye5v.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/D6cK74PYcv82p5Kxb5i91rneoAwK74z2ZWN65jnLr4vA",
+        "snapshot": "evidence/snapshots/f1-web-join.json"
+      },
+      "expected": {
+        "final_execution_status": "FINAL",
+        "status": "success",
+        "has_event": {
+          "nft_mint": true,
+          "invite_redeemed": true
+        },
+        "storage_verdict": "deposit covers storage growth"
+      }
+    },
+    {
+      "id": "f1-web-repay-tier",
+      "track": "NFTs That Do Something",
+      "feature": "Passport NFT written by repayments; gates credit",
+      "network": "testnet",
+      "kind": "tx",
+      "reference": {
+        "tx_hash": "FVVgaWmNE8fYwLbUNJSDTr55bWDbTVgcN93fPH5pU7vw",
+        "signer_id": "254edye5v.testnet",
+        "explorer": "https://testnet.nearblocks.io/txns/FVVgaWmNE8fYwLbUNJSDTr55bWDbTVgcN93fPH5pU7vw",
+        "snapshot": "evidence/snapshots/f1-web-repay-tier.json"
+      },
+      "expected": {
+        "final_execution_status": "FINAL",
+        "status": "success",
+        "has_event": {
+          "tier_changed": true
+        }
+      }
+    },
+    {
+      "id": "f1-web-passport",
+      "track": "NFTs That Do Something",
+      "feature": "Passport NFT written by repayments; gates credit",
+      "network": "testnet",
+      "kind": "view",
+      "reference": {
+        "account_id": "commoncircle-light.testnet",
+        "method": "passport_for",
+        "args": {
+          "circle_id": "3",
+          "account_id": "254edye5v.testnet"
+        },
+        "snapshot": "evidence/snapshots/f1-web-passport.json"
+      },
+      "expected": {
+        "result": {
+          "tier": "Trusted",
+          "effective_tier": "Trusted",
+          "status": "Active",
+          "on_time_count": 1,
+          "late_count": 0
         }
       }
     },

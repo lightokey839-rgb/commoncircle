@@ -5,7 +5,7 @@
   "args": {
     "circle_id": "3"
   },
-  "block_height": 277345961,
+  "block_height": 277429853,
   "result": {
     "circle_id": "3",
     "name": "The Dogs (DEMO)",
@@ -28,9 +28,9 @@
       "recovery_lock_sec": "0",
       "writeoff_grace_sec": "600"
     },
-    "member_count": 3,
+    "member_count": 5,
     "steward_count": 2,
-    "loan_count": 5,
+    "loan_count": 9,
     "treasury_lending_enabled": true,
     "theme": {
       "tagline": "Good dogs pay back",
@@ -44,5 +44,5 @@
     }
   },
   "rpc": "https://test.rpc.fastnear.com",
-  "read_at": "2026-11-12T09:44:19.153Z"
+  "read_at": "2026-11-12T23:19:27.886Z"
 }

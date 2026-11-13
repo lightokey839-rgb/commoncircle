@@ -1,0 +1,48 @@
+{
+  "network": "testnet",
+  "tx_hash": "6ZcAoR3sqGV2rGti41t8Ug3RuNKyUp9HwokZDJGmmoS9",
+  "signer_id": "254edye5v.testnet",
+  "receiver_id": "commoncircle-light.testnet",
+  "final_execution_status": "FINAL",
+  "status": "success",
+  "error": null,
+  "attached_deposit": "1",
+  "refunded_to_signer": "0",
+  "storage_kept": "1",
+  "storage_growth": null,
+  "storage_verdict": null,
+  "has_event": {
+    "loan_cancelled": true
+  },
+  "error_codes": {},
+  "refund_memo": false,
+  "gas_at_tgas": {
+    "cancel_loan": 30
+  },
+  "function_calls": [
+    {
+      "receiver": "commoncircle-light.testnet",
+      "predecessor": "254edye5v.testnet",
+      "method": "cancel_loan",
+      "gas_tgas": 30,
+      "ok": true
+    }
+  ],
+  "receipt_failures": [],
+  "events": [
+    {
+      "standard": "commoncircle",
+      "version": "1.0.0",
+      "event": "loan_cancelled",
+      "data": [
+        {
+          "loan_id": "10",
+          "circle_id": "3",
+          "reason": "Borrower"
+        }
+      ]
+    }
+  ],
+  "rpc": "https://test.rpc.fastnear.com",
+  "read_at": "2026-11-12T23:19:03.799Z"
+}

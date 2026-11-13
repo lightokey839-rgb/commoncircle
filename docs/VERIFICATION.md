@@ -419,3 +419,21 @@ Checks run by the lead on `lane/web-polish`. Type check: `tsc -p <temp config ex
 | Loan requests in the chat (LoanBook-style): a request card with a reason, offers from any member, the borrower picks a lender, the on-chain loan is linked only if `get_loan` matches (borrower, circle, amount, days, a lender who offered); direct-loan reasons; members-only | PASS | `tests/requests.test.ts` (5 tests); `curl http://127.0.0.1:3001/chat/3/requests` without a token answers 401 "Sign in first" |
 | New pages and boxes render: Direct loans page, "Two ways to borrow" on Loans, Invite a friend on Members (Trusted only), Reason column, + button in the chat | PASS | browser pane, production build, no console errors |
 | Live two-wallet run: post a request in chat, offer from the second wallet, pick the lender, fund, repay; paste an invite link on Home; create and copy an invite on Members | UNVERIFIED | builder, with two Meteor testnet wallets in two Chrome profiles (steps in the chat reply of 2026-11-12 ~23:50 UTC) |
+
+## Gate 2: the builder's wallet test from the web app (2026-11-12)
+
+Wallet: `254edye5v.testnet`, a Meteor testnet wallet created by the builder (1 test NEAR from tx `9wsL3gA1E4YN9pxpNzaAKLErF11BSB2QaJMxX6KY2YVD`). The app ran locally (`npm run build` + `npm run preview` in `work/commoncircle`, sign-in server `npm run auth`). The builder signed every transaction in Meteor from the web app, except the lender's funding, which the builder ran with `./contracts/scripts/testnet-dao.sh fund 11`. Hashes come from the NearBlocks v3 account list (`/v3/accounts/254edye5v.testnet/txns`); each was read independently by the lead with `node contracts/scripts/near-tx.mjs <hash> <signer>` over `https://test.rpc.fastnear.com`: all FINAL and SUCCESS.
+
+| Step | Tx | What the receipts show |
+| --- | --- | --- |
+| Join by invite (`redeem_invite`, invite from `borrower3`) | `D6cK74PYcv82p5Kxb5i91rneoAwK74z2ZWN65jnLr4vA` | `nft_mint` of `3:254edye5v.testnet`, `invite_redeemed`; deposit 0.009 NEAR, 0.00431 kept, storage growth 256 bytes covered |
+| Set up USDC (`storage_deposit`) | `HXJww1pbCtbjgPxrzep4CyvM2f8K9JnZibhjSp6j1xRs` | 0.00125 NEAR, registered |
+| Sign in (NEP-413) and chat | no transaction | done in the app by the builder; the chat server accepted posts (reported by the builder). No on-chain record by design |
+| Cancel a waiting request (`cancel_loan`, new P0-2 button) | `6ZcAoR3sqGV2rGti41t8Ug3RuNKyUp9HwokZDJGmmoS9` | `loan_cancelled` loan 10, reason `Borrower` (loan 9 was cancelled by `EsCYELr45vn4GGbpP1SywP56XUvkb7K8PfNphWDc5fFV`) |
+| Ask the lender (`create_loan`) | `9TDk7xsPm7NpunmeFvZDfTUJLXep4kVzxwt2LXbrgLfG` | `loan_created` loan 11: 1 USDC from `commoncircle-light-lender.testnet`, 7 demo days (420 s); storage growth 415 bytes covered |
+| Fund (lender, CLI) | `DZV3Kbm551wgjsHhjgWU8PMh1nKRsQGoLtP6n267dLHq` | `loan_funded`; 1 USDC forwarded to `254edye5v.testnet` in the same transaction |
+| Repay on time (web app, Repay dialog) | `FVVgaWmNE8fYwLbUNJSDTr55bWDbTVgcN93fPH5pU7vw` | `loan_repaid` `on_time: true`; 1 USDC forwarded to the lender; `tier_changed` Member -> Trusted |
+
+After: `passport_for(3, 254edye5v.testnet)` = Trusted, effective Trusted, on time 1, late 0 (row `f1-web-passport`); circle USDC balance still 0 (`f0-zero-balance`). Evidence rows added: `f0-web-request`, `f0-web-cancel`, `f0-web-fund`, `f0-web-repay`, `f1-web-join`, `f1-web-repay-tier`, `f1-web-passport`. `node contracts/scripts/build-evidence.mjs && npm run claims`: 32 rows, 0 FAIL, all three tracks PASS (2026-11-12 ~23:20 UTC).
+
+Earlier attempts by the same wallet, not claimed: `register_invite` failed twice (`8XLxTEdQN5b9ZSYn4Mt4Snyi9j1XKCRLpfLKPJ51959f`, `3neTPZviYjvzRX5xfXiQ5sVHsTKXAnKazUhpQec291Hx`: a Member cannot invite after `attach_dao`, E34); requests 8 and 9 asked `borrower3`, who holds no USDC, and lapsed or were cancelled.

@@ -14,6 +14,10 @@ Ship Sat 14 Nov 17:59. This replaces amendment A11's Gate 2/3 times.
 - P0-4 checklist and layout: PASS (measured in the browser pane; the member view simulated). Done steps fold into one line; one current step with one primary button; locked steps AA contrast (no more 55% opacity); one scroll container; compact hero for members; 1366x768 and 1920x1080 keep the card and the next action in view; 390 px has no overflow and a slide-out nav.
 - P0-5 members and badges: PASS. One label per member (avatar + `common…lender`, full account in the tooltip, copy on click; passports have no nickname); one `.badge` component for Member/Trusted/Steward, 22 px everywhere; People tab heading fixed; no `short()` labels left.
 
+## Gate 2: COMPLETE (2026-11-12 ~23:20 UTC)
+
+The builder's Meteor testnet wallet `254edye5v.testnet` did the member loop from the web app: join by invite, sign in, chat, USDC setup, ask, cancel, ask the lender, repay on time; the card turned Trusted. Every tx verified over FastNEAR (`docs/VERIFICATION.md`, "Gate 2: the builder's wallet test"). `npm run claims`: 32 rows, 0 FAIL, all three tracks PASS. The web polish P0 (branch `lane/web-polish`) was the build used for this test.
+
 ## Gate 2 progress (lead, 2026-11-11 ~22:30 UTC)
 
 - **D-009 is deployed** (interface 1.1.1, code hash
