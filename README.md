@@ -70,7 +70,7 @@ at rest, and the web app's Overview shows that balance live.
 | Token | Circle testnet USDC `3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af` |
 | Upgradeability | **The builder can still upgrade this testnet contract.** Its account holds a full-access key until the keys are deleted at ship. Until then, nothing here claims "locked code". |
 | Demo circles | Labelled DEMO, and the app shows a "Demo settings" note on them: 60-second "days", a 1-hour funding window, and one on-time loan from one lender reaches Trusted. The standard rules (the contract defaults) are 3 qualifying loans from 2 different lenders, real days and a 72-hour window; the app's "new circle" form offers both, clearly labelled. |
-| Web app | `web/` (TypeScript, Vite), NEAR Wallet Selector 10.1.4 with Meteor and MyNearWallet. Pages: Overview, Chat, Loans, Direct loans, My Passport, Treasury, Members, Advanced tools, Evidence & Tracks. Runs locally; a hosted copy needs the repository to be public (ship day). |
+| Web app | `web/` (TypeScript, Vite), NEAR Wallet Selector 10.1.4 with Meteor and MyNearWallet. Pages: Overview, Chat, Loans, Direct loans, My Passport, Treasury, Members, Advanced tools, Evidence & Tracks. Live at https://lightokey839-rgb.github.io/commoncircle/ (chat needs the local sign-in server). |
 | Chat and loan requests | Run on the local sign-in server (`npm run auth`): NEP-413 sign-in, members-only (checked on-chain), not end-to-end encrypted, history in local files. Not hosted publicly yet; a public copy of the app says so and the rest keeps working. |
 
 ## Check it yourself, without a wallet
@@ -129,8 +129,10 @@ Done from the web app on testnet, verified over FastNEAR (`docs/VERIFICATION.md`
   after the due time, so it counts as late, and the passport's late count is 1.
   Both wallets are run by the builder.
 
-A hosted copy (GitHub Pages) goes live when the repository is made public at
-ship; Pages cannot serve it while the repository is private.
+**Live app (testnet):** https://lightokey839-rgb.github.io/commoncircle/?circle_id=3
+(GitHub Pages, deployed 13 Nov 2026 from `9173f08`). Everything except chat and
+chat loan requests works there; those need the sign-in server, which runs locally
+(`npm run auth`), and the hosted page says so.
 
 ## Do X, see Y
 

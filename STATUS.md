@@ -6,6 +6,12 @@ Gate 1 contract freeze Wed 11 Nov 23:59 · Gate 2 Tier A proof **Thu 12 Nov
 23:59** · Gate 3 pilot/user-test proof and feature freeze **Fri 13 Nov 23:59** ·
 Ship Sat 14 Nov 17:59. This replaces amendment A11's Gate 2/3 times.
 
+## Public (13 Nov 2026 ~11:20 UTC)
+
+- The builder made the repository public. GitHub Pages is on (source: Actions); deploy run `43416163294` built `9173f08` and GitHub reports the `github-pages` deployment as success at https://lightokey839-rgb.github.io/commoncircle/. The first run failed at `npm ci` on Node 22; the workflow now uses `.nvmrc` (Node 24) like the main CI.
+- Not checked by the lead: the live page in a browser (this PC cannot connect to GitHub Pages' IPs; github.com works). Builder: open the link and check Overview, My Passport and Evidence & Tracks load.
+- Chat and chat loan requests are not hosted (sign-in server is local only); the hosted page says so.
+
 ## Finishing pass (13 Nov 2026 ~01:20 UTC, branch `lane/web-polish`, not pushed)
 
 - Two-wallet loan done **from the web app on both sides** (request card in chat, offer, pick lender, lender funds from its own browser, repay). Repaid 26 s late, so it counts as late. Evidence 36/36.
