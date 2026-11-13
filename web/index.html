@@ -3,164 +3,142 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#24150f" />
+    <meta name="theme-color" content="#0f1216" />
     <title>CommonCircle</title>
-    <meta name="description" content="Zero-interest loans and a members-only chat for people who already trust each other, on NEAR testnet." />
+    <meta name="description" content="Zero-interest USDC loans and a members-only chat for people who already trust each other, on NEAR testnet." />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div class="frame">
-      <!-- SIDEBAR -->
-      <aside class="sidebar" id="sidebar">
-        <a class="brand" href="./" aria-label="CommonCircle home">
-          <span class="brand-mark" aria-hidden="true"></span>
-          <span>CommonCircle</span>
-        </a>
-
-        <div class="profile" id="profile">
-          <div id="profile-out" class="profile-out">
-            <p class="profile-hint">Connect a NEAR testnet wallet to join, borrow and chat.</p>
-            <button id="connect-meteor" class="btn btn-accent btn-block">Connect Meteor</button>
-            <button id="connect-wallet" class="btn btn-glass btn-block">MyNearWallet</button>
-          </div>
-          <div id="profile-in" class="profile-in" hidden>
-            <p class="profile-label">Signed in as</p>
-            <div class="profile-row">
-              <span id="profile-avatar" class="avatar"></span>
-              <div class="profile-text">
-                <button id="wallet-account" class="profile-name" type="button" title="Show and copy the full account"></button>
-                <p id="profile-tier" class="profile-tier">Not a member yet</p>
-              </div>
-            </div>
-            <div class="profile-actions">
-              <button id="switch-wallet" class="btn btn-glass btn-sm" type="button">Switch</button>
-              <button id="disconnect-wallet" class="btn btn-glass btn-sm" type="button">Disconnect</button>
-            </div>
-          </div>
+    <a class="skip" href="#panel">Skip to content</a>
+    <div class="shell">
+      <!-- SIDEBAR (desktop) / DRAWER (phone "More") -->
+      <aside class="sidebar" id="sidebar" aria-label="Navigation">
+        <div class="side-top">
+          <a class="brand" href="./" aria-label="CommonCircle home">
+            <span class="brand-mark" aria-hidden="true"><span></span></span>
+            <span class="brand-text">CommonCircle<small>on NEAR testnet</small></span>
+          </a>
+          <button class="icon-btn side-close" id="side-close" type="button" aria-label="Close menu">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+          </button>
         </div>
 
-        <p class="side-label">Menu</p>
+        <div class="circle-switch">
+          <p class="side-label">Your circles</p>
+          <div id="side-circles" class="side-circles"></div>
+          <p id="side-circles-note" class="side-note"></p>
+        </div>
+
         <nav class="nav" aria-label="Main">
-          <button class="nav-item" data-view="home">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
-            <span>Overview</span>
-          </button>
-          <button class="nav-item" data-view="chat">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H9l-5 4v-4H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/></svg>
-            <span>Chat</span>
-            <span class="nav-badge" id="nav-chat-badge" hidden></span>
-          </button>
-          <button class="nav-item" data-view="loans">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18v12H3zM3 7l3-3h12l3 3M12 10v6M9.5 11.5h4a1.5 1.5 0 0 1 0 3h-3a1.5 1.5 0 0 0 0 3h4"/></svg>
-            <span>Loans</span>
-            <span class="nav-badge" id="nav-loans-badge" hidden></span>
-          </button>
-          <button class="nav-item" data-view="direct">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>
-            <span>Direct loans</span>
-          </button>
-          <button class="nav-item" data-view="treasury">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9 12 4l9 5M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/></svg>
-            <span>Treasury</span>
-            <span class="nav-badge" id="nav-treasury-badge" hidden></span>
-          </button>
-          <button class="nav-item" data-view="passport">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v18H5zM9 8a3 3 0 1 0 6 0 3 3 0 0 0-6 0M8 16h8M8 19h5"/></svg>
-            <span>My Passport</span>
-          </button>
-          <button class="nav-item" data-view="members">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21a7 7 0 0 1 14 0M16 3.5a4 4 0 0 1 0 7.5M22 21a7 7 0 0 0-4-6.3"/></svg>
-            <span>Members</span>
-          </button>
-          <button class="nav-item" data-view="tools">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
-            <span>Advanced tools</span>
-          </button>
-          <button class="nav-item" data-view="evidence">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 12l2 2 4-4M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg>
-            <span>Evidence &amp; Tracks</span>
-          </button>
+          <p class="nav-group">Overview</p>
+          <button class="nav-item" data-view="home" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>Overview</span></button>
+
+          <p class="nav-group">Your circle</p>
+          <button class="nav-item" data-view="chat" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H9l-5 4v-4H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/></svg><span>Circle chat</span><span class="nav-badge" id="nav-chat-badge" hidden></span></button>
+          <button class="nav-item" data-view="members" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21a7 7 0 0 1 14 0M16 3.5a4 4 0 0 1 0 7.5M22 21a7 7 0 0 0-4-6.3"/></svg><span>Members</span></button>
+          <button class="nav-item" data-view="invites" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0zM3 21a8 8 0 0 1 13-6.2M19 14v6M16 17h6"/></svg><span>Invitations</span></button>
+
+          <p class="nav-group">Lending</p>
+          <button class="nav-item" data-view="loans" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18v12H3zM3 7l3-3h12l3 3M12 10v6M9.5 11.5h4a1.5 1.5 0 0 1 0 3h-3a1.5 1.5 0 0 0 0 3h4"/></svg><span>Loans</span><span class="nav-badge" id="nav-loans-badge" hidden></span></button>
+          <button class="nav-item" data-view="direct" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span>Direct loans</span></button>
+          <button class="nav-item" data-view="myloans" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 9h16M8 13h4M8 16h7"/></svg><span>My loans</span></button>
+
+          <p class="nav-group">Identity</p>
+          <button class="nav-item" data-view="passport" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v18H5zM9 8a3 3 0 1 0 6 0 3 3 0 0 0-6 0M8 16h8M8 19h5"/></svg><span>My passport</span></button>
+
+          <p class="nav-group">Governance</p>
+          <button class="nav-item" data-view="treasury" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9 12 4l9 5M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/></svg><span>Treasury</span><span class="nav-badge" id="nav-treasury-badge" hidden></span></button>
+
+          <p class="nav-group">Transparency</p>
+          <button class="nav-item" data-view="activity" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg><span>Activity</span></button>
+          <button class="nav-item" data-view="evidence" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 12l2 2 4-4M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg><span>Evidence &amp; tracks</span></button>
+          <button class="nav-item" data-view="network" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9M12 3C9.5 5.5 8.5 8.5 8.5 12s1 6.5 3.5 9"/></svg><span>NEAR network</span></button>
+
+          <p class="nav-group">Settings</p>
+          <button class="nav-item" data-view="tools" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg><span>Advanced tools</span></button>
+          <button class="nav-item" data-view="settings" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15l1.6 1-2 3.4-1.8-.7a7 7 0 0 1-2 1.2L15 22h-4l-.3-2.1a7 7 0 0 1-2-1.2l-1.8.7-2-3.4 1.6-1a7 7 0 0 1 0-2.3L4.9 11.6l2-3.4 1.8.7a7 7 0 0 1 2-1.2L11 5.6h4l.3 2.1a7 7 0 0 1 2 1.2l1.8-.7 2 3.4-1.6 1a7 7 0 0 1 0 2.4z"/></svg><span>Account &amp; network</span></button>
         </nav>
 
-        <p class="side-label">Your circles</p>
-        <div id="side-circles" class="side-circles"></div>
-        <p id="side-circles-note" class="side-note"></p>
-
+        <div class="side-foot">
+          <div id="profile-out" class="profile-out">
+            <button id="connect-meteor" class="btn btn-accent btn-block" type="button">Connect Meteor wallet</button>
+            <button id="connect-wallet" class="btn btn-dark btn-block" type="button">MyNearWallet</button>
+          </div>
+          <div id="profile-in" class="profile-in" hidden>
+            <span id="profile-avatar" class="avatar"></span>
+            <div class="profile-text">
+              <button id="wallet-account" class="profile-name" type="button" title="Copy the full account"></button>
+              <p id="profile-tier" class="profile-tier"></p>
+            </div>
+            <button id="switch-wallet" class="icon-btn" type="button" aria-label="Switch account" title="Switch account"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg></button>
+            <button id="disconnect-wallet" class="icon-btn" type="button" aria-label="Disconnect" title="Disconnect"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg></button>
+          </div>
+        </div>
       </aside>
       <div class="scrim" id="scrim" hidden></div>
 
       <!-- WORKSPACE -->
       <section class="workspace">
         <header class="topbar">
-          <button class="icon-btn menu-btn" id="menu-btn" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
-          </button>
-          <p class="crumbs"><span id="crumb-circle" class="crumb-circle"><span class="skeleton-line" aria-label="Loading circle"></span></span><span class="crumb-sep">/</span><strong id="crumb-view">Overview</strong></p>
-          <span class="topbar-meta"><span id="refresh-time">loading…</span></span>
-          <span class="chip-testnet" tabindex="0" title="Everything here runs on NEAR testnet: no real money, no mainnet funds.">TESTNET</span>
+          <a class="brand brand-mobile" href="./" aria-label="CommonCircle home"><span class="brand-mark" aria-hidden="true"><span></span></span></a>
+          <div class="crumbs">
+            <span id="crumb-circle" class="crumb-circle"><span class="skeleton-line" aria-label="Loading circle"></span></span>
+            <strong id="crumb-view">Overview</strong>
+          </div>
+          <button id="net-pill" class="net-pill idle" type="button" title="NEAR testnet connection"><span class="dot" aria-hidden="true"></span><span id="net-pill-text">Connecting…</span></button>
+          <span class="chip-testnet" tabindex="0" title="Everything here runs on NEAR testnet: test tokens only, no real money.">Testnet</span>
           <div class="head-account">
             <button id="head-connect" class="btn btn-accent btn-sm head-connect" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="account-menu"><span class="label-long">Connect wallet</span><span class="label-short">Connect</span></button>
             <button id="head-account" class="head-chip" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="account-menu" hidden></button>
             <div id="account-menu" class="account-menu" role="menu" hidden></div>
           </div>
-          <button id="journey-refresh" class="icon-btn refresh-btn" title="Refresh from testnet" aria-label="Refresh from testnet">
+          <button id="journey-refresh" class="icon-btn refresh-btn" type="button" title="Refresh from testnet" aria-label="Refresh from testnet">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/></svg>
           </button>
         </header>
         <div id="net-banner" class="net-banner" role="status" hidden>
           <span id="net-banner-text"></span>
-          <button id="net-banner-retry" class="btn btn-soft btn-sm" type="button">Retry now</button>
+          <button id="net-banner-retry" class="btn btn-sm btn-light" type="button">Retry now</button>
         </div>
 
-        <main class="panel" id="panel">
-          <!-- HOME -->
+        <main class="panel" id="panel" tabindex="-1">
+          <!-- OVERVIEW -->
           <section class="view" id="view-home" data-title="Overview">
-            <div class="home-hero" id="home-hero">
-              <div class="hero-text">
-                <p class="eyebrow">Relationship-based lending on NEAR</p>
-                <h1>Ajo pays you in turn. CommonCircle is for when it isn't your turn.</h1>
-                <p class="lede">Members lend USDC straight to each other, with no interest and no pooled pot. Every on-time repayment is written into a passport NFT that cannot be sold or sent; it turns <strong>Trusted</strong>, which raises your limit and opens the circle's DAO treasury.</p>
+            <div class="hero" id="home-hero">
+              <div class="hero-main">
+                <p class="eyebrow">Your circle</p>
+                <h1 id="circle-name"><span class="skeleton-line" aria-label="Loading circle"></span></h1>
+                <p class="hero-tag">Ajo pays you in turn. CommonCircle is for when it isn't your turn.</p>
+                <p class="hero-lede">People who already trust each other lend USDC straight to one another: no interest, no pooled pot. Repaying on time builds a passport that unlocks more.</p>
+                <div class="hero-flags">
+                  <span id="demo-flag" class="flag flag-warn" hidden></span>
+                  <span id="dao-status" class="flag">Checking the circle's DAO…</span>
+                </div>
               </div>
-              <div class="snapshot">
-                <p id="circle-name" class="snapshot-name"><span class="skeleton-line" aria-label="Loading circle"></span></p>
-                <p id="demo-flag" class="demo-flag" hidden></p>
-                <p id="dao-status" class="dao-status">Checking the circle's DAO…</p>
-              </div>
+              <figure class="hero-card">
+                <img id="my-card-image" class="my-card" alt="My CommonCircle passport" hidden />
+                <div id="hero-card-empty" class="card-empty">Your passport appears here once you join this circle.</div>
+                <figcaption id="my-card-title" class="small"></figcaption>
+                <button id="load-my-card" class="btn btn-ghost btn-sm" type="button" hidden>Reload</button>
+                <input id="my-card-circle-id" type="hidden" value="3" />
+              </figure>
             </div>
 
-            <div id="join-box" class="box join-box" hidden>
-              <h2>Have an invite link?</h2>
-              <p id="join-text" class="muted">Paste it here to join this circle. Opening the link in this browser works too.</p>
+            <div id="join-box" class="card join-card" hidden>
+              <div><h2>Have an invite link?</h2><p id="join-text" class="muted">Paste it here to join this circle. Opening the link in this browser works too.</p></div>
               <div id="join-slot"></div>
             </div>
 
-            <section class="stats-wrap" aria-label="Circle statistics from testnet">
-              <div id="stats-grid" class="stats-grid"></div>
-              <div id="custody" class="custody"></div>
+            <div id="quick-actions" class="quick" aria-label="Quick actions"></div>
+
+            <section aria-label="Circle numbers from testnet">
+              <div class="section-head"><h2>Financial overview</h2><p class="muted small" id="stats-note">From the contract's views on NEAR testnet.</p></div>
+              <div id="stats-grid" class="stats"></div>
             </section>
 
-            <div id="home-invite" class="box invite-box" hidden></div>
-
-            <div id="for-you" class="box for-you" hidden>
-              <h2>Requests for you</h2>
-              <p class="muted">Members asked you for a loan. Funding sends the money straight to them.</p>
-              <ul id="for-you-list" class="requests"></ul>
-            </div>
-
-            <div id="open-requests" class="box open-requests" hidden>
-              <div class="box-head row">
-                <h2>Open requests in this circle</h2>
-                <button id="open-chat-requests" class="btn btn-soft btn-sm" type="button">Open the chat</button>
-              </div>
-              <ul id="open-requests-list" class="requests"></ul>
-            </div>
-
-            <div class="home-grid">
-              <div class="box">
-                <div class="box-head">
-                  <h2>Your steps</h2>
-                  <p class="muted" id="journey-sub">Follow these in order. Each one updates from the blockchain by itself.</p>
-                </div>
+            <div class="grid-2">
+              <div class="card">
+                <div class="section-head"><h2>Your steps</h2><p class="muted small" id="journey-sub">Each one updates from the blockchain by itself.</p></div>
                 <ol id="steps" class="steps"></ol>
                 <details class="invite-fields" id="invite-details">
                   <summary>Invite details (filled in from your invite link)</summary>
@@ -170,56 +148,74 @@
                   <input id="invite-public-key" placeholder="ed25519:…" autocomplete="off" />
                   <label for="invite-secret">Invite secret</label>
                   <input id="invite-secret" type="password" autocomplete="off" placeholder="from the invite link" />
-                  <p class="muted small">The secret stays in this browser. It is never sent to a server.</p>
+                  <p class="hint">The secret stays in this browser. It is never sent to a server.</p>
                 </details>
               </div>
-              <div class="box card-box">
-                <h2>My card</h2>
-                <p id="my-card-title" class="muted">Connect a wallet and join to see your card.</p>
-                <img id="my-card-image" class="my-card" alt="My CommonCircle passport card" hidden />
-                <input id="my-card-circle-id" type="hidden" value="3" />
-                <button id="load-my-card" class="btn btn-soft btn-sm" hidden>Reload card</button>
-                <p id="my-eligibility" class="eligibility" hidden></p>
+              <div class="stack">
+                <div id="custody" class="card custody"></div>
+                <div id="trust-summary" class="card"></div>
+                <div id="dao-summary" class="card"></div>
               </div>
             </div>
 
-            <div class="box activity-box">
-              <div class="box-head row">
-                <h2>Recent activity</h2>
-                <a class="small" id="activity-link" target="_blank" rel="noopener">Contract on NearBlocks</a>
-              </div>
-              <p class="muted small">Built only from timestamps in the contract's loan and passport views. Open a loan's transactions from the contract page.</p>
-              <ol id="activity" class="activity"></ol>
+            <div id="for-you" class="card attention" hidden>
+              <h2>Requests for you</h2>
+              <p class="muted">Members asked you for a loan. Funding sends the money straight to them.</p>
+              <ul id="for-you-list" class="rows"></ul>
+            </div>
+
+            <div id="open-requests" class="card" hidden>
+              <div class="section-head row"><h2>Open requests in this circle</h2><button id="open-chat-requests" class="btn btn-ghost btn-sm" type="button">Open the chat</button></div>
+              <ul id="open-requests-list" class="rows"></ul>
+            </div>
+
+            <div class="card">
+              <div class="section-head row"><h2>Recent activity</h2><button id="see-activity" class="btn btn-ghost btn-sm" type="button">All activity</button></div>
+              <p class="muted small">Built from timestamps in the contract's loan and passport views. Not a full blockchain indexer.</p>
+              <ol id="activity" class="feed"></ol>
+            </div>
+
+            <div class="card">
+              <div class="section-head"><h2>Good to know before you lend or borrow</h2></div>
+              <ul class="facts">
+                <li><strong>Unsecured.</strong> No collateral, no interest, and repayment cannot be forced. A borrower may not repay.</li>
+                <li><strong>No guarantee.</strong> Asking does not mean someone will lend, and the app never approves loans.</li>
+                <li><strong>Public on-chain.</strong> Account names, loan terms and passport history are public on NEAR testnet.</li>
+                <li><strong>Membership, not identity.</strong> Members join by invite link. Nobody's identity or family relationship is verified.</li>
+                <li><strong>Chat is private to members, not encrypted.</strong> Messages are off-chain on the chat server and access-controlled.</li>
+              </ul>
             </div>
           </section>
 
-          <!-- (activity is appended into the Overview by the app) -->
-          <!-- CHAT -->
-          <section class="view chat-view" id="view-chat" data-title="Chat" hidden>
+          <!-- CIRCLE CHAT -->
+          <section class="view chat-view" id="view-chat" data-title="Circle chat" hidden>
             <div class="chat-side">
               <div class="search">
                 <input id="chat-search" type="search" placeholder="Search rooms" aria-label="Search rooms" />
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3"/></svg>
               </div>
               <div class="segmented" role="tablist" aria-label="Chat lists">
-                <button role="tab" id="seg-rooms" aria-selected="true">Rooms</button>
-                <button role="tab" id="seg-people" aria-selected="false">People</button>
+                <button role="tab" id="seg-rooms" aria-selected="true" type="button">Rooms</button>
+                <button role="tab" id="seg-people" aria-selected="false" type="button">People</button>
               </div>
               <p class="list-label" id="list-label">Circle rooms</p>
               <ul id="room-list" class="room-list"></ul>
               <ul id="people-list" class="room-list" hidden></ul>
-              <p class="chat-note">Members only, checked on the blockchain. Messages are <strong>not</strong> end-to-end encrypted.</p>
+              <p class="chat-note">One room per circle, members only, checked on the blockchain. Messages are <strong>not</strong> end-to-end encrypted. New messages are fetched every few seconds.</p>
             </div>
 
             <div class="chat-room">
               <header class="room-head">
+                <button id="room-back" class="icon-btn room-back" type="button" aria-label="Rooms and people" title="Rooms and people">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+                </button>
                 <span id="room-avatar" class="avatar avatar-room"></span>
-                <div>
+                <div class="grow">
                   <p id="room-title" class="room-title"><span class="skeleton-line" aria-label="Loading room"></span></p>
                   <p id="room-sub" class="room-sub">&nbsp;</p>
                 </div>
                 <input id="chat-circle-id" type="hidden" value="3" />
-                <button id="check-chat-access" class="icon-btn icon-btn-light" title="Check my access again" aria-label="Check my access again">
+                <button id="check-chat-access" class="icon-btn" type="button" title="Check my access again" aria-label="Check my access again">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/></svg>
                 </button>
               </header>
@@ -228,15 +224,15 @@
 
               <div id="chat-gate" class="chat-gate">
                 <p id="chat-access" class="gate-text">Connect your wallet to open the chat.</p>
-                <div id="chat-gate-actions" class="gate-actions"></div>
+                <div id="chat-gate-actions" class="btn-row center"></div>
               </div>
 
               <div id="ask-panel" class="ask-panel" hidden>
-                <p class="ask-title">Ask the circle for a loan</p>
-                <p class="muted small">Every member sees this card. Members offer to lend, then you pick one and sign the loan in your wallet. Posting is free.</p>
+                <p class="ask-title">Ask your circle for a loan</p>
+                <p class="muted small">Every member sees this card. Members offer to lend, then you choose who to borrow from and sign the loan in your wallet. Posting is free and moves no money.</p>
                 <div class="field-row">
                   <div><label for="ask-amount">Amount (USDC)</label><input id="ask-amount" inputmode="decimal" value="1" /><p id="ask-amount-hint" class="hint"></p></div>
-                  <div><label for="ask-days">Days</label><input id="ask-days" inputmode="numeric" value="7" /><p id="ask-days-hint" class="hint"></p></div>
+                  <div><label for="ask-days">Days to repay</label><input id="ask-days" inputmode="numeric" value="7" /><p id="ask-days-hint" class="hint"></p></div>
                 </div>
                 <label for="ask-note">What is the loan for?</label>
                 <textarea id="ask-note" rows="2" maxlength="500" placeholder="For example: school fees, stock for my shop, a bus ticket home"></textarea>
@@ -247,10 +243,10 @@
               </div>
 
               <form id="composer" class="composer" hidden>
-                <button id="ask-open" class="ask-btn" type="button" title="Ask the circle for a loan" aria-label="Ask the circle for a loan">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                <button id="ask-open" class="ask-btn" type="button" title="Ask your circle for a loan" aria-label="Ask your circle for a loan">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Ask for a loan</span>
                 </button>
-                <textarea id="chat-message" rows="1" placeholder="Type your message…" aria-label="Message" disabled></textarea>
+                <textarea id="chat-message" rows="1" placeholder="Message your circle…" aria-label="Message" disabled></textarea>
                 <button id="send-chat" class="send-btn" type="submit" aria-label="Send" disabled>
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12 20 4l-4 16-4-7z"/></svg>
                 </button>
@@ -258,190 +254,266 @@
             </div>
           </section>
 
+          <!-- MEMBERS -->
+          <section class="view" id="view-members" data-title="Members" hidden>
+            <div class="page-head">
+              <div><p class="eyebrow">Your circle</p><h1>People in your circle</h1><p class="muted">Every member holds one passport in this circle. It cannot be sold or sent, and it changes when they repay. Names are NEAR accounts; nobody's identity is verified.</p></div>
+              <button id="members-invite-cta" class="btn btn-accent" type="button">Invite someone</button>
+            </div>
+            <div id="members-table" class="card"></div>
+            <div class="card">
+              <h2>Passport cards</h2>
+              <div id="demo-cards" class="member-grid" aria-label="Member passport cards"></div>
+            </div>
+          </section>
+
+          <!-- INVITATIONS -->
+          <section class="view" id="view-invites" data-title="Invitations" hidden>
+            <div class="page-head"><div><p class="eyebrow">Your circle</p><h1>Invitations</h1><p class="muted">Each invite link works once. Its secret stays in your browser and is never sent to a server. Creating a link costs a small NEAR storage deposit.</p></div></div>
+            <div id="members-invite" class="card"></div>
+            <div id="home-invite" hidden></div>
+          </section>
+
           <!-- LOANS -->
           <section class="view" id="view-loans" data-title="Loans" hidden>
-            <div class="two-col">
-              <div class="box">
-                <div class="box-head row">
-                  <h2>My loans</h2>
-                  <button id="load-positions" class="btn btn-soft btn-sm">Refresh</button>
-                </div>
-                <ul id="positions" class="list" aria-live="polite"><li class="empty">Connect a wallet to see your loans.</li></ul>
+            <div class="page-head"><div><p class="eyebrow">Lending</p><h1>Loans</h1><p class="muted">Money goes straight from the lender to the borrower. The circle contract checks the loan and passes the USDC on in the same transaction; it does not keep a pot.</p></div></div>
+            <div class="grid-2">
+              <div class="card choice">
+                <span class="choice-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H9l-5 4v-4H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/></svg></span>
+                <h2>Ask your circle</h2>
+                <p class="muted">Post what you need and why in the circle chat. Members offer to lend; you choose who to borrow from. The card is off-chain until you choose and sign.</p>
+                <button id="go-ask-chat" class="btn btn-accent" type="button">Ask in the chat</button>
               </div>
-              <div class="box">
-                <h2>Two ways to borrow</h2>
-                <p class="muted"><strong>Ask the circle</strong> in the chat: post what you need and why, members offer to lend, you pick one. <strong>Direct loan</strong>: you already know who to ask.</p>
-                <div class="btn-row">
-                  <button id="go-ask-chat" class="btn btn-accent" type="button">Ask in the chat</button>
-                  <button id="go-direct" class="btn btn-ghost" type="button">Direct loan</button>
-                </div>
+              <div class="card choice">
+                <span class="choice-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+                <h2>Ask one member directly</h2>
+                <p class="muted">You already know who to ask. The request is created on-chain straight away and names them; only they can fund it.</p>
+                <button id="go-direct" class="btn btn-ghost" type="button">Make a direct request</button>
               </div>
             </div>
-            <div class="box">
-              <h2>All loans in this circle</h2>
-              <p class="muted">Money goes straight from the lender to the borrower. The circle itself never holds it.</p>
-              <div class="table-wrap">
-                <table class="loans">
-                  <thead><tr><th>#</th><th>Borrower</th><th>Lender</th><th>Amount</th><th>Reason</th><th>Status</th></tr></thead>
-                  <tbody id="circle-loans"><tr><td colspan="6" class="muted">Loading…</td></tr></tbody>
-                </table>
-              </div>
+            <div class="card">
+              <div class="section-head"><h2>Loan lifecycle</h2></div>
+              <ol class="lifecycle">
+                <li><strong>Open</strong><span>Waits for the named lender until the funding deadline. The borrower can cancel; unfunded requests lapse.</span></li>
+                <li><strong>Funded</strong><span>The borrower has the USDC. The due time starts now.</span></li>
+                <li><strong>Repaid</strong><span>Paid back straight to the lender. On time builds the passport; late is recorded and pauses Trusted perks until cleared.</span></li>
+              </ol>
+            </div>
+            <div class="card">
+              <div class="section-head row"><h2>All loans in this circle</h2><span class="muted small" id="loans-count"></span></div>
+              <div id="circle-loans" class="loan-list"></div>
             </div>
           </section>
 
           <!-- DIRECT LOANS -->
           <section class="view" id="view-direct" data-title="Direct loans" hidden>
-            <div class="box">
-              <p class="eyebrow">Direct loan</p>
-              <h2 class="big">Ask one member directly</h2>
-              <p class="muted">You already know who to ask. The loan is created on-chain straight away and names them as the lender; only they can fund it. Prefer to ask everyone? Use the chat.</p>
-              <div id="loan-form-slot"></div>
+            <div class="page-head"><div><p class="eyebrow">Lending</p><h1>Ask one member directly</h1><p class="muted">Choose a member, the amount and how long. Your wallet creates the request on-chain naming them as lender; only they can fund it, before the funding deadline. Prefer to ask everyone? Use the circle chat.</p></div></div>
+            <div class="grid-main">
+              <div class="card"><div id="loan-form-slot"></div></div>
+              <aside class="card side-note-card">
+                <h2>Check before you sign</h2>
+                <ul class="facts">
+                  <li>Creating the request moves no USDC. It costs a small NEAR storage deposit, shown by your wallet.</li>
+                  <li>When the lender funds it, the USDC goes straight to you and the due time starts.</li>
+                  <li>You repay the lender directly. No interest. Repaying late is recorded on your passport.</li>
+                  <li>The loan is unsecured. Nobody can force repayment, and nobody has to lend.</li>
+                </ul>
+              </aside>
             </div>
           </section>
 
+          <!-- MY LOANS -->
+          <section class="view" id="view-myloans" data-title="My loans" hidden>
+            <div class="page-head">
+              <div><p class="eyebrow">Lending</p><h1>My loans</h1><p class="muted">What you asked for, what you owe, and what you lent, in this circle.</p></div>
+              <button id="load-positions" class="btn btn-ghost" type="button">Refresh</button>
+            </div>
+            <ul id="positions" class="rows card" aria-live="polite"><li class="empty">Connect a wallet to see your loans.</li></ul>
+          </section>
+
           <!-- MY PASSPORT -->
-          <section class="view" id="view-passport" data-title="My Passport" hidden>
-            <div class="box passport-head">
-              <div>
-                <p class="eyebrow">NFTs That Do Something</p>
-                <h2 class="big">Your repayment history becomes your financial passport</h2>
-                <p class="muted">A non-transferable NEP-171 token, one per member per circle. Repayments write its tier; the tier sets your credit limit and treasury access. The picture is drawn by the contract from the circle's theme and your record.</p>
-              </div>
+          <section class="view" id="view-passport" data-title="My passport" hidden>
+            <div class="page-head">
+              <div><p class="eyebrow" id="pp-eyebrow">Identity · NEP-171</p><h1 id="pp-title">My passport</h1><p class="muted" id="pp-sub">A non-transferable token, one per member per circle. Repayments set its tier; the tier sets the loan limit, open loans, invites and treasury access.</p></div>
               <label class="pp-pick">Viewing<select id="pp-account"></select></label>
             </div>
             <div id="passport-body" class="passport-grid"></div>
           </section>
 
-          <!-- EVIDENCE & TRACKS -->
-          <section class="view" id="view-evidence" data-title="Evidence &amp; Tracks" hidden>
-            <div class="box">
-              <p class="eyebrow">For judges</p>
-              <h2 class="big">Three tracks, each backed by transactions you can open</h2>
-              <p class="muted">Statuses come from <code>npm run claims</code>, which compares every claim in <code>evidence/evidence.json</code> with a JSON snapshot read from testnet (<code>node contracts/scripts/build-evidence.mjs</code>). This page only shows that output; it does not compute a status. <span id="evidence-generated"></span></p>
-            </div>
-            <div id="tracks"></div>
-          </section>
-
           <!-- TREASURY -->
           <section class="view" id="view-treasury" data-title="Treasury" hidden>
-            <div id="treasury-none" class="box">
+            <div class="page-head"><div><p class="eyebrow">Governance · Sputnik DAO</p><h1>Circle treasury</h1><p class="muted">A shared treasury run by a Sputnik DAO. It lends only to Trusted members who are not stewards, and only when both stewards approve. Repayments go back to the DAO.</p></div></div>
+            <div id="treasury-none" class="card">
               <h2>No verified treasury</h2>
-              <p class="muted">This circle has no DAO attached, or its DAO did not pass the safety check, so treasury buttons stay hidden.</p>
+              <p class="muted">This circle has no DAO attached, or its DAO did not pass this app's trust checks, so treasury actions stay hidden.</p>
             </div>
-            <div id="treasury-actions" class="treasury" hidden>
-              <div class="box treasury-hero">
-                <div>
-                  <p class="eyebrow">Shared treasury · Sputnik DAO</p>
-                  <h2 class="big">The circle's DAO treasury</h2>
-                  <p class="muted">It pays out only when <strong>both stewards</strong> vote yes, and only to Trusted members who are not stewards. The money goes straight to the borrower and comes back to the DAO on repayment.</p>
-                  <p class="disclosure">Trust note: the app checks that this account runs the pinned Sputnik DAO code and has no access keys (<strong>DAO verified by frontend trust checks</strong>). The circle contract does not check this itself. In this testnet demo both steward accounts are run by the same operator, so the two votes do not prove two independent people.</p>
+            <div id="treasury-actions" class="stack" hidden>
+              <div class="grid-2">
+                <div class="card">
+                  <h2>Treasury</h2>
+                  <div id="treasury-summary" class="kv">Loading…</div>
                 </div>
-                <p id="treasury-summary" class="treasury-summary">Loading…</p>
+                <div class="card disclosure">
+                  <h2>How far to trust this</h2>
+                  <p><strong>DAO verified by CommonCircle frontend trust checks.</strong> This app checks the account runs the pinned Sputnik DAO code, has no access keys, and that its voting rules need the circle's stewards. The circle contract itself does not check which DAO is attached.</p>
+                  <p>In this testnet demo both steward accounts may be run by the same operator: two accounts are not proof of two people.</p>
+                </div>
               </div>
               <p id="treasury-eligibility" class="callout"></p>
-              <div id="treasury-ask" class="box" hidden>
+              <div id="treasury-ask" class="card" hidden>
                 <h2>Ask the treasury for a loan</h2>
-                <p class="muted">Step 1 records your request. Step 2 sends it to the stewards. A 7-day demo loan is due 7 minutes after the money arrives.</p>
+                <p class="muted">Step 1 records your request on-chain. Step 2 sends it to the stewards as a DAO proposal (with a refundable bond). The money arrives when both approve.</p>
                 <div class="field-row">
-                  <label>Amount (USDC)<input id="treasury-amount" inputmode="decimal" value="1" /></label>
-                  <label>Days<input id="treasury-days" inputmode="numeric" value="7" /></label>
+                  <div><label for="treasury-amount">Amount (USDC)</label><input id="treasury-amount" inputmode="decimal" value="1" /></div>
+                  <div><label for="treasury-days">Days to repay</label><input id="treasury-days" inputmode="numeric" value="7" /></div>
                 </div>
-                <button id="treasury-request" class="btn btn-accent">1. Create my request</button>
-                <ul id="treasury-pending" class="list"></ul>
+                <button id="treasury-request" class="btn btn-accent" type="button">1. Create my request</button>
+                <ul id="treasury-pending" class="rows"></ul>
               </div>
-              <div class="box">
-                <h2>Votes</h2>
-                <ul id="treasury-proposals" class="list"></ul>
+              <div class="card">
+                <h2>Proposals and votes</h2>
+                <ul id="treasury-proposals" class="rows"></ul>
               </div>
             </div>
           </section>
 
-          <!-- MEMBERS -->
-          <section class="view" id="view-members" data-title="Members" hidden>
-            <div id="members-invite" class="box invite-box"></div>
-            <div class="box">
-              <h2>Members and their cards</h2>
-              <p class="muted">Each card belongs to one member. It cannot be sold or sent, and it changes when they repay on time.</p>
-              <div id="demo-cards" class="member-grid" aria-label="Member passport cards"></div>
+          <!-- ACTIVITY -->
+          <section class="view" id="view-activity" data-title="Activity" hidden>
+            <div class="page-head">
+              <div><p class="eyebrow">Transparency</p><h1>Circle activity</h1><p class="muted">Derived from the timestamps in the contract's loan and passport views: joins, requests, funding and repayments. This is not a complete transaction indexer; open the contract on NearBlocks for every transaction.</p></div>
+              <a class="btn btn-ghost" id="activity-link" target="_blank" rel="noopener">Contract on NearBlocks</a>
             </div>
+            <ol id="activity-full" class="feed card"></ol>
           </section>
 
-          <!-- TOOLS -->
-          <section class="view" id="view-tools" data-title="Tools" hidden>
+          <!-- EVIDENCE & TRACKS -->
+          <section class="view" id="view-evidence" data-title="Evidence &amp; tracks" hidden>
+            <div class="page-head"><div><p class="eyebrow">For judges</p><h1>Evidence &amp; tracks</h1><p class="muted">Every claim in <code>evidence/evidence.json</code>, checked by <code>npm run claims</code> against a snapshot read from testnet. This page only shows that output; it does not compute a status. <span id="evidence-generated"></span></p></div></div>
+            <div id="tracks" class="stack"></div>
+          </section>
 
-            <details class="box details">
-              <summary>Start a new circle (testnet)</summary>
-              <p class="muted">You become its founder. Pick the rules; they are fixed once the circle exists.</p>
+          <!-- NEAR NETWORK -->
+          <section class="view" id="view-network" data-title="NEAR network" hidden>
+            <div class="page-head"><div><p class="eyebrow">Transparency</p><h1>NEAR network details</h1><p class="muted">What this page reads, from where, and how fresh it is.</p></div></div>
+            <div class="card flow-card">
+              <h2>Zero custody: how a loan moves</h2>
+              <div class="flow" aria-label="Lender to contract validation to borrower">
+                <div class="flow-step"><span class="flow-dot">1</span><strong>Lender</strong><span>sends USDC with <code>ft_transfer_call</code></span></div>
+                <div class="flow-arrow" aria-hidden="true"></div>
+                <div class="flow-step"><span class="flow-dot">2</span><strong>Circle contract</strong><span>checks loan, lender, token, amount and gas</span></div>
+                <div class="flow-arrow" aria-hidden="true"></div>
+                <div class="flow-step"><span class="flow-dot">3</span><strong>Borrower</strong><span>receives the USDC in the same transaction</span></div>
+              </div>
+              <p class="muted small">The contract holds the tokens only for the moment it forwards them. If any check fails (wrong token, unregistered borrower, too little gas…), the lender is refunded. At rest its USDC balance should be zero.</p>
+            </div>
+            <div id="network-body" class="grid-2"></div>
+          </section>
+
+          <!-- ADVANCED TOOLS -->
+          <section class="view" id="view-tools" data-title="Advanced tools" hidden>
+            <div class="page-head"><div><p class="eyebrow">Settings</p><h1>Advanced tools</h1><p class="muted">Start a circle, change a circle's passport design, or read raw testnet data.</p></div></div>
+
+            <details class="card details">
+              <summary>Start a new circle</summary>
+              <p class="muted">You become its founder and admin until a DAO is attached. Pick the rules; they are fixed once the circle exists.</p>
               <label for="new-circle-preset">Rules</label>
               <select id="new-circle-preset">
-                <option value="demo">Demo settings: a day is 60 seconds, 1 on-time repayment from 1 lender earns Trusted, requests can be funded for 1 hour</option>
-                <option value="standard">Standard settings: real 1-day days, 3 on-time repayments from 2 different lenders earn Trusted, 72 hours to fund</option>
+                <option value="standard">Standard: 1-day days, 3 on-time repayments from 2 different lenders earn Trusted, 72 hours to fund</option>
+                <option value="demo">Demo (fast, for testing): a day is 60 seconds, 1 on-time repayment from 1 lender earns Trusted, 1 hour to fund</option>
               </select>
               <label for="new-circle-name">Circle name</label>
-              <input id="new-circle-name" value="CommonCircle demo" maxlength="64" />
-              <label for="new-circle-tagline">Card tagline (optional, up to 32 characters)</label>
+              <input id="new-circle-name" value="Our circle" maxlength="64" />
+              <label for="new-circle-tagline">Passport tagline (optional, up to 32 characters)</label>
               <input id="new-circle-tagline" maxlength="32" placeholder="Small turns, stronger ties" />
               <div class="theme-grid">
-                <label>Background <input id="new-circle-background" type="color" value="#1D3557" /></label>
-                <label>Accent <input id="new-circle-accent" type="color" value="#A8DADC" /></label>
+                <label>Background <input id="new-circle-background" type="color" value="#12352E" /></label>
+                <label>Accent <input id="new-circle-accent" type="color" value="#5EEAD4" /></label>
                 <label>Text <input id="new-circle-text" type="color" value="#FFFFFF" /></label>
               </div>
               <label for="new-circle-pattern">Pattern</label>
-              <select id="new-circle-pattern">
-                <option>None</option><option selected>Dots</option><option>Grid</option><option>Waves</option><option>Rays</option>
-              </select>
-              <label for="new-circle-emblem">Emblem image (PNG, WebP, JPEG or GIF; shrunk to 12 KiB)</label>
+              <select id="new-circle-pattern"><option>None</option><option selected>Dots</option><option>Grid</option><option>Waves</option><option>Rays</option></select>
+              <label for="new-circle-emblem">Emblem (PNG, WebP, JPEG or GIF; shrunk to 12 KiB; SVG is refused)</label>
               <input id="new-circle-emblem" type="file" accept="image/png,image/webp,image/jpeg,image/gif" />
-              <div id="new-circle-preview" class="theme-preview" aria-label="New circle card preview"></div>
-              <button id="create-circle" class="btn btn-accent">Create circle</button>
+              <div id="new-circle-preview" class="theme-preview" aria-label="New circle passport preview"></div>
+              <button id="create-circle" class="btn btn-accent" type="button">Create circle</button>
             </details>
 
-            <details class="box details">
-              <summary>Change a circle's card design (circle admin only)</summary>
+            <details class="card details">
+              <summary>Change a circle's passport design (circle admin only)</summary>
+              <p class="muted">Before a DAO is attached the founder is the admin. After that, design changes go through a DAO vote; members have no admin controls.</p>
               <label for="design-circle-id">Circle number</label>
               <input id="design-circle-id" inputmode="numeric" value="3" />
-              <label for="design-tagline">Card tagline (optional, up to 32 characters)</label>
+              <label for="design-tagline">Passport tagline (optional, up to 32 characters)</label>
               <input id="design-tagline" maxlength="32" placeholder="Small turns, stronger ties" />
               <div class="theme-grid">
-                <label>Background <input id="design-background" type="color" value="#1D3557" /></label>
-                <label>Accent <input id="design-accent" type="color" value="#A8DADC" /></label>
+                <label>Background <input id="design-background" type="color" value="#12352E" /></label>
+                <label>Accent <input id="design-accent" type="color" value="#5EEAD4" /></label>
                 <label>Text <input id="design-text" type="color" value="#FFFFFF" /></label>
               </div>
               <label for="design-pattern">Pattern</label>
-              <select id="design-pattern">
-                <option>None</option><option selected>Dots</option><option>Grid</option><option>Waves</option><option>Rays</option>
-              </select>
+              <select id="design-pattern"><option>None</option><option selected>Dots</option><option>Grid</option><option>Waves</option><option>Rays</option></select>
               <label for="design-emblem">Emblem image</label>
               <input id="design-emblem" type="file" accept="image/png,image/webp,image/jpeg,image/gif" />
-              <div id="design-preview" class="theme-preview" aria-label="Edited card preview"></div>
-              <button id="save-design" class="btn btn-accent">Save design</button>
-              <img id="design-card-preview" class="my-card" alt="Saved card preview" hidden />
+              <div id="design-preview" class="theme-preview" aria-label="Edited passport preview"></div>
+              <button id="save-design" class="btn btn-accent" type="button">Save design</button>
+              <img id="design-card-preview" class="my-card" alt="Saved passport preview" hidden />
             </details>
 
-            <details class="box details">
+            <details class="card details">
               <summary>Look at another circle / raw testnet data</summary>
               <div class="inline-form">
                 <label for="demo-circle-id">Circle number</label>
                 <input id="demo-circle-id" inputmode="numeric" value="3" />
-                <button id="load-demo" class="btn btn-soft">Load</button>
+                <button id="load-demo" class="btn btn-ghost" type="button">Load</button>
               </div>
               <pre id="demo-output" class="raw">Not loaded.</pre>
             </details>
+          </section>
 
-            <details class="box details">
-              <summary>Advanced</summary>
-              <label for="account-id">Connected account</label>
-              <input id="account-id" readonly placeholder="Filled in when you connect a wallet" />
-              <div class="btn-row">
-                <button id="sign-in" class="btn btn-soft">Sign in (NEP-413)</button>
-                <button id="join-invite" class="btn btn-soft">Join with the invite details</button>
+          <!-- ACCOUNT & NETWORK SETTINGS -->
+          <section class="view" id="view-settings" data-title="Account &amp; network" hidden>
+            <div class="page-head"><div><p class="eyebrow">Settings</p><h1>Account &amp; network</h1><p class="muted">Your wallet, your chat sign-in and the services this page talks to. CommonCircle never asks for your private key or seed phrase; never paste them anywhere.</p></div></div>
+            <div class="grid-2">
+              <div class="card">
+                <h2>Wallet</h2>
+                <label for="account-id">Connected account</label>
+                <input id="account-id" readonly placeholder="Filled in when you connect a wallet" />
+                <div class="btn-row" id="settings-wallet-actions"></div>
               </div>
-            </details>
+              <div class="card">
+                <h2>Chat sign-in (NEP-413)</h2>
+                <p class="muted small" id="settings-session">Not signed in.</p>
+                <div class="btn-row">
+                  <button id="sign-in" class="btn btn-accent btn-sm" type="button">Sign in to chat</button>
+                  <button id="sign-out" class="btn btn-ghost btn-sm" type="button">Sign out of chat</button>
+                </div>
+                <p class="hint">A free signature that proves the account is yours. No transaction, no fee.</p>
+              </div>
+              <div class="card">
+                <h2>Chat server</h2>
+                <dl class="kv" id="settings-chat"></dl>
+                <button id="check-server" class="btn btn-ghost btn-sm" type="button">Check the chat server</button>
+              </div>
+              <div class="card">
+                <h2>Join with invite details</h2>
+                <p class="muted small">Only if opening or pasting your invite link did not work.</p>
+                <button id="join-invite" class="btn btn-ghost btn-sm" type="button">Join with the invite details</button>
+              </div>
+            </div>
           </section>
         </main>
-        <p class="legal">Testnet demo, no real money. Loans are unsecured; repayment cannot be forced. Loan terms, account names and card history are public on the blockchain. Contract <code>commoncircle-light.testnet</code>.</p>
+        <p class="legal">Testnet demo: test tokens, no real money. Loans are unsecured and repayment cannot be forced. Account names, loan terms and passport history are public on the blockchain. Contract <code>commoncircle-light.testnet</code>. Not affiliated with or endorsed by the NEAR Foundation.</p>
       </section>
     </div>
+
+    <!-- PHONE TAB BAR -->
+    <nav class="tabbar" aria-label="Main (phone)">
+      <button class="tab" data-tab="home" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>Home</span></button>
+      <button class="tab" data-tab="chat" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H9l-5 4v-4H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/></svg><span>Chat</span><span class="tab-badge" id="tab-chat-badge" hidden></span></button>
+      <button class="tab" data-tab="loans" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18v12H3zM3 7l3-3h12l3 3M12 10v6"/></svg><span>Loans</span></button>
+      <button class="tab" data-tab="passport" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v18H5zM9 8a3 3 0 1 0 6 0 3 3 0 0 0-6 0M8 16h8"/></svg><span>Passport</span></button>
+      <button class="tab" data-tab="more" type="button" id="menu-btn" aria-controls="sidebar" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span>More</span></button>
+    </nav>
 
     <dialog id="money-dialog" class="dialog" aria-labelledby="money-title">
       <div class="dialog-body">

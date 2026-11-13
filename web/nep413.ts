@@ -36,13 +36,18 @@ function decodeNonce(value: string): Uint8Array {
 }
 
 async function post<T>(url: string, payload: unknown): Promise<T> {
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
-  })
-  const body = await response.json() as T & { error?: string }
-  if (!response.ok) throw new Error(body.error ?? `Authentication request failed (${response.status})`)
+  let response: Response
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+  } catch {
+    throw new Error('The chat sign-in server is not answering. If it was idle it can take up to a minute to wake up; try again shortly.')
+  }
+  const body = await response.json().catch(() => ({})) as T & { error?: string }
+  if (!response.ok) throw new Error(body.error ?? `Sign-in failed (${response.status}). Try again.`)
   return body
 }
 

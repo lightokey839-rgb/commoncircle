@@ -7,14 +7,15 @@ import { borrowLimit, canCancel, countdown, formatDuration, isWaiting, loanLengt
 import { explorerTxUrl, moneySummary, runMoney, type MoneyDeps, type MoneyKind, type MoneyOptions } from './money'
 import { signInWithNep413 } from './nep413'
 import { buildInviteLink, generateInviteKeyPair, parseInviteLink, signInviteWithSecret } from './invite'
-import { loadReadOnlyDemo, type ReadOnlyDemoSnapshot } from './demo'
+import { allPages, loadReadOnlyDemo, type ReadOnlyDemoSnapshot } from './demo'
 import { bindThemeForm, readThemeForm, renderThemePreview } from './theme'
 // The wallet library (~1.5 MB) loads only on Connect or when a session exists.
 import type { NearWalletController } from './near-wallet'
 import { assertCircleName } from './text-rules'
 import { checkCardSvg } from './card-safety'
-import { onRpcHealth } from './rpc'
-import { avatarFor, ChatApiError, ChatClient, dayLabel, timeLabel, type ChatMessage, type LoanRequestCard } from './chat'
+import { onRpcHealth, rpcHealth, TESTNET_RPCS } from './rpc'
+import { describeNet, initialNet, isStale, netFailed, netSucceeded, retryDelay, type NetState } from './net-state'
+import { avatarFor, ChatApiError, ChatClient, chatServerHealth, dayLabel, mergeMessages, timeLabel, type ChatMessage, type LoanRequestCard } from './chat'
 import {
   clearFlagProposal, DEMO_TREASURY_LOAN_DAYS, formatUsdc, loansNeedingProposal, proposalLoanId, repaymentNotice,
   SputnikDaoClient, stewardsOf, treasuryFundProposal, type SputnikProposal,
@@ -40,7 +41,9 @@ const config = {
 const readClient = new CircleClient(config.rpcUrl, config.contractId)
 const client = () => new CircleClient(config.rpcUrl, config.contractId, window.commonCircleWallet)
 const TOKEN_KEY = 'commoncircle.session'
-const VIEWS = ['home', 'chat', 'loans', 'direct', 'passport', 'treasury', 'members', 'tools', 'evidence'] as const
+const VIEWS = ['home', 'chat', 'members', 'invites', 'loans', 'direct', 'myloans', 'passport', 'treasury', 'activity', 'evidence', 'network', 'tools', 'settings'] as const
+/** Phone tab bar: which tab lights up for each page ("more" covers the rest). */
+const TAB_OF: Partial<Record<string, string>> = { home: 'home', chat: 'chat', loans: 'loans', direct: 'loans', myloans: 'loans', passport: 'passport' }
 type View = (typeof VIEWS)[number]
 
 /** loans: as borrower in this circle; lent: as lender in this circle. */
@@ -55,9 +58,14 @@ let usdcId = ''
 let view: View = 'home'
 /** USDC balances read from testnet: the loan contract (zero custody) and the DAO treasury. null = not read. */
 let balances: { contract: string | null; dao: string | null } = { contract: null, dao: null }
-let lastRefresh = 0
 let loadError = ''
 let passportAccount = ''
+/** How fresh the testnet data on screen is (web/net-state.ts). */
+let net: NetState = initialNet()
+/** Bumped when the account or circle changes: answers to older reads are dropped. */
+let epoch = 0
+/** One refresh at a time; callers share the one in flight. */
+let refreshing: Promise<void> | null = null
 
 // chat state
 let chatRoom = '3'
@@ -147,7 +155,8 @@ function errorText(error: unknown, context: 'wallet' | 'chat' | 'chain' = 'chain
 function showError(error: unknown, context: 'wallet' | 'chat' | 'chain' = 'chain', retry?: () => Promise<void>): void {
   const friendly = error instanceof ChatApiError ? { text: error.message, next: null } : friendlyError(error, context)
   // Testnet being unreachable is shown once in the banner (with the last good data kept), not as a toast.
-  if (context === 'chain' && isNetworkText(friendly.text)) { netTrouble(); return }
+  // Testnet unreachable: the banner keeps the last good data (labelled stale) and retries.
+  if (context === 'chain' && isNetworkText(friendly.text)) netTrouble(friendly.text)
   show(friendly.text, 'bad', friendly.next, retry)
 }
 
@@ -156,26 +165,37 @@ const isNetworkText = (text: string) => /Could not reach NEAR testnet|NEAR testn
 /* ---------- testnet connection banner: keep the last good data, retry with backoff ---------- */
 
 let netRetryTimer = 0
-let netRetryStep = 0
-const NET_RETRY_MS = [10_000, 30_000, 60_000]
 
-function netTrouble(): void {
+/** The status pill and banner, from the one network state. */
+function renderNet(): void {
+  const d = describeNet(net, Date.now())
+  const pill = $('#net-pill')
+  pill.className = `net-pill ${d.tone}`
+  $('#net-pill-text').textContent = d.pill
+  pill.title = net.lastOkAt ? `Last successful testnet read: ${new Date(net.lastOkAt).toLocaleString()}` : 'No successful testnet read yet'
   const banner = $('#net-banner')
-  const when = lastRefresh ? new Date(lastRefresh).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
-  $('#net-banner-text').textContent = demo
-    ? `Can't reach NEAR testnet right now. Showing data from ${when}; retrying by itself.`
-    : "Can't reach NEAR testnet right now. Retrying by itself."
-  banner.hidden = false
-  window.clearTimeout(netRetryTimer)
-  const delay = NET_RETRY_MS[Math.min(netRetryStep, NET_RETRY_MS.length - 1)]
-  netRetryStep++
-  netRetryTimer = window.setTimeout(() => void refreshAll().catch(() => netTrouble()), delay)
+  banner.hidden = !d.banner
+  banner.className = `net-banner ${d.tone === 'bad' ? 'bad' : ''}`
+  $('#net-banner-text').textContent = d.banner ?? ''
 }
 
-function netOk(): void {
+/** A full refresh failed: keep the last good data (labelled stale) and retry with bounded backoff. */
+function netTrouble(error = ''): void {
+  net = netFailed(net, error)
+  renderNet()
   window.clearTimeout(netRetryTimer)
-  netRetryStep = 0
-  $('#net-banner').hidden = true
+  netRetryTimer = window.setTimeout(() => void refreshAll().catch(() => undefined), retryDelay(net))
+}
+
+function netOk(partial: string[] = []): void {
+  window.clearTimeout(netRetryTimer)
+  net = netSucceeded(net, Date.now(), partial)
+  renderNet()
+}
+
+/** Money actions never rely on cached data: refuse while testnet is unreachable or the data is stale. */
+function requireFresh(): void {
+  if (isStale(net, Date.now())) throw new Error('The data on screen is not fresh (NEAR testnet could not be reached). Press Retry, then try again. Nothing was sent.')
 }
 
 async function run(b: HTMLButtonElement | null, action: () => Promise<void>, context: 'wallet' | 'chat' | 'chain' = 'chain'): Promise<void> {
@@ -222,11 +242,18 @@ function goView(next: View): void {
     if (item.dataset.view === next) item.setAttribute('aria-current', 'page')
     else item.removeAttribute('aria-current')
   }
-  $('#crumb-view').textContent = $(`#view-${next}`).dataset.title ?? ''
+  const tab = TAB_OF[next] ?? 'more'
+  for (const t of document.querySelectorAll<HTMLButtonElement>('.tab')) t.classList.toggle('active', t.dataset.tab === tab)
+  const title = $(`#view-${next}`).dataset.title ?? ''
+  $('#crumb-view').textContent = title
+  document.title = `${title} · CommonCircle`
   closeDrawer()
   window.scrollTo({ top: 0 })
   try { localStorage.setItem('commoncircle.view', next) } catch { /* ignore */ }
   if (next === 'chat') { void openRoom(chatRoom); startChatPolling() } else stopChatPolling()
+  if (next === 'network') renderNetwork()
+  if (next === 'settings') renderSettings()
+  if (next === 'direct') mountForm($('#loan-form-slot'), 'direct')
 }
 
 /* ---------- drawer (phone) and account menu ---------- */
@@ -296,7 +323,17 @@ function onAccountChange(nextAccountId: string): void {
   // after its testnet reads, which can take a few seconds.
   // A "connect your wallet" error is stale once an account is connected.
   if (nextAccountId && toastShown?.next === 'connect') hideToast()
-  if (changed) { chatMessages.clear(); renderAll(); void refreshMe() }
+  if (changed) {
+    // A different account: forget everything read for the previous one, and drop its in-flight reads.
+    epoch++
+    me = null
+    chatMessages.clear()
+    chatRequests.clear()
+    chatAllowed = false
+    formCache.clear()
+    renderAll()
+    void refreshMe()
+  }
 }
 
 function hasSavedWalletSession(): boolean {
@@ -362,6 +399,12 @@ function session(): { accountId: string; token: string } | null {
   } catch {
     return null
   }
+}
+
+/** A public copy (GitHub Pages) can only use a chat server that was configured at build time. */
+function chatServerConfigured(): boolean {
+  const local = (h: string) => /^(localhost|127\.0\.0\.1|\[::1\])$/.test(h)
+  try { return !(local(new URL(config.authUrl).hostname) && !local(window.location.hostname)) } catch { return false }
 }
 
 function chatClient(): ChatClient | null {
@@ -463,8 +506,20 @@ function moneyDeps(): MoneyDeps {
 }
 
 /** Opens the "check before you sign" dialog; the action runs only on Confirm. */
-async function money(kind: MoneyKind, loan: LoanView): Promise<void> {
+async function money(kind: MoneyKind, cachedLoan: LoanView): Promise<void> {
   requireWallet()
+  requireFresh()
+  // Never act on cached data: read the loan from testnet now and summarise that.
+  let loan: LoanView | null
+  try {
+    loan = await readClient.getLoan(cachedLoan.loan_id)
+  } catch {
+    throw new Error(`Could not read loan #${cachedLoan.loan_id} from NEAR testnet just now, so nothing was sent. Try again in a moment.`)
+  }
+  if (!loan) throw new Error(`Loan #${cachedLoan.loan_id} was not found on testnet. Nothing was sent.`)
+  if (kind === 'fund' && !(loan.state === 'Open' && isWaiting(loan, Date.now()))) { void refreshAll(); throw new Error(`Loan #${loan.loan_id} can no longer be funded (it is ${loan.state === 'Open' ? 'past its funding deadline' : loan.state}). Nothing was sent.`) }
+  if (kind === 'repay' && loan.state !== 'Funded') { void refreshAll(); throw new Error(`Loan #${loan.loan_id} is ${loan.state}, so there is nothing to repay right now.`) }
+  if (kind === 'cancel' && loan.state !== 'Open') { void refreshAll(); throw new Error(`Loan #${loan.loan_id} is ${loan.state} and cannot be cancelled.`) }
   const dialog = $<HTMLDialogElement>('#money-dialog')
   // Repaying a lender who left USDC would bounce: offer to pay their USDC registration first (F-09 route).
   const options: MoneyOptions = {}
@@ -639,7 +694,7 @@ function renderRooms(): void {
   updateChatBadge()
 }
 
-function renderMessages(): void {
+function renderMessages(stickToBottom = true): void {
   const box = $('#messages')
   const msgs = chatMessages.get(chatRoom) ?? []
   const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80
@@ -652,6 +707,21 @@ function renderMessages(): void {
   if (!msgs.length && !cards.length) {
     box.append(el('p', { className: 'chat-empty', textContent: 'No messages yet. Say hello, or press + to ask the circle for a loan.' }))
     return
+  }
+  // Older history is paged: ids are 1, 2, 3… per room, so a first id above 1 means there is more.
+  if (msgs.length && msgs[0].id > 1) {
+    const earlier = button('Load earlier messages', async () => {
+      const chat = chatClient()
+      if (!chat) return
+      const room = chatRoom
+      const older = await chat.list(room, 0, msgs[0].id)
+      chatMessages.set(room, mergeMessages(chatMessages.get(room) ?? [], older))
+      const keep = box.scrollHeight - box.scrollTop
+      renderMessages(false)
+      box.scrollTop = box.scrollHeight - keep
+    }, 'ghost', 'chat')
+    earlier.classList.add('load-earlier')
+    box.append(earlier)
   }
   let lastDay = ''
   let prev: ChatMessage | null = null
@@ -669,7 +739,7 @@ function renderMessages(): void {
     box.append(el('div', { className: `msg${mine ? ' mine' : ''}${cont ? ' cont' : ''}` }, meta, el('div', { className: 'bubble', textContent: m.text })))
     prev = m
   }
-  if (nearBottom || msgs.length) box.scrollTop = box.scrollHeight
+  if (stickToBottom && nearBottom) box.scrollTop = box.scrollHeight
   if (msgs.length) chatSeen.set(chatRoom, msgs[msgs.length - 1].id)
   tickDue()
 }
@@ -694,13 +764,14 @@ async function openRoom(id: string): Promise<void> {
   $('#room-sub').textContent = `Circle room${members !== null ? ` · ${members} members` : ''} · members only`
   await checkChatAccess(true)
   renderRooms()
+  $('#messages').scrollTop = $('#messages').scrollHeight
+  $('#view-chat').classList.remove('rooms-open')
 }
 
 async function checkChatAccess(quiet = false): Promise<void> {
   // A public copy of the app (e.g. GitHub Pages) has no sign-in server unless one is configured.
-  const local = (h: string) => /^(localhost|127\.0\.0\.1|\[::1\])$/.test(h)
-  if (local(new URL(config.authUrl).hostname) && !local(window.location.hostname)) {
-    setGate('Chat and chat loan requests are offline on this public copy: they need the CommonCircle sign-in server, which is not hosted yet. Joining, direct loans, the treasury and passports all work here. To try chat, run the app locally (npm run auth).', [button('Make a direct loan instead', async () => goView('direct'), 'soft')]); renderMessages(); return
+  if (!chatServerConfigured()) {
+    setGate('Chat and "ask your circle" requests are switched off on this copy of the app: no chat server is configured for it. Joining, direct loans, the treasury and passports all still work.', [button('Make a direct loan instead', async () => goView('direct'), 'soft')]); renderMessages(); return
   }
   if (!accountId) { setGate('Connect your wallet to open the chat.', connectButtons()); renderMessages(); return }
   const access = await readClient.checkAccess(chatRoom, accountId)
@@ -733,7 +804,7 @@ async function checkChatAccess(quiet = false): Promise<void> {
       setGate('Your sign-in expired. Sign in again to keep chatting.', [button('Sign in to chat', async () => { await signIn(); await checkChatAccess(true) })])
     } else {
       setGate(error instanceof ChatApiError ? errorText(error) : 'The chat server is not answering right now, so chat and loan requests are paused. Direct loans still work.',
-        [button('Try again', () => checkChatAccess(false), 'soft'), button('Direct loan', async () => goView('direct'), 'ghost')])
+        [button('Try again', () => checkChatAccess(false), 'soft'), button('Make a direct loan', async () => goView('direct'), 'ghost')])
     }
     renderMessages()
   }
@@ -759,7 +830,7 @@ async function pollChat(): Promise<void> {
     try {
       const fresh = await chat.list(id, after)
       if (fresh.length) {
-        chatMessages.set(id, [...have, ...fresh])
+        chatMessages.set(id, mergeMessages(have, fresh))
         if (id === chatRoom && view === 'chat') renderMessages()
       }
     } catch { /* room not readable right now */ }
@@ -993,11 +1064,14 @@ function invitePanel(where: 'home' | 'members'): HTMLElement[] {
   return nodes
 }
 
-/** Home (members only) and Members: the same invite panel. */
+/** Invitations page. Only shows the form when the contract would let this account invite. */
+let invitePanelKey = ''
 function renderInvitePanels(): void {
-  const member = !!me?.passport && me.passport.status === 'Active'
-  $('#home-invite').hidden = !member
-  if (member) $('#home-invite').replaceChildren(...invitePanel('home'))
+  // Rebuild only when something the panel shows changes, so a background refresh never clears typing.
+  const right = inviteRight()
+  const key = JSON.stringify([accountId, circleId, right.can, right.why, inviteResult?.link ?? ''])
+  if (key === invitePanelKey) return
+  invitePanelKey = key
   $('#members-invite').replaceChildren(...invitePanel('members'))
 }
 
@@ -1011,83 +1085,203 @@ function cardImage(svg: string | null, alt: string): HTMLElement | null {
   return el('img', { alt, src: URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' })) })
 }
 
-function tile(label: string, value: string, note = '', cls = ''): HTMLElement {
-  return el('div', { className: `tile ${cls}` }, el('p', { className: 'tile-label', textContent: label }), el('p', { className: 'tile-value', textContent: value }), note ? el('p', { className: 'tile-note', textContent: note }) : '')
+function tile(label: string, value: string | null, note = '', cls = ''): HTMLElement {
+  // null = could not be read: say so, never show a made-up zero.
+  return el('div', { className: `tile ${cls}${value === null ? ' unavailable' : ''}` },
+    el('p', { className: 'tile-label', textContent: label }),
+    el('p', { className: 'tile-value', textContent: value ?? 'Unavailable' }),
+    note ? el('p', { className: 'tile-note', textContent: note }) : '')
 }
 
-/** Overview tiles, all from testnet views. Loading and failure states never show a misleading 0. */
+const usdText = (v: string | null) => (v === null ? null : `${formatUsdc(v)} USDC`)
+
+/** Overview numbers, all from testnet views. Loading and failure never show a misleading 0. */
 function renderStats(): void {
   const grid = $('#stats-grid')
-  const custody = $('#custody')
-  if (loadError) {
-    grid.replaceChildren(el('div', { className: 'tile tile-error' }, el('p', { textContent: `Could not read testnet: ${loadError}` }), button('Retry', refreshAll, 'soft')))
-    custody.replaceChildren()
+  if (loadError && !demo) {
+    grid.replaceChildren(el('div', { className: 'tile tile-error' }, el('p', { textContent: `Could not read testnet: ${loadError}` }), button('Retry', refreshAll, 'ghost')))
+    renderCustody(); renderTrust(); renderDaoSummary(); renderQuick()
     return
   }
   if (!demo?.circle) {
-    grid.replaceChildren(...Array.from({ length: 8 }, () => el('div', { className: 'tile skeleton' }, el('p', { className: 'tile-label', textContent: 'Loading…' }), el('p', { className: 'tile-value', textContent: '…' }))))
-    custody.replaceChildren()
+    grid.replaceChildren(...Array.from({ length: 6 }, () => el('div', { className: 'tile skeleton' }, el('p', { className: 'tile-label', textContent: 'Loading…' }), el('p', { className: 'tile-value', textContent: '0' }))))
+    renderCustody(); renderTrust(); renderDaoSummary(); renderQuick()
     return
   }
   const st = circleStats(demo.loans, demo.passports)
-  const capped = demo.loans.length >= 50 ? ' (first 50)' : ''
-  const usd = (v: string | null) => (v === null ? 'unavailable' : `${formatUsdc(v)} USDC`)
+  const repaidUsdc = demo.loans.filter((l) => l.state === 'Repaid').reduce((sum, l) => sum + BigInt(l.principal), 0n).toString()
+  const lentUsdc = demo.loans.filter((l) => l.funded_at !== null).reduce((sum, l) => sum + BigInt(l.principal), 0n).toString()
+  const waiting = demo.loans.filter((l) => isWaiting(l, Date.now())).length
+  const repaidLoans = demo.loans.filter((l) => l.state === 'Repaid')
+  const onTimeLoans = repaidLoans.filter((l) => l.repaid_on_time === true).length
+  const lateLoans = repaidLoans.filter((l) => l.repaid_on_time === false).length
+  const forgiven = repaidLoans.filter((l) => l.repaid_on_time === false && l.flag_cleared).length
+  const stale = isStale(net, Date.now()) ? ' (stale)' : ''
+  $('#stats-note').textContent = `From the contract's views on NEAR testnet${net.lastOkAt ? `, read ${new Date(net.lastOkAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}${stale}` : ''}.`
   grid.replaceChildren(
     tile('Members', String(st.members), `${st.trusted} Trusted`),
-    tile('Loans', `${st.totalLoans}${capped}`, `${st.funded} funded`),
-    tile('Repaid', String(st.repaid), 'money back to the lender'),
-    tile('Active now', String(st.active), `${formatUsdc(st.outstanding)} USDC outstanding`),
-    tile('Overdue', String(st.overdue), st.overdue ? 'Trusted perks paused' : 'none', st.overdue ? 'warn' : ''),
-    tile('DAO treasury', usd(balances.dao), demo.circle.treasury_id ? memberLabel(demo.circle.treasury_id) : 'no DAO'),
+    tile('Loans in this circle', String(st.totalLoans), `${st.funded} funded · ${waiting} waiting for a lender`),
+    tile('Lent so far', `${formatUsdc(lentUsdc)} USDC`, `${st.repaid} repaid (${formatUsdc(repaidUsdc)} USDC): ${onTimeLoans} on time, ${lateLoans} late${forgiven ? `, ${forgiven} late mark${forgiven > 1 ? 's' : ''} forgiven` : ''}`),
+    tile('Out right now', `${formatUsdc(st.outstanding)} USDC`, `${st.active} active loan${st.active === 1 ? '' : 's'}`),
+    tile('Overdue', String(st.overdue), st.overdue ? 'Trusted perks paused for those borrowers' : 'none', st.overdue ? 'warn' : ''),
+    tile('Circle treasury', demo.circle.treasury_id ? usdText(balances.dao) : 'No DAO', demo.circle.treasury_id ? `${memberLabel(demo.circle.treasury_id)} · separate from loans` : 'The founder runs this circle'),
   )
-  const zero = balances.contract === '0'
-  custody.className = `custody ${balances.contract === null ? '' : zero ? 'ok' : 'warn'}`
+  renderCustody(); renderTrust(); renderDaoSummary(); renderQuick()
+}
+
+/** Zero custody, with the live balance of the loan contract (never mixed with the DAO's). */
+function renderCustody(): void {
+  const custody = $('#custody')
+  const value = balances.contract
+  const zero = value === '0'
+  custody.className = `card custody ${value === null ? '' : zero ? 'ok' : 'warn'}`
   custody.replaceChildren(
-    el('div', {}, el('p', { className: 'tile-label', textContent: 'Loan contract USDC balance (zero custody)' }),
-      el('p', { className: 'custody-value', textContent: usd(balances.contract) })),
-    el('p', { className: 'custody-text', textContent: balances.contract === null ? 'Could not read the balance right now.'
-      : zero ? `The lending contract holds no USDC. Funding goes from the lender straight to the borrower in one transaction, and every failed path refunds the lender. Live balance of ${config.contractId}, separate from the DAO treasury.`
-        : 'The lending contract holds USDC right now. It should be 0 at rest: a transfer may be in flight. Refresh in a moment.' }))
+    el('p', { className: 'tile-label', textContent: 'Loan contract USDC balance (zero custody)' }),
+    el('p', { className: 'custody-value', textContent: !demo ? '…' : value === null ? 'Unavailable' : `${formatUsdc(value)} USDC` }),
+    el('div', { className: 'mini-flow', ariaLabel: 'Lender to contract check to borrower' }, el('span', { textContent: 'Lender' }), el('i', { textContent: '→' }), el('span', { textContent: 'Contract checks' }), el('i', { textContent: '→' }), el('span', { textContent: 'Borrower' })),
+    el('p', { className: 'custody-text', textContent: !demo ? 'Reading the balance…'
+      : value === null ? 'Could not read the balance right now. This is not a zero.'
+        : zero ? `No pooled pot: funding passes from the lender through the contract's checks to the borrower in one transaction, and failed paths refund the lender. Live balance of ${config.contractId}${isStale(net, Date.now()) ? ' (stale)' : ''}.`
+          : 'The contract holds USDC right now. It should be 0 at rest; a transfer may be in flight. Refresh in a moment.' }),
+    el('button', { className: 'btn btn-ghost btn-sm', type: 'button', textContent: 'Network details', onclick: () => goView('network') }))
+}
+
+function renderTrust(): void {
+  const box = $('#trust-summary')
+  const passports = (demo?.passports ?? []).filter((p) => p.status === 'Active')
+  if (!demo?.circle) { box.replaceChildren(el('h2', { textContent: 'Trust in this circle' }), el('p', { className: 'muted', textContent: 'Loading…' })); return }
+  const trusted = passports.filter((p) => p.effective_tier === 'Trusted').length
+  const onTime = passports.reduce((s, p) => s + p.on_time_count, 0)
+  const late = passports.reduce((s, p) => s + p.late_count, 0)
+  const pct = (n: number, d: number) => `${d ? Math.round((n / d) * 100) : 0}%`
+  const bar = (n: number, d: number) => { const b = el('div', { className: 'bar' }, el('span')); (b.firstChild as HTMLElement).style.width = pct(n, d); return b }
+  box.replaceChildren(
+    el('div', { className: 'section-head row' }, el('h2', { textContent: 'Trust in this circle' }), el('button', { className: 'btn btn-ghost btn-sm', type: 'button', textContent: 'Members', onclick: () => goView('members') })),
+    el('div', { className: 'trust-bars' },
+      el('p', { className: 'small', textContent: `${trusted} of ${passports.length} members are Trusted` }), bar(trusted, passports.length),
+      el('p', { className: 'small', textContent: `Passports record ${onTime} on-time and ${late} late repayment${late === 1 ? '' : 's'}` }), bar(onTime, onTime + late)),
+    el('p', { className: 'hint', textContent: 'A late mark the circle\'s DAO forgives by vote is removed from the passport, so passport counts can be lower than the loan list.' }),
+    el('p', { className: 'hint', textContent: 'Reputation counts only inside this circle. Accounts that cooperate can build it between themselves; the minimums slow that down but do not prove they are different people.' }))
+}
+
+function renderDaoSummary(): void {
+  const box = $('#dao-summary')
+  const circle = demo?.circle
+  if (!circle) { box.hidden = true; return }
+  box.hidden = false
+  if (!circle.treasury_id) {
+    box.replaceChildren(el('h2', { textContent: 'Circle treasury' }), el('p', { className: 'muted', textContent: 'No DAO is attached yet: the founder administers this circle. A DAO treasury can be attached later.' }))
+    return
+  }
+  const verified = !!demo?.dao?.verified
+  box.replaceChildren(
+    el('div', { className: 'section-head row' }, el('h2', { textContent: 'Circle treasury' }), el('button', { className: 'btn btn-ghost btn-sm', type: 'button', textContent: 'Treasury', onclick: () => goView('treasury') })),
+    el('dl', { className: 'kv' },
+      el('dt', { textContent: 'DAO' }), el('dd', {}, el('code', { textContent: circle.treasury_id })),
+      el('dt', { textContent: 'Holds' }), el('dd', { textContent: usdText(balances.dao) ?? 'Unavailable (could not read)' }),
+      el('dt', { textContent: 'Check' }), el('dd', { className: verified ? 'net-ok' : 'net-bad', textContent: verified ? 'DAO verified by CommonCircle frontend trust checks' : 'Did not pass this app\'s DAO trust checks' })))
+}
+
+type Quick = { label: string; sub: string; icon: string; go: () => void; primary?: boolean }
+const QI = {
+  ask: '<path d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H9l-5 4v-4H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/>',
+  direct: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  repay: '<path d="M3 7h18v12H3zM12 10v6M9 13h6"/>',
+  invite: '<path d="M15 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0zM3 21a8 8 0 0 1 13-6.2M19 14v6M16 17h6"/>',
+  wallet: '<path d="M3 7h18v12H3zM16 13h2"/>',
+  join: '<path d="M10 17l5-5-5-5M15 12H3M21 3v18"/>',
+  passport: '<path d="M5 3h14v18H5zM9 8a3 3 0 1 0 6 0 3 3 0 0 0-6 0M8 16h8"/>',
+}
+
+/** The one or two things this account can do next, from real state only. */
+function renderQuick(): void {
+  const items: Quick[] = []
+  const member = !!me?.passport && me.passport.status === 'Active'
+  const funded = me?.loans.find((l) => l.state === 'Funded')
+  const forMe = accountId && me ? requestsForLender(me.lent, accountId, Date.now()) : []
+  if (!accountId) items.push({ label: 'Connect wallet', sub: 'NEAR testnet', icon: QI.wallet, go: () => toggleAccountMenu($('#head-connect')), primary: true })
+  else if (!member) items.push({ label: 'Join with an invite', sub: 'Paste your link above', icon: QI.join, go: () => { $<HTMLInputElement>('.paste-input')?.focus() }, primary: true })
+  if (funded) items.push({ label: `Repay ${formatUsdc(funded.outstanding)} USDC`, sub: `Loan #${funded.loan_id}`, icon: QI.repay, go: () => void run(null, () => repay(funded)), primary: true })
+  if (forMe.length) items.push({ label: `${forMe.length} request${forMe.length > 1 ? 's' : ''} for you`, sub: 'Review and fund', icon: QI.repay, go: () => $('#for-you').scrollIntoView({ behavior: 'smooth' }), primary: !funded })
+  if (member) {
+    items.push({ label: 'Ask your circle', sub: 'Post in the chat', icon: QI.ask, go: () => { goView('chat'); $('#ask-panel').hidden = false; checkAsk() }, primary: !funded && !forMe.length })
+    items.push({ label: 'Ask one member', sub: 'Direct loan', icon: QI.direct, go: () => goView('direct') })
+    if (inviteRight().can) items.push({ label: 'Invite someone', sub: 'One-time link', icon: QI.invite, go: () => goView('invites') })
+    items.push({ label: 'My passport', sub: me?.passport?.display_tier ?? '', icon: QI.passport, go: () => { passportAccount = accountId; renderPassport(); goView('passport') } })
+  }
+  $('#quick-actions').replaceChildren(...items.slice(0, 4).map((q) => {
+    const b = el('button', { className: `quick-btn${q.primary ? ' primary' : ''}`, type: 'button' })
+    const icon = el('span', { className: 'qi', ariaHidden: 'true' })
+    icon.innerHTML = `<svg viewBox="0 0 24 24">${q.icon}</svg>` // static icon markup defined above
+    b.append(icon, el('span', {}, el('strong', { textContent: q.label }), q.sub ? el('small', { textContent: q.sub }) : ''))
+    b.addEventListener('click', q.go)
+    return b
+  }))
+}
+
+const activityTime = (at: number) => new Date(at).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+
+function activityItems(limit: number): HTMLLIElement[] {
+  const items = demo ? recentActivity(demo.loans, demo.passports, formatUsdc, memberLabel, limit) : []
+  if (!items.length) return [el('li', { className: 'empty', textContent: demo ? 'No activity yet.' : loadError ? 'Unavailable: testnet could not be read.' : 'Loading…' })]
+  const loanState = (id?: string) => demo?.loans.find((l) => l.loan_id === id)
+  return items.map((a) => {
+    const loan = loanState(a.loanId)
+    const label = loan ? (loan.state === 'Repaid' && loan.repaid_on_time === false ? 'Repaid late' : loan.state === 'Open' && !isWaiting(loan, Date.now()) ? 'Expired' : loan.state) : ''
+    return el('li', { className: `act act-${a.kind}` },
+      el('span', { className: 'act-dot', ariaHidden: 'true' }),
+      el('span', { className: 'act-text', textContent: a.text }),
+      el('span', { className: 'act-meta' },
+        el('time', { textContent: activityTime(a.at) }),
+        a.loanId ? el('span', { textContent: `Loan #${a.loanId}` }) : '',
+        label ? el('span', { className: `state state-${label.split(' ')[0]}`, textContent: `now ${label}` }) : '',
+        el('a', { href: `${config.explorerUrl}/address/${a.account}`, target: '_blank', rel: 'noopener', textContent: `${memberLabel(a.account)} on NearBlocks` })))
+  })
 }
 
 function renderActivity(): void {
   $<HTMLAnchorElement>('#activity-link').href = `${config.explorerUrl}/address/${config.contractId}`
-  const items = demo ? recentActivity(demo.loans, demo.passports, formatUsdc, memberLabel) : []
-  $('#activity').replaceChildren(...(items.length ? items.map((a) => el('li', { className: `act act-${a.kind}` },
-    el('time', { textContent: new Date(a.at).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) }),
-    el('span', { textContent: a.text }))) : [el('li', { className: 'muted', textContent: demo ? 'No activity yet.' : 'Loading…' })]))
+  $('#activity').replaceChildren(...activityItems(6))
+  $('#activity-full').replaceChildren(...activityItems(200))
 }
 
-function renderEligibility(): void {
-  const box = $('#my-eligibility')
-  if (!accountId || !demo?.circle) { box.hidden = true; return }
-  const e = treasuryEligibility(me?.passport ?? null, demo.circle.treasury_lending_enabled, !!demo.dao?.verified)
-  box.hidden = false
-  box.className = `eligibility ${e.eligible ? 'ok' : ''}`
-  box.textContent = `Treasury: ${e.reason}`
-}
-
-/** My Passport: the connected member's card, or any member's (read-only) so a judge can see one without a wallet. */
+/** My Passport (connected member) or Member passport (anyone else, read-only). Never mixes the two. */
 function renderPassport(): void {
   const select = $<HTMLSelectElement>('#pp-account')
   const passports = demo?.passports ?? []
   const mine = accountId && passports.some((p) => p.owner_id === accountId) ? accountId : ''
   if (!passportAccount || !passports.some((p) => p.owner_id === passportAccount)) passportAccount = mine || passports.find((p) => p.display_tier === 'Trusted')?.owner_id || passports[0]?.owner_id || ''
-  select.replaceChildren(...passports.map((p) => el('option', { value: p.owner_id, selected: p.owner_id === passportAccount, textContent: `${p.owner_id === accountId ? 'You · ' : ''}${memberLabel(p.owner_id)} · ${p.display_tier}` })))
+  select.replaceChildren(...passports.map((p) => el('option', { value: p.owner_id, selected: p.owner_id === passportAccount, textContent: `${p.owner_id === accountId ? 'Me · ' : ''}${memberLabel(p.owner_id)} · ${p.display_tier}` })))
   const body = $('#passport-body')
   const p = passports.find((x) => x.owner_id === passportAccount)
+  const isMine = !!p && p.owner_id === accountId
+  $('#pp-title').textContent = isMine || !p ? 'My passport' : 'Member passport'
+  $('#crumb-view').textContent = view === 'passport' ? (isMine || !p ? 'My passport' : 'Member passport') : $('#crumb-view').textContent
   const card = demo?.cards.find((c) => c.passport.owner_id === passportAccount)
-  if (!p || !demo?.circle) { body.replaceChildren(el('p', { className: 'muted', textContent: demo ? 'No passports in this circle yet.' : 'Loading…' })); return }
+  if (!p || !demo?.circle) {
+    body.replaceChildren(el('div', { className: 'card' }, el('p', { className: 'muted', textContent: demo ? 'No passports in this circle yet.' : loadError ? 'Unavailable: testnet could not be read.' : 'Loading…' })))
+    return
+  }
   const params = demo.circle.params
   const prog = trustedProgress(p, params)
+  const limit = borrowLimit(params, p, demo.config.hard_loan_cap)
+  const elig = treasuryEligibility(p, demo.circle.treasury_lending_enabled, !!demo.dao?.verified)
+  const founderAdmin = demo.circle.founder_id === p.owner_id && demo.circle.admin_id === p.owner_id
+  const canInvite = p.status === 'Active' && (founderAdmin || p.effective_tier === 'Trusted')
   const art = el('figure', { className: 'pp-card' })
-  const picture = cardImage(card?.svg ?? null, `${p.owner_id} passport card`)
-  if (picture) art.append(picture)
-  art.append(el('figcaption', { className: 'small muted', textContent: `Token ${p.token_id} · NEP-171 · cannot be transferred (nft_transfer always fails)` }))
+  const picture = cardImage(card?.svg ?? null, `${p.owner_id} passport`)
+  art.append(picture ?? el('p', { className: 'card-blocked', textContent: 'Passport picture unavailable right now.' }))
+  art.append(el('figcaption', { className: 'small' }, `Token ${p.token_id} · NEP-171 · non-transferable (nft_transfer always fails) · `,
+    el('a', { href: `${config.explorerUrl}/address/${p.owner_id}`, target: '_blank', rel: 'noopener', textContent: 'owner on NearBlocks' })))
+  const who = el('div', { className: 'pp-who' }, avatar(p.owner_id), el('div', { className: 'grow' },
+    el('p', { className: 'small muted', textContent: isMine ? 'Your account' : 'Viewing another member (read-only)' }),
+    el('p', { className: 'acct-full', textContent: p.owner_id })), badge(p.display_tier), p.steward ? badge('Steward') : '')
   const statsList = el('dl', { className: 'pp-stats' },
-    ...[['Account', p.owner_id], ['Tier', `${p.tier}${p.steward ? ' · Steward' : ''}`], ['Effective tier', p.effective_tier], ['Status', p.status],
-      ['On-time repayments', String(p.on_time_count)], ['Late repayments', String(p.late_count)], ['Counted toward Trusted', String(p.qualifying_count)],
-      ['Different lenders', String(p.distinct_lenders)], ['Open loans', String(p.open_loans)], ['Overdue loans', String(p.overdue_loans)]]
+    ...[['Circle', demo.circle.name], ['Passport token', p.token_id], ['Tier', p.tier], ['Effective tier', p.effective_tier], ['Status', p.status],
+      ['On-time repayments', String(p.on_time_count)], ['Late repayments', String(p.late_count)], ['Counted toward Trusted', `${p.qualifying_count} of ${params.trusted_threshold}`],
+      ['Different lenders', `${p.distinct_lenders} (needs ${params.min_distinct_lenders})`], ['Loan limit', `${formatUsdc(limit.min)}–${formatUsdc(limit.max)} USDC`],
+      ['Open loans', `${p.open_loans} of ${limit.openAllowed} allowed`], ['Overdue loans', String(p.overdue_loans)],
+      ['Can invite', canInvite ? 'Yes' : 'No'], ['Treasury loans', elig.eligible ? 'Eligible' : 'Not eligible']]
       .map(([k, v]) => el('div', {}, el('dt', { textContent: k }), el('dd', { textContent: v }))))
   const need = prog.trusted ? null : [
     `${prog.qualifying} of ${prog.threshold} on-time repayment${prog.threshold === 1 ? '' : 's'} that count`,
@@ -1095,15 +1289,14 @@ function renderPassport(): void {
     `a loan counts if it is at least ${formatUsdc(params.qualifying_min_amount)} USDC for ${params.qualifying_min_days}+ day${params.qualifying_min_days === 1 ? '' : 's'}, repaid by its due time`,
   ]
   const diffs = demoDifferences(params)
-  const elig = treasuryEligibility(p, demo.circle.treasury_lending_enabled, !!demo.dao?.verified)
   const side = el('div', { className: 'pp-side' },
-    el('div', { className: 'box' }, el('h2', {}, 'Reputation ', badge(p.display_tier)), statsList),
-    el('div', { className: 'box' }, el('h2', { textContent: prog.trusted ? 'Trusted' : 'Road to Trusted' }),
+    el('div', { className: 'card' }, who, isMine ? '' : el('p', { className: 'viewing-other', textContent: `These are ${memberLabel(p.owner_id)}'s numbers, not yours.${mine ? ' Pick "Me" above to see your own passport.' : ''}` }), statsList),
+    el('div', { className: 'card' }, el('h2', { textContent: prog.trusted ? 'Trusted' : 'Road to Trusted' }),
       prog.trusted ? el('p', { textContent: p.perks_paused ? 'Trusted, but perks are paused by an overdue loan until it is repaid or the stewards clear the flag.' : 'Earned by on-time repayments. The tier never goes down; an overdue loan only pauses its perks.' })
         : el('ul', { className: 'pp-need' }, ...need!.map((t) => el('li', { textContent: t }))),
       progressNode(p) ?? '',
-      diffs.length ? el('p', { className: 'demo-flag', textContent: `This is a demo circle: ${diffs.join('; ')}.` }) : ''),
-    el('div', { className: 'box' }, el('h2', { textContent: 'What this passport unlocks' }),
+      diffs.length ? el('p', { className: 'demo-flag', textContent: `This circle uses demo settings: ${diffs.join('; ')}.` }) : ''),
+    el('div', { className: 'card' }, el('h2', { textContent: 'What this passport unlocks' }),
       el('ul', { className: 'pp-need' }, ...privileges(p, params, demo.config.hard_loan_cap, formatUsdc).map((t) => el('li', { textContent: t }))),
       el('p', { className: `eligibility ${elig.eligible ? 'ok' : ''}`, textContent: `Treasury: ${elig.reason}` })))
   body.replaceChildren(art, side)
@@ -1138,57 +1331,151 @@ const TRACKS: Array<{ track: string; heading: string; problem: string; does: str
 
 function renderEvidence(): void {
   const status = evidenceFile as unknown as EvidenceStatus
-  $('#evidence-generated').textContent = `Last run: ${new Date(status.generated_at).toLocaleString()}.`
+  const total = status.claims.length
+  const passed = status.claims.filter((c) => c.status === 'PASS').length
+  $('#evidence-generated').textContent = `Claims run ${new Date(status.generated_at).toLocaleString()}: ${passed} of ${total} pass. That time is when the evidence was generated, not a live chain check (the live balance below is).`
   const zero = balances.contract === null ? 'unavailable' : `${formatUsdc(balances.contract)} USDC`
   $('#tracks').replaceChildren(...trackSummaries(status, TRACKS.map((t) => t.track)).map((sum) => {
     const t = TRACKS.find((x) => x.track === sum.track)!
-    const rows = sum.claims.map((c) => {
-      const ref = c.reference as { explorer?: string; tx_hash?: string; method?: string; account_id?: string; report?: string; snapshot?: string }
-      const what = c.kind === 'tx' && ref.explorer ? el('a', { href: ref.explorer, target: '_blank', rel: 'noopener', textContent: `tx ${ref.tx_hash?.slice(0, 8)}…` })
-        : c.kind === 'view' ? el('span', { textContent: `view ${ref.method}(${ref.account_id ? memberLabel(ref.account_id) : ''})` }) : el('span', { textContent: `test report ${ref.report?.split('/').pop() ?? ''}` })
-      const cells = [el('td', { textContent: c.id }), el('td', {}, what), el('td', {}, el('span', { className: `state state-${c.status === 'PASS' ? 'Repaid' : 'Cancelled'}`, textContent: c.status }))]
-      cells.forEach((cell, i) => { cell.dataset.label = ['Claim', 'Evidence', 'Status'][i] })
-      return el('tr', {}, ...cells)
+    const claims = sum.claims.map((c) => {
+      const ref = c.reference as { explorer?: string; tx_hash?: string; method?: string; account_id?: string; report?: string; snapshot?: string; network?: string }
+      const kind = c.kind === 'tx' ? 'Transaction' : c.kind === 'view' ? 'Contract view' : 'Automated test'
+      const evidence = c.kind === 'tx' && ref.explorer ? el('a', { href: ref.explorer, target: '_blank', rel: 'noopener', textContent: `${ref.tx_hash ?? 'transaction'} on NearBlocks` })
+        : c.kind === 'view' ? el('code', { textContent: `${ref.method ?? 'view'}(${ref.account_id ?? ''})` })
+          : el('span', { textContent: ref.report ?? 'CI test report' })
+      return el('details', { className: 'claim' },
+        el('summary', {}, el('span', { className: 'claim-id', textContent: c.id }), el('span', { className: `state state-${c.status}`, textContent: c.status })),
+        el('dl', { className: 'kv' },
+          el('dt', { textContent: 'Feature' }), el('dd', { textContent: c.feature }),
+          el('dt', { textContent: 'Type' }), el('dd', { textContent: kind }),
+          el('dt', { textContent: 'Network' }), el('dd', { textContent: ref.network ?? 'NEAR testnet' }),
+          el('dt', { textContent: 'Reference' }), el('dd', {}, evidence),
+          el('dt', { textContent: 'Result' }), el('dd', { textContent: c.reason || c.status })))
     })
-    return el('section', { className: 'box track' },
+    return el('section', { className: 'card track' },
       el('div', { className: 'track-head' },
-        el('div', {}, el('p', { className: 'eyebrow', textContent: sum.track }), el('h2', { className: 'big', textContent: t.heading })),
+        el('div', {}, el('p', { className: 'eyebrow', textContent: sum.track }), el('h2', { textContent: t.heading })),
         el('div', { className: `track-status ${sum.status === 'PASS' ? 'ok' : 'bad'}` }, el('strong', { textContent: sum.status }), el('span', { textContent: `${sum.pass} of ${sum.total} claims pass${sum.fail ? ` · ${sum.fail} fail` : ''}` }))),
-      sum.track === 'Open Innovation' ? el('p', { className: `custody-inline ${balances.contract === '0' ? 'ok' : ''}`, textContent: `Live now: the loan contract holds ${zero}.` }) : '',
+      sum.track === 'Open Innovation' ? el('p', { className: `custody-inline ${balances.contract === '0' ? 'ok' : ''}`, textContent: `Live chain check${net.lastOkAt ? ` (${new Date(net.lastOkAt).toLocaleTimeString()})` : ''}: the loan contract holds ${zero}.` }) : '',
       el('dl', { className: 'track-facts' },
         ...[['Problem', t.problem], ['What CommonCircle does', t.does], ['Automated tests', t.tests], ['Reproduce', t.reproduce], ['Limits we disclose', t.limits]]
           .map(([k, v]) => el('div', {}, el('dt', { textContent: k }), el('dd', { textContent: v })))),
-      el('div', { className: 'table-wrap' }, el('table', { className: 'loans' }, el('thead', {}, el('tr', {}, el('th', { textContent: 'Claim' }), el('th', { textContent: 'Evidence' }), el('th', { textContent: 'Status' }))), el('tbody', {}, ...rows))))
+      el('div', { className: 'claims' }, ...claims))
   }))
+}
+
+/** NEAR network details: where data comes from and how fresh it is. */
+function renderNetwork(): void {
+  const h = rpcHealth()
+  const snapshot = demo
+  const row = (k: string, v: Node | string) => [el('dt', { textContent: k }), el('dd', {}, v)]
+  const code = (t: string) => el('code', { textContent: t })
+  const link = (href: string, t: string) => el('a', { href, target: '_blank', rel: 'noopener', textContent: t })
+  const state = describeNet(net, Date.now())
+  const cls = state.tone === 'ok' ? 'net-ok' : state.tone === 'bad' ? 'net-bad' : 'net-warn'
+  $('#network-body').replaceChildren(
+    el('div', { className: 'card' }, el('h2', { textContent: 'Connection' }), el('dl', { className: 'kv' },
+      ...row('Network', 'NEAR testnet (no real money)'),
+      ...row('Status', el('span', { className: cls, textContent: state.pill })),
+      ...row('Last good read', net.lastOkAt ? new Date(net.lastOkAt).toLocaleString() : 'none yet'),
+      ...row('RPC in use', code(h.endpoint)),
+      ...row('Fallbacks', el('span', {}, ...TESTNET_RPCS.flatMap((u, i) => (i ? [', ', code(u)] : [code(u)])))),
+      ...(net.partial.length ? row('Could not read', net.partial.join(', ')) : []),
+      ...(h.lastError ? row('Last RPC error', h.lastError) : [])),
+    el('button', { className: 'btn btn-ghost btn-sm', type: 'button', textContent: 'Refresh now', onclick: () => void run(null, refreshAll) })),
+    el('div', { className: 'card' }, el('h2', { textContent: 'Contracts and tokens' }), el('dl', { className: 'kv' },
+      ...row('Circle contract', link(`${config.explorerUrl}/address/${config.contractId}`, config.contractId)),
+      ...row('Interface', snapshot ? code(snapshot.config.interface_version) : '…'),
+      ...row('USDC token', snapshot ? link(`${config.explorerUrl}/address/${snapshot.config.usdc_id}`, snapshot.config.usdc_id) : '…'),
+      ...row('Loan contract USDC', usdText(balances.contract) ?? 'Unavailable'),
+      ...row('Circle', snapshot?.circle ? `${snapshot.circle.name} (#${snapshot.circle.circle_id})` : '…'),
+      ...row('Circle admin', snapshot?.circle ? code(snapshot.circle.admin_id) : '…'),
+      ...row('Contract keys', 'The contract account still has a full-access key, so its code can be upgraded. It is not locked.'))),
+    el('div', { className: 'card' }, el('h2', { textContent: 'DAO treasury' }), el('dl', { className: 'kv' },
+      ...row('DAO', snapshot?.circle?.treasury_id ? link(`${config.explorerUrl}/address/${snapshot.circle.treasury_id}`, snapshot.circle.treasury_id) : 'none'),
+      ...row('Treasury USDC', snapshot?.circle?.treasury_id ? (usdText(balances.dao) ?? 'Unavailable') : '—'),
+      ...row('Trust check', snapshot?.dao ? (snapshot.dao.verified ? 'DAO verified by CommonCircle frontend trust checks' : snapshot.dao.message) : '—'),
+      ...row('Code hash', snapshot?.dao?.codeHash ? code(snapshot.dao.codeHash) : '—'),
+      ...row('Access keys', snapshot?.dao ? String(snapshot.dao.accessKeyCount ?? 'unknown') : '—'),
+      ...row('Who checks', 'This app (frontend). The circle contract does not verify which DAO is attached.'))),
+    el('div', { className: 'card' }, el('h2', { textContent: 'Circle rules (read from the contract)' }), snapshot?.circle ? el('dl', { className: 'kv' },
+      ...row('A "day" lasts', loanLengthText(1, snapshot.circle.params.day_length_sec)),
+      ...row('Funding window', formatDuration(BigInt(snapshot.circle.params.funding_window_sec))),
+      ...row('Trusted after', `${snapshot.circle.params.trusted_threshold} qualifying on-time repayment${snapshot.circle.params.trusted_threshold === 1 ? '' : 's'}`),
+      ...row('Different lenders', String(snapshot.circle.params.min_distinct_lenders)),
+      ...row('Member limit', `${formatUsdc(snapshot.circle.params.min_amount)}–${formatUsdc(snapshot.circle.params.member_max_amount)} USDC`),
+      ...row('Trusted limit', `up to ${formatUsdc(snapshot.circle.params.trusted_max_amount)} USDC`),
+      ...row('Settings', demoDifferences(snapshot.circle.params).length ? `Demo (faster than standard): ${demoDifferences(snapshot.circle.params).join('; ')}` : 'Standard')) : el('p', { className: 'muted', textContent: 'Loading…' })),
+  )
+}
+
+/** Account & network settings: wallet, chat session, chat server health. */
+function renderSettings(): void {
+  $('#settings-wallet-actions').replaceChildren(...(accountId
+    ? [button('Copy account ID', async () => { await navigator.clipboard.writeText(accountId); show(`${accountId} (copied)`, 'ok') }, 'ghost'), button('Switch account', switchWallet, 'ghost', 'wallet'), button('Disconnect', disconnectWallet, 'ghost')]
+    : connectButtons()))
+  const s = session()
+  const exp = s ? tokenExpiry(s.token) : null
+  $('#settings-session').textContent = !accountId ? 'Connect a wallet first.'
+    : s && s.accountId === accountId ? `Signed in to chat as ${s.accountId}${exp ? ` until ${exp.toLocaleString()}` : ''}.` : 'Not signed in to chat in this browser.'
+  $('#settings-chat').replaceChildren(
+    el('dt', { textContent: 'Server' }), el('dd', {}, el('code', { textContent: config.authUrl })),
+    el('dt', { textContent: 'Configured' }), el('dd', { textContent: chatServerConfigured() ? 'Yes' : 'No (chat is off on this copy)' }),
+    el('dt', { textContent: 'Privacy' }), el('dd', { textContent: 'Members only, checked on-chain. Not end-to-end encrypted; the server operator can read messages.' }),
+    el('dt', { textContent: 'Delivery' }), el('dd', { textContent: 'Checks for new messages every 3 s while the chat is open (polling, not instant push).' }),
+    el('dt', { textContent: 'Health' }), el('dd', { id: 'settings-health', textContent: 'Not checked yet.' }))
+}
+
+/** When the chat session token expires (read from its payload; the server checks the signature). */
+function tokenExpiry(token: string): Date | null {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))) as { exp?: number }
+    return payload.exp ? new Date(payload.exp * 1000) : null
+  } catch { return null }
+}
+
+async function checkServer(): Promise<void> {
+  const out = $('#settings-health')
+  out.textContent = 'Checking… (a sleeping free server can take up to a minute)'
+  const result = await chatServerHealth(config.authUrl, 70_000)
+  out.textContent = !result.reachable ? `Not reachable after ${Math.round(result.ms / 1000)} s.`
+    : result.health?.ok ? `OK in ${(result.ms / 1000).toFixed(1)} s · storage ${result.health.store}${result.health.shared ? ' (shared, durable)' : result.health.durable ? ' (single process)' : ' (memory)'} · delivery ${result.health.delivery ?? 'polling'}`
+      : `Answered but not healthy: ${result.health?.detail ?? 'unknown'}`
 }
 
 /* ---------- reading state ---------- */
 
 async function refreshMe(): Promise<void> {
   if (!accountId) { me = null; renderAll(); return }
+  const mine = epoch
+  const account = accountId
   try {
     const usdc = new CircleClient(config.rpcUrl, await getUsdcId())
     const [passport, registration, loans, lent, tokens] = await Promise.all([
-      readClient.passportFor(circleId, accountId),
-      usdc.view<unknown>('storage_balance_of', { account_id: accountId }),
-      readClient.loansByBorrower(accountId),
-      readClient.loansByLender(accountId),
-      readClient.nftTokensForOwner(accountId, null, 50).catch(() => []),
+      readClient.passportFor(circleId, account),
+      usdc.view<unknown>('storage_balance_of', { account_id: account }),
+      allPages((fromIndex) => readClient.loansByBorrower(account, { fromIndex, limit: 50 })),
+      allPages((fromIndex) => readClient.loansByLender(account, { fromIndex, limit: 50 })),
+      readClient.nftTokensForOwner(account, null, 50).catch(() => []),
     ])
     const ids = [...new Set(tokens.map((t) => t.token_id.split(':')[0]))]
     const circles = await Promise.all(ids.map(async (id) => ({ id, name: (await readClient.getCircle(id).catch(() => null))?.name ?? `Circle ${id}` })))
+    // The account (or circle) changed while we were reading: these answers belong to someone else.
+    if (mine !== epoch || account !== accountId) return
     me = {
-      passport, registered: !!registration, signedIn: session()?.accountId === accountId, circles,
+      passport, registered: !!registration, signedIn: session()?.accountId === account, circles,
       loans: loans.filter((l) => l.circle_id === circleId),
       lent: lent.filter((l) => l.circle_id === circleId),
     }
   } catch (error) {
+    if (mine !== epoch) return
     const text = errorText(error)
-    if (isNetworkText(text)) netTrouble()
+    if (isNetworkText(text)) netTrouble(text)
     else show(`Could not read your account. ${text}`, 'bad', 'retry', refreshMe)
   }
   const chatForHome = chatClient()
   if (chatForHome && me?.passport) await loadRequests(chatForHome, circleId)
+  if (mine !== epoch) return
   renderAll()
   await Promise.all([
     loadMyCard().catch(() => {}),
@@ -1199,9 +1486,18 @@ async function refreshMe(): Promise<void> {
   if (view !== 'chat') stopChatPolling()
 }
 
+/** Re-read everything. Concurrent callers (Retry, timers, after a transaction) share one refresh. */
 async function refreshAll(): Promise<void> {
-  await loadDemo()
-  await refreshMe()
+  if (refreshing) return refreshing
+  refreshing = (async () => {
+    try {
+      await loadDemo()
+      await refreshMe()
+    } finally {
+      refreshing = null
+    }
+  })()
+  return refreshing
 }
 
 /* ---------- rendering ---------- */
@@ -1210,14 +1506,17 @@ function renderAll(): void {
   renderStats()
   renderActivity()
   renderPassport()
-  renderEligibility()
   renderForYou()
   renderOpenRequests()
   renderInvitePanels()
   renderJourney()
   renderMembers()
+  renderLoansTable()
   renderSidebar()
   renderRooms()
+  if (view === 'direct') mountForm($('#loan-form-slot'), 'direct')
+  if (view === 'network') renderNetwork()
+  if (view === 'settings') renderSettings()
 }
 
 function renderSidebar(): void {
@@ -1296,8 +1595,39 @@ function progressNode(passport: PassportView): HTMLElement | null {
 
 let formSeq = 0
 
+/** Why the loan form cannot be shown yet, as a full card with a way forward (never a blank page). */
+function formState(title: string, text: string, actions: HTMLElement[] = []): HTMLElement {
+  return el('div', { className: 'form-state' }, el('h2', { textContent: title }), el('p', { className: 'muted', textContent: text }), actions.length ? el('div', { className: 'btn-row' }, ...actions) : '')
+}
+
 /**
- * P0-3: the one loan form (Home step 5 and Loans). Lender = a member picker
+ * Mounted forms, per slot. A form is rebuilt only when what it depends on changes
+ * (account, circle, passport, members, chain refresh failing), so a background refresh
+ * never wipes what someone is typing.
+ */
+const formCache = new Map<string, { key: string; node: HTMLElement }>()
+
+function formKey(): string {
+  const p = me?.passport
+  return JSON.stringify([accountId, circleId, !!demo?.circle, loadError && !demo ? loadError : '', !!me, p?.status, p?.effective_tier, p?.steward,
+    (demo?.passports ?? []).filter((x) => x.status === 'Active').map((x) => `${x.owner_id}:${x.display_tier}:${x.on_time_count}:${x.late_count}`).join(','),
+    demo?.dao?.verified, demo?.circle?.treasury_lending_enabled])
+}
+
+function mountForm(slot: HTMLElement, name: string): void {
+  const key = formKey()
+  const cached = formCache.get(name)
+  if (cached && cached.key === key) {
+    if (cached.node.parentElement !== slot) slot.replaceChildren(cached.node)
+    return
+  }
+  const node = loanRequestForm()
+  formCache.set(name, { key, node })
+  slot.replaceChildren(node)
+}
+
+/**
+ * The one loan form (Direct loans page and Overview step 5). Lender = a member picker
  * (label, badge, on-time/late) plus "Ask the treasury" when the spec allows it;
  * limits come from borrowLimit() only; amount and days are validated inline.
  */
@@ -1305,9 +1635,12 @@ function loanRequestForm(): HTMLElement {
   const id = `lf${++formSeq}`
   const circle = demo?.circle
   const passport = me?.passport ?? null
-  if (!circle || !demo) return el('p', { className: 'muted', textContent: 'Loading the circle…' })
-  if (!accountId) return el('p', { className: 'muted', textContent: 'Connect your wallet first (step 1).' })
-  if (!passport || passport.status !== 'Active') return el('p', { className: 'muted', textContent: 'Join the circle first (step 2).' })
+  if (!demo && loadError) return formState('Testnet could not be read', `The form needs the circle's members and limits from NEAR testnet. ${loadError}`, [button('Retry', refreshAll, 'ghost')])
+  if (!circle || !demo) return formState('Loading the circle…', 'Reading members and limits from NEAR testnet.')
+  if (!accountId) return formState('Connect your wallet', 'Connect a NEAR testnet wallet to ask a member for a loan. Viewing works without one.', connectButtons())
+  if (!me) return formState('Reading your passport…', `Checking ${memberLabel(accountId)}'s membership in ${circle.name} on testnet.`)
+  if (!passport) return formState(`You are not a member of ${circle.name} yet`, `${memberLabel(accountId)} has no passport in this circle, so the contract would refuse a loan request. Join with an invite link from the founder or a Trusted member first.`, [button('Paste an invite link', async () => { goView('home'); $<HTMLInputElement>('.paste-input')?.focus() }), button('Look at members', async () => goView('members'), 'ghost')])
+  if (passport.status !== 'Active') return formState(`Your passport is ${passport.status}`, 'Only members with an active passport can borrow. Ask the circle\'s stewards for help.')
   const limit = borrowLimit(circle.params, passport, demo.config.hard_loan_cap)
   const lenders = demo.passports.filter((p) => p.owner_id !== accountId && p.status === 'Active')
   // Treasury loans: DAO attached and verified, at least 2 stewards, borrower effective Trusted and not a steward (interface section 4).
@@ -1324,7 +1657,7 @@ function loanRequestForm(): HTMLElement {
       `On time ${p.on_time_count} · late ${p.late_count}`, p.owner_id === preferred))
   }
   if (treasuryOk) picker.append(option(circle.treasury_id!, [el('span', { className: 'avatar avatar-sm avatar-room', textContent: 'DAO' }), el('span', { className: 'pick-name', textContent: 'Ask the treasury (DAO)' })], 'Both stewards vote', !preferred))
-  if (!picker.children.length) return el('p', { className: 'muted', textContent: 'There is nobody else in this circle to ask yet.' })
+  if (!picker.children.length) return formState('Nobody to ask yet', 'There is no other active member in this circle yet. Invite someone you trust first.', [button('Invitations', async () => goView('invites'), 'ghost')])
 
   const amount = el('input', { id: `${id}-amount`, inputMode: 'decimal', value: formatUsdc(limit.min) })
   const days = el('input', { id: `${id}-days`, inputMode: 'numeric', value: String(Math.min(7, limit.maxDays)) })
@@ -1418,7 +1751,7 @@ function renderJourney(): void {
     got ? `Loan #${got.loan_id}: ${formatUsdc(got.principal)} USDC from ${lenderName(got)}.`
       : open ? el('span', {}, `Request #${open.loan_id} for ${formatUsdc(open.principal)} USDC is waiting for `, open.lender_is_treasury ? 'the stewards' : accountChip(open.lender_id), ' to fund it. ', windowSpan(open))
         : `Choose who to ask, how much, and for how long.${trustedHint}`,
-    open ? [button('Cancel request', () => cancelRequest(open), 'ghost')] : [], open ? undefined : loanRequestForm()))
+    open ? [button('Cancel request', () => cancelRequest(open), 'ghost')] : [], open ? undefined : (() => { const slot = el('div', { className: 'form-slot' }); mountForm(slot, 'journey'); return slot })()))
   let repayDesc: string | Node = 'Once your loan arrives, pay it back before the due time to earn your next on-time mark.'
   const repayActions: HTMLElement[] = []
   if (funded) {
@@ -1462,42 +1795,62 @@ function renderJourney(): void {
 }
 
 function renderMembers(): void {
+  const passports = demo?.passports ?? []
+  const table = $('#members-table')
+  const rows = passports.map((p) => el('div', { className: 'mrow' },
+    el('span', { className: 'who' }, avatar(p.owner_id, 'sm'), accountChip(p.owner_id)),
+    el('span', {}, badge(p.display_tier), p.steward ? ' ' : '', p.steward ? badge('Steward') : ''),
+    el('span', { className: 'c-hide', textContent: p.status }),
+    el('span', { className: 'c-hide', textContent: `${p.on_time_count} on time` }),
+    el('span', { className: 'c-hide', textContent: `${p.late_count} late` })))
+  table.replaceChildren(
+    el('div', { className: 'section-head row' }, el('h2', { textContent: passports.length === 1 ? '1 member' : `${passports.length} members` }), el('span', { className: 'muted small', textContent: demo?.circle ? `${demo.circle.name} · from passports_in_circle` : '' })),
+    el('div', { className: 'mtable' },
+      el('div', { className: 'mrow head' }, el('span', { textContent: 'Account' }), el('span', { textContent: 'Tier' }), el('span', { textContent: 'Passport' }), el('span', { textContent: 'On time' }), el('span', { textContent: 'Late' })),
+      ...(rows.length ? rows : [el('p', { className: 'muted', textContent: demo ? 'No members yet.' : loadError ? 'Unavailable: testnet could not be read.' : 'Loading…' })])))
+  $('#members-invite-cta').hidden = !inviteRight().can
   const grid = $('#demo-cards')
   grid.replaceChildren()
   for (const card of demo?.cards ?? []) {
-    const fig = el('figure', { className: `member${card.passport.owner_id === accountId ? ' me' : ''}` })
-    const picture = cardImage(card.svg, `${card.passport.owner_id} passport card`)
+    const owner = card.passport.owner_id
+    const fig = el('figure', { className: `member${owner === accountId ? ' me' : ''}` })
+    const picture = cardImage(card.svg, `${owner} passport`)
     if (picture) fig.append(picture)
     fig.append(el('figcaption', {},
-      el('span', { className: 'who' }, avatar(card.passport.owner_id, 'sm'), accountChip(card.passport.owner_id)), badge(card.passport.display_tier)),
-      el('p', { className: 'member-counts', textContent: `On time ${card.passport.on_time_count} · late ${card.passport.late_count}` }))
+      el('span', { className: 'who' }, avatar(owner, 'sm'), accountChip(owner)), badge(card.passport.display_tier)),
+      el('p', { className: 'member-counts', textContent: `On time ${card.passport.on_time_count} · late ${card.passport.late_count}` }),
+      el('button', { className: 'btn btn-ghost btn-sm', type: 'button', textContent: owner === accountId ? 'My passport' : 'View passport', onclick: () => { passportAccount = owner; renderPassport(); goView('passport') } }))
     grid.append(fig)
   }
-  if (!grid.children.length) grid.append(el('p', { className: 'muted', textContent: 'No members yet.' }))
-  $('#loan-form-slot').replaceChildren(loanRequestForm())
+  if (!grid.children.length) grid.append(el('p', { className: 'muted', textContent: demo ? 'No members yet.' : 'Loading…' }))
 }
 
 function renderLoansTable(): void {
   const loans = (demo?.loans ?? []).slice().sort((a, b) => Number(b.loan_id) - Number(a.loan_id))
-  const td = (label: string, props: Partial<HTMLTableCellElement>, ...children: Array<Node | string>) => {
-    const cell = el('td', props, ...children)
-    cell.dataset.label = label
-    return cell
-  }
+  const now = Date.now()
   const reasonOf = (l: LoanView) => (chatRequests.get(l.circle_id) ?? []).find((c) => c.loan_id === l.loan_id)?.note ?? ''
-  $('#circle-loans').replaceChildren(...(loans.length ? loans.map((l) => el('tr', {},
-    td('Loan', { textContent: `#${l.loan_id}` }),
-    td('Borrower', {}, l.borrower_id === accountId ? who(l.borrower_id, 'You') : el('span', { className: 'who' }, avatar(l.borrower_id, 'sm'), accountChip(l.borrower_id))),
-    td('Lender', {}, l.lender_is_treasury ? who(l.lender_id, 'Treasury (DAO)') : l.lender_id === accountId ? who(l.lender_id, 'You') : el('span', { className: 'who' }, avatar(l.lender_id, 'sm'), accountChip(l.lender_id))),
-    td('Amount', { textContent: `${formatUsdc(l.principal)} USDC` }),
-    td('Reason', { className: 'reason', textContent: reasonOf(l) || '—', title: reasonOf(l) }),
-    td('Status', {}, el('span', { className: `state state-${l.state}`, textContent: l.state === 'Repaid' && l.repaid_on_time === false ? (l.flag_cleared ? 'Repaid (late, forgiven)' : 'Repaid late') : l.state })),
-  )) : [el('tr', {}, el('td', { colSpan: 6, className: 'muted', textContent: demo ? 'No loans in this circle yet.' : 'Loading…' }))]))
+  const party = (account: string, treasury = false) => treasury ? who(account, 'Treasury (DAO)') : account === accountId ? who(account, 'You') : el('span', { className: 'who' }, avatar(account, 'sm'), accountChip(account))
+  const status = (l: LoanView) => l.state === 'Repaid' && l.repaid_on_time === false ? (l.flag_cleared ? 'Repaid late (forgiven)' : 'Repaid late')
+    : l.state === 'Open' && !isWaiting(l, now) ? 'Expired' : l.state === 'Funded' && l.overdue ? 'Overdue' : l.state
+  $('#loans-count').textContent = demo ? `${loans.length} loan${loans.length === 1 ? '' : 's'} · loan numbers are shared by every circle, so they skip` : ''
+  $('#circle-loans').replaceChildren(...(loans.length ? [
+    el('div', { className: 'loan-row head' }, el('span', { textContent: 'Loan' }), el('span', { textContent: 'Borrower' }), el('span', { textContent: 'Lender' }), el('span', { textContent: 'Amount' }), el('span', { className: 'reason', textContent: 'Reason' }), el('span', { textContent: 'Status' })),
+    ...loans.map((l) => {
+      const s = status(l)
+      const reason = reasonOf(l)
+      return el('div', { className: 'loan-row' },
+        el('span', { className: 'c-id num', textContent: `#${l.loan_id}` }),
+        el('span', { className: 'c-b' }, party(l.borrower_id)),
+        el('span', { className: 'c-l' }, party(l.lender_id, l.lender_is_treasury)),
+        el('span', { className: 'c-amt num', textContent: `${formatUsdc(l.principal)} USDC · ${loanLengthText(l.duration_days, demo?.circle?.params.day_length_sec ?? '86400')}` }),
+        el('span', { className: 'reason', textContent: reason || '—', title: reason }),
+        el('span', { className: 'c-who', textContent: `${l.borrower_id === accountId ? 'You' : memberLabel(l.borrower_id)} borrowed from ${l.lender_is_treasury ? 'the treasury' : l.lender_id === accountId ? 'you' : memberLabel(l.lender_id)}${reason ? ` · "${reason}"` : ''}` }),
+        el('span', { className: 'c-status' }, el('span', { className: `state state-${s.split(' ')[0]}`, textContent: s })))
+    })] : [el('p', { className: 'muted', textContent: demo ? 'No loans in this circle yet.' : loadError ? 'Unavailable: testnet could not be read.' : 'Loading…' })]))
 }
 
 function tickDue(): void {
-  const age = lastRefresh ? Math.round((Date.now() - lastRefresh) / 1000) : -1
-  $('#refresh-time').textContent = loadError ? 'testnet unavailable' : age < 0 ? 'loading…' : `updated ${new Date(lastRefresh).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}${age > 120 ? ' (stale: press refresh)' : ''}`
+  renderNet()
   for (const node of document.querySelectorAll<HTMLElement>('[data-until]')) {
     const left = countdown(node.dataset.until || null, Date.now())
     node.textContent = left ? `${node.dataset.prefix ?? ''}${left}` : (node.dataset.after ?? '')
@@ -1506,17 +1859,20 @@ function tickDue(): void {
 
 async function loadMyCard(): Promise<void> {
   const image = $<HTMLImageElement>('#my-card-image')
+  const empty = $('#hero-card-empty')
   if (!accountId || !me?.passport) {
     image.hidden = true
+    empty.hidden = false
     $('#load-my-card').hidden = true
-    $('#my-card-title').textContent = accountId ? 'No card in this circle yet. Join with an invite (step 2).' : 'Connect a wallet and join to see your card.'
+    empty.textContent = accountId ? 'No passport in this circle yet. Join with an invite to get one.' : 'Connect a wallet and join to see your passport here.'
+    $('#my-card-title').textContent = ''
     return
   }
   const passport = me.passport
   const [svg, token] = await Promise.all([readClient.cardSvg(passport.token_id), readClient.nftToken(passport.token_id)])
   const check = svg ? checkCardSvg(svg) : null
-  if (svg && check?.ok) { image.src = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' })); image.hidden = false }
-  else image.hidden = true
+  if (svg && check?.ok) { image.src = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' })); image.hidden = false; empty.hidden = true }
+  else { image.hidden = true; empty.hidden = false; empty.textContent = svg ? `Passport picture not shown: ${check && !check.ok ? check.reason : 'unsafe image'}.` : 'Passport picture unavailable right now.' }
   $('#load-my-card').hidden = false
   $('#my-card-title').textContent = `${token?.metadata?.title ?? passportTokenTitle(demo?.circle?.name ?? '')} · ${passport.display_tier} · on time ${passport.on_time_count}, late ${passport.late_count}`
 }
@@ -1623,7 +1979,18 @@ async function requestFromTreasury(): Promise<void> {
 
 async function loadDemo(): Promise<void> {
   const requested = $<HTMLInputElement>('#demo-circle-id').value.trim() || circleId
-  const snapshot = await loadReadOnlyDemo(requested)
+  let snapshot: ReadOnlyDemoSnapshot
+  try {
+    snapshot = await loadReadOnlyDemo(requested)
+  } catch (error) {
+    // Keep the last good snapshot on screen, labelled stale; never replace it with zeros.
+    const text = errorText(error)
+    if (!demo) loadError = text
+    netTrouble(text)
+    renderAll()
+    throw error
+  }
+  if (snapshot.circleId !== circleId) { epoch++; formCache.clear(); chatRequests.clear() }
   demo = snapshot
   circleId = snapshot.circleId
   if (!usdcId) usdcId = snapshot.config.usdc_id
@@ -1645,26 +2012,27 @@ async function loadDemo(): Promise<void> {
     snapshot.circle?.treasury_id ? usdc.view<string>('ft_balance_of', { account_id: snapshot.circle.treasury_id }).catch(() => null) : Promise.resolve(null),
   ])
   balances = { contract: contractBal, dao: daoBal }
-  lastRefresh = Date.now()
   loadError = ''
-  netOk()
+  const partial = [...(snapshot.partial ?? [])]
+  if (contractBal === null) partial.push('loan contract balance')
+  if (snapshot.circle?.treasury_id && daoBal === null) partial.push('treasury balance')
+  netOk(partial)
   const diffs = snapshot.circle ? demoDifferences(snapshot.circle.params) : []
   $('#demo-flag').hidden = !diffs.length
-  $('#demo-flag').textContent = diffs.length ? `Demo settings: ${diffs.join('; ')}.` : ''
+  $('#demo-flag').textContent = diffs.length ? `Demo settings, faster than standard: ${diffs.join('; ')}.` : ''
   const dao = $('#dao-status')
   if (snapshot.dao) {
-    dao.textContent = snapshot.dao.verified ? '✓ DAO verified by this app: pinned Sputnik code, no access keys, and its voting rules need both stewards.' : `⚠ ${snapshot.dao.message} Treasury buttons are hidden.`
-    dao.title = `${snapshot.dao.daoId} · code ${snapshot.dao.codeHash ?? 'unknown'} · keys ${snapshot.dao.accessKeyCount ?? 'unknown'} · voting: ${snapshot.dao.policyReason}`
-    dao.className = `dao-status ${snapshot.dao.verified ? 'trusted' : ''}`
+    dao.textContent = snapshot.dao.verified ? '✓ DAO verified by CommonCircle frontend trust checks' : `⚠ ${snapshot.dao.message} Treasury actions are hidden.`
+    dao.title = `${snapshot.dao.daoId} · code ${snapshot.dao.codeHash ?? 'unknown'} · keys ${snapshot.dao.accessKeyCount ?? 'unknown'} · voting: ${snapshot.dao.policyReason}. The circle contract itself does not check this.`
+    dao.className = `flag ${snapshot.dao.verified ? 'trusted' : 'flag-warn'}`
   } else {
-    dao.textContent = 'No DAO yet: the founder runs this circle.'
-    dao.className = 'dao-status neutral'
+    dao.textContent = 'No DAO yet: the founder runs this circle'
+    dao.className = 'flag'
   }
   if (!chatMessages.size) chatRoom = circleId
   renderAll()
   renderEvidence()
-  renderLoansTable()
-  await renderTreasury().catch((error) => { const text = errorText(error); if (isNetworkText(text)) netTrouble(); else show(`Treasury: ${text}`, 'bad') })
+  await renderTreasury().catch((error) => { const text = errorText(error); if (isNetworkText(text)) netTrouble(text); else show(`Treasury: ${text}`, 'bad') })
 }
 
 /* ---------- wiring ---------- */
@@ -1676,7 +2044,15 @@ function on(selector: string, action: () => Promise<void> | void, context: 'wall
 
 function wire(): void {
   for (const item of document.querySelectorAll<HTMLButtonElement>('.nav-item')) item.addEventListener('click', () => goView(item.dataset.view as View))
+  for (const tab of document.querySelectorAll<HTMLButtonElement>('.tab')) if (tab.dataset.tab !== 'more') tab.addEventListener('click', () => goView(tab.dataset.tab as View))
   $('#menu-btn').addEventListener('click', (event) => { event.stopPropagation(); if ($('#sidebar').classList.contains('open')) closeDrawer(); else openDrawer() })
+  $('#side-close').addEventListener('click', closeDrawer)
+  $('#room-back').addEventListener('click', () => $('#view-chat').classList.add('rooms-open'))
+  $('#see-activity').addEventListener('click', () => goView('activity'))
+  $('#members-invite-cta').addEventListener('click', () => goView('invites'))
+  $('#net-pill').addEventListener('click', () => goView('network'))
+  on('#check-server', checkServer)
+  on('#sign-out', async () => { try { sessionStorage.removeItem(TOKEN_KEY) } catch { /* ignore */ } chatAllowed = false; if (me) me.signedIn = false; renderAll(); renderSettings(); show('Signed out of the chat in this browser.', 'ok') })
   // Phone: a tap on the backdrop (or anywhere outside the drawer) closes it; so does Escape.
   $('#scrim').addEventListener('click', closeDrawer)
   document.addEventListener('click', (event) => {
@@ -1690,7 +2066,8 @@ function wire(): void {
   on('#switch-wallet', switchWallet, 'wallet')
   $('#wallet-account').addEventListener('click', () => { if (accountId) void navigator.clipboard?.writeText(accountId).then(() => show(`${accountId} (copied)`, 'ok'), () => show(accountId, 'info')) })
   on('#net-banner-retry', async () => { await refreshAll() })
-  onRpcHealth((h) => { if (h.ok && !$('#net-banner').hidden && demo) netOk() })
+  // One RPC answering again does not make the whole snapshot fresh: re-read everything.
+  onRpcHealth((h) => { if (h.ok && (net.phase === 'stale' || net.phase === 'offline')) void refreshAll().catch(() => undefined) })
   on('#connect-meteor', () => connectWallet('meteor-wallet'), 'wallet')
   on('#connect-wallet', () => connectWallet('my-near-wallet'), 'wallet')
   $('#status-close').addEventListener('click', hideToast)
@@ -1733,6 +2110,9 @@ function wire(): void {
   $<HTMLInputElement>('#new-circle-name').addEventListener('input', () => renderThemePreview('new-circle', $('#new-circle-preview'), $<HTMLInputElement>('#new-circle-name').value.trim() || 'New circle'))
   for (const id of ['#circle-id', '#invite-public-key', '#invite-secret']) $(id).addEventListener('input', () => renderJourney())
   window.setInterval(tickDue, 1000)
+  // Keep the snapshot fresh while the page is visible (one refresh at a time; failures back off by themselves).
+  window.setInterval(() => { if (document.visibilityState === 'visible' && !refreshing && (net.phase === 'connected' || net.phase === 'degraded')) void refreshAll().catch(() => undefined) }, 60_000)
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && isStale(net, Date.now())) void refreshAll().catch(() => undefined) })
 }
 
 // The invite link is kept in this browser until the join succeeds, so reopening the
@@ -1784,13 +2164,9 @@ function boot(): void {
   goView(start)
   renderAll()
   renderHeadAccount()
-  void loadDemo().catch((error) => {
-    const text = errorText(error)
-    if (isNetworkText(text)) { netTrouble(); return }
-    loadError = text
-    renderStats()
-    showError(error, 'chain', refreshAll)
-  })
+  renderNet()
+  // loadDemo() already records the failure (banner + bounded retry); nothing else to do here.
+  void loadDemo().catch(() => undefined)
   void restoreWallet().catch(() => { /* no saved wallet session */ })
 }
 
