@@ -6,6 +6,10 @@ Gate 1 contract freeze Wed 11 Nov 23:59 · Gate 2 Tier A proof **Thu 12 Nov
 23:59** · Gate 3 pilot/user-test proof and feature freeze **Fri 13 Nov 23:59** ·
 Ship Sat 14 Nov 17:59. This replaces amendment A11's Gate 2/3 times.
 
+## Refinement pass (13 Nov 2026 ~21:00 UTC, lane/contracts)
+
+Durable chat backend (PostgreSQL store, strict NEP-413 recipient, production config checks, Dockerfile + render.yaml), quality pipeline on web/server/tests, new dashboard (grouped navigation, phone tab bar, Invitations / My loans / Activity / NEAR network / Settings pages, central network state, Direct Loans states). No contract change. Tests 161 + 20 on PostgreSQL; CI green on 9b911f9. Not done: hosted chat server (needs the builder's Render account), two-wallet live run. Full report: docs/REFINEMENT_REPORT.md.
+
 ## Fixes pass (13 Nov 2026 ~15:30 UTC, lane/contracts)
 
 Frontend and server fixes for bugs 1-7 and the source red-team review; no contract change. Details, checks and what was **not** tested: docs/VERIFICATION.md, "Fixes pass". Tests 133/133, build OK, headless-Chrome matrix at 360/390/768/1280/1920 with no overflow. Not tested: connected wallet states, real iOS Safari and the Android in-app browser. Still needs the frozen contract: emblem dimension check, lender-unregister griefing, on-chain DAO policy check, steward invites.
