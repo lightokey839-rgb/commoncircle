@@ -98,7 +98,7 @@ export async function createNearWallet(input: {
         callbackUrl: params.callbackUrl,
       })
       if (!signed) throw new Error('The wallet did not return the NEP-413 signature yet. Complete the wallet approval and try again.')
-      return signed as SignedMessage
+      return signed
     },
     async signAndSendTransaction(transaction) {
       const wallet = await requireWallet()

@@ -135,7 +135,7 @@ describe('Sputnik treasury proposals', () => {
 
 describe('F-09 repayment notices', () => {
   const outcome = (repaymentFailed: number): FtTransferCallOutcome => ({
-    unusedAmount: null, events: [], refunded: [], funded: [], fundingFailed: [], repayment: [], repaid: [],
+    txHash: null, unusedAmount: null, events: [], refunded: [], funded: [], fundingFailed: [], repayment: [], repaid: [],
     repaymentFailed: Array.from({ length: repaymentFailed }, () => ({ standard: 'commoncircle', version: '1.0.0', event: 'loan_repayment_failed', data: [] })),
   })
   it('explains a bounced repayment', () => {

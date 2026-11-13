@@ -268,7 +268,7 @@ function toggleAccountMenu(trigger: HTMLElement): void {
       item('MyNearWallet', () => connectWallet('my-near-wallet'), 'wallet')]))
   menu.hidden = false
   trigger.setAttribute('aria-expanded', 'true')
-  ;(menu.querySelector('button') as HTMLButtonElement | null)?.focus()
+  menu.querySelector('button')?.focus()
 }
 
 function renderHeadAccount(): void {
@@ -1400,7 +1400,7 @@ function renderJourney(): void {
     connectButtons(), undefined,
     [button('Switch', switchWallet, 'ghost', 'wallet'), button('Disconnect', disconnectWallet, 'ghost')]))
   steps.push(step(2, stateOf(1), `Join ${circleName}`,
-    isMember ? `You are a ${passport!.display_tier} of ${circleName}.`
+    isMember ? `You are a ${passport.display_tier} of ${circleName}.`
       : passport ? `Your card is ${passport.status}. Ask the stewards for help.`
         : invite.inviteSecret ? 'You have an invite. Joining costs about 0.009 NEAR, which pays for storing your card.'
           : 'You need an invite link from the founder or a Trusted member. Paste it in "Have an invite link?" above.',
@@ -1436,7 +1436,7 @@ function renderJourney(): void {
   const leadingDone = steps.findIndex((li) => !li.classList.contains('done'))
   const folded = leadingDone === -1 ? steps.length : leadingDone
   if (folded >= 2 && current !== -1) {
-    const summaries = ['Wallet connected', isMember ? `joined as ${passport!.display_tier}` : 'joined', 'signed in', 'ready for USDC', 'loan received'].slice(0, folded)
+    const summaries = ['Wallet connected', isMember ? `joined as ${passport?.display_tier ?? 'Member'}` : 'joined', 'signed in', 'ready for USDC', 'loan received'].slice(0, folded)
     const group = el('li', { className: 'step done group' },
       el('span', { className: 'step-dot', textContent: '✓', ariaHidden: 'true' }),
       el('div', { className: 'step-text' }, el('p', { className: 'step-title', textContent: `Steps 1–${folded} done` }),

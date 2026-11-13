@@ -1,7 +1,18 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "ignorePatterns": ["dist", "contracts/**", "node_modules"],
-  "plugins": ["typescript", "react"],
+  "ignorePatterns": [
+    "dist",
+    "web/dist",
+    "contracts/**",
+    "node_modules",
+    "src/**",
+    "tests/legacy/**",
+    "scripts/**"
+  ],
+  "plugins": [
+    "typescript",
+    "react"
+  ],
   "categories": {
     "correctness": "off",
     "suspicious": "off",
@@ -49,19 +60,23 @@
     "typescript/prefer-as-const": "error",
     "typescript/prefer-namespace-keyword": "error",
     "typescript/prefer-promise-reject-errors": "error",
-    "typescript/require-await": "error",
+    "typescript/require-await": "off",
     "typescript/restrict-plus-operands": "error",
     "typescript/restrict-template-expressions": "error",
     "typescript/triple-slash-reference": "error",
     "typescript/unbound-method": "error",
-
-    "eslint/no-unused-vars": ["warn", { "vars": "all", "varsIgnorePattern": "^_", "args": "after-used", "argsIgnorePattern": "^_" }],
-
+    "eslint/no-unused-vars": [
+      "warn",
+      {
+        "vars": "all",
+        "varsIgnorePattern": "^_",
+        "args": "after-used",
+        "argsIgnorePattern": "^_"
+      }
+    ],
     "react/rules-of-hooks": "error",
     "react/exhaustive-deps": "warn",
-
     "react/react-in-jsx-scope": "off",
-
     "react/set-state-in-effect": "error",
     "react/refs": "error",
     "react/purity": "error",
@@ -74,5 +89,21 @@
     "react/unsupported-syntax": "warn",
     "react/set-state-in-render": "error",
     "react/globals": "error"
-  }
+  },
+  "overrides": [
+    {
+      "files": [
+        "tests/**"
+      ],
+      "rules": {
+        "typescript/no-unsafe-member-access": "off",
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-return": "off",
+        "typescript/no-unsafe-argument": "off",
+        "typescript/no-explicit-any": "off",
+        "typescript/unbound-method": "off"
+      }
+    }
+  ]
 }

@@ -3,9 +3,9 @@ import { privateKeyToAccount } from 'viem/accounts'
 import { type WalletClient } from 'viem'
 import { parseSiweMessage, validateSiweMessage } from 'viem/siwe'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { authenticateWallet,buildSignInMessage,verifiedWallet,restoreSession } from '../src/lib/auth'
+import { authenticateWallet,buildSignInMessage,verifiedWallet,restoreSession } from '../../src/lib/auth'
 const holder=vi.hoisted(()=>({client:null as unknown}))
-vi.mock('../src/lib/supabase',()=>({getSupabaseClient:()=>holder.client}))
+vi.mock('../../src/lib/supabase',()=>({getSupabaseClient:()=>holder.client}))
 // Deterministic PUBLIC TEST-ONLY keys. Never funded or used outside local mocks.
 const alice=privateKeyToAccount(('0x'+'11'.repeat(32)) as `0x${string}`)
 const bob=privateKeyToAccount(('0x'+'22'.repeat(32)) as `0x${string}`)

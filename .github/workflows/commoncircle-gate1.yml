@@ -143,6 +143,14 @@ jobs:
   javascript:
     name: npm tests, claims, and USDC verification
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -158,11 +166,33 @@ jobs:
         run: |
           set -o pipefail
           npm ci --ignore-scripts --no-audit --no-fund 2>&1 | tee artifacts/npm-ci.log
+      - name: Typecheck web, server and tests
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run typecheck 2>&1 | tee artifacts/typecheck.log
+      - name: Lint web, server and tests
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run lint 2>&1 | tee artifacts/lint.log
       - name: Run npm tests
         shell: bash
         run: |
           set -o pipefail
           npm test 2>&1 | tee artifacts/npm-test.log
+      - name: Chat server on PostgreSQL (store tests + real server restart)
+        shell: bash
+        env:
+          TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
+        run: |
+          set -o pipefail
+          npm run test:db 2>&1 | tee artifacts/test-db.log
+      - name: Build web app
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee artifacts/build.log
       - name: Run claims self-test
         shell: bash
         run: |

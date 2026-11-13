@@ -46,7 +46,7 @@ function inviteProof(accountId = 'bob.testnet') {
 function readerFor(invite: Awaited<ReturnType<typeof inviteProof>>['invite'] | null, allowed = false): RelayerReader {
   return {
     getInvite: vi.fn(async () => invite),
-    checkAccess: vi.fn(async () => ({ allowed, reason: allowed ? 'Active' : 'NoPassport', token_id: null, display_tier: null })),
+    checkAccess: vi.fn(async () => ({ allowed, reason: allowed ? 'Active' as const : 'NoPassport' as const, token_id: null, display_tier: null })),
   }
 }
 

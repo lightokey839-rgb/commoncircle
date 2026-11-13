@@ -1,6 +1,6 @@
 import {it,expect} from 'vitest'
-import {verifyLoanTerms,verifiedStatus} from '../src/lib/loan-verification'
-import {inviteCode} from '../src/lib/invites'
+import {verifyLoanTerms,verifiedStatus} from '../../src/lib/loan-verification'
+import {inviteCode} from '../../src/lib/invites'
 const borrower='0x'+'aa'.repeat(20),lender='0x'+'bb'.repeat(20)
 const request={borrower,selected_lender:lender,amount_usdc:'0.010001',duration_days:7}
 const loan={borrower:borrower as `0x${string}`,lender:lender as `0x${string}`,amount:10001n,duration:604800n,state:0,dueDate:0n}

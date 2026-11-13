@@ -22,7 +22,8 @@ export type SputnikProposal = {
   proposer: string
   description: string
   kind: ProposalKind
-  status: 'InProgress' | 'Approved' | 'Rejected' | 'Removed' | 'Expired' | 'Moved' | 'Failed' | string
+  /** 'InProgress' | 'Approved' | 'Rejected' | 'Removed' | 'Expired' | 'Moved' | 'Failed' (kept open: newer Sputnik versions may add states). */
+  status: string
   vote_counts: Record<string, [string, string, string]>
   votes: Record<string, string>
   submission_time: U64
@@ -171,7 +172,7 @@ export class SputnikDaoClient {
 
   /** Anyone may file transfer or call proposals (role "members-may-ask"); the bond is returned when it passes. */
   addProposal(proposal: { proposal: unknown }, bond: U128): Promise<unknown> {
-    return this.send('add_proposal', proposal as Record<string, unknown>, bond, ADD_PROPOSAL_GAS)
+    return this.send('add_proposal', proposal, bond, ADD_PROPOSAL_GAS)
   }
 
   /** Steward approval. Sputnik requires the proposal kind to be echoed back. */

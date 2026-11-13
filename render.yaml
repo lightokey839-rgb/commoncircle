@@ -1,0 +1,37 @@
+# Render blueprint for the CommonCircle chat server + PostgreSQL (testnet demo).
+# Render dashboard -> New -> Blueprint -> pick this repository and this file.
+# After the first deploy, set APP_ORIGINS / NEAR_AUTH_RECIPIENTS if your page lives elsewhere,
+# then set the GitHub repository variable COMMONCIRCLE_AUTH_URL to the service URL and
+# re-run "Deploy CommonCircle testnet demo" so the page knows where chat lives.
+databases:
+  - name: commoncircle-chat-db
+    plan: free
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: commoncircle-chat
+    runtime: docker
+    dockerfilePath: ./deploy/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: COMMONCIRCLE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: commoncircle-chat-db
+          property: connectionString
+      - key: AUTH_JWT_SECRET
+        generateValue: true
+      - key: APP_ORIGINS
+        value: https://lightokey839-rgb.github.io
+      - key: NEAR_AUTH_RECIPIENTS
+        value: lightokey839-rgb.github.io
+      - key: AUTH_TRUST_PROXY
+        value: "1"
+      - key: NEAR_RPC_URL
+        value: https://test.rpc.fastnear.com
+      - key: CIRCLE_CONTRACT_ID
+        value: commoncircle-light.testnet

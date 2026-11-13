@@ -104,7 +104,7 @@ export function evaluateDaoTrust(input: {
     policyReason: policyCheck?.reason ?? 'voting rules not checked',
     verified,
     message: verified
-      ? `Sputnik DAO · no keys · ${policyCheck!.reason}`
+      ? `Sputnik DAO · no keys · ${policyCheck.reason}`
       : !codeOk
         ? 'DAO trust check failed: treasury controls are disabled until the pinned code hash and empty key list both verify.'
         : `DAO trust check failed: ${policyCheck?.reason ?? 'its voting rules could not be checked'}.`,

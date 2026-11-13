@@ -1,0 +1,8 @@
+{
+  "name": "commoncircle-chat-server",
+  "private": true,
+  "description": "CommonCircle members-only chat and NEP-413 sign-in server (testnet). Installed on its own by deploy/Dockerfile.",
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "dependencies": { "pg": "8.23.1" }
+}
