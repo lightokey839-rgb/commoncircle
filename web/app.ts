@@ -1,7 +1,7 @@
 import { CircleClient, parseFtTransferCallOutcome, passportTokenTitle, type CircleParams, type LoanView, type PassportView } from './circle-client'
 import { friendlyError, isRepeat, TOAST_MS, type NextAction, type ToastKind } from './notify'
 import { badgeFor, memberLabel, type Tier } from './labels'
-import { borrowLimit, canCancel, countdown, formatDuration, isWaiting, loanLengthText, requestsForLender, trustedProgress, validateLoanInput } from './loan-rules'
+import { borrowLimit, canCancel, countdown, formatDuration, isWaiting, loanLengthText, openLimitMessage, requestsForLender, trustedProgress, validateLoanInput } from './loan-rules'
 import { explorerTxUrl, moneySummary, runMoney, type MoneyDeps, type MoneyKind } from './money'
 import { signInWithNep413 } from './nep413'
 import { buildInviteLink, generateInviteKeyPair, parseInviteLink, signInviteWithSecret } from './invite'
@@ -316,6 +316,15 @@ async function registerForUsdc(): Promise<void> {
 }
 
 /** create_loan in the current circle. `amount` is base units, already validated by the form. */
+/** Refuse before signing when the open-loan limit is reached (the contract would fail with E16). */
+async function assertCanBorrow(): Promise<void> {
+  if (!demo?.circle) return
+  const limit = borrowLimit(demo.circle.params, me?.passport ?? null, demo.config.hard_loan_cap)
+  const loans = (await readClient.loansByBorrower(accountId)).filter((l) => l.circle_id === circleId)
+  const message = openLimitMessage(loans, limit, Date.now())
+  if (message) throw new Error(message)
+}
+
 /** The new loan id from a create_loan outcome (loan_created event), else the newest matching open loan. */
 async function newLoanId(raw: unknown, lenderId: string, amount: string): Promise<string | null> {
   const event = parseFtTransferCallOutcome(raw).events.find((e) => e.event === 'loan_created')
@@ -328,6 +337,7 @@ async function newLoanId(raw: unknown, lenderId: string, amount: string): Promis
 async function requestLoan(lenderId: string, amount: string, durationDays: number, note = ''): Promise<void> {
   requireWallet()
   if (!lenderId) throw new Error('Choose who you are asking.')
+  await assertCanBorrow()
   const storage = await readClient.storageCosts()
   const raw = await client().createLoan({ circleId, lenderId, amount, durationDays, deposit: storage.create_loan })
   const chat = chatClient()
@@ -686,6 +696,7 @@ async function chooseLender(card: LoanRequestCard, lenderId: string): Promise<vo
   requireWallet()
   const chat = chatClient()
   if (!chat) throw new Error('Sign in first (Home, step 3).')
+  await assertCanBorrow()
   const storage = await readClient.storageCosts()
   const raw = await client().createLoan({ circleId: card.circle_id, lenderId, amount: card.amount, durationDays: card.days, deposit: storage.create_loan })
   const loanId = await newLoanId(raw, lenderId, card.amount)
@@ -1213,6 +1224,7 @@ async function requestFromTreasury(): Promise<void> {
   const limit = borrowLimit(demo.circle.params, me?.passport ?? null, demo.config.hard_loan_cap)
   const v = validateLoanInput($<HTMLInputElement>('#treasury-amount').value, $<HTMLInputElement>('#treasury-days').value || String(DEMO_TREASURY_LOAN_DAYS), limit, formatUsdc)
   if (!v.amount || !v.days) throw new Error(v.errors.amount ?? v.errors.days ?? 'Check the amount and days.')
+  await assertCanBorrow()
   const storage = await readClient.storageCosts()
   await client().createLoan({ circleId: demo.circle.circle_id, lenderId: demo.circle.treasury_id, amount: v.amount, durationDays: v.days, deposit: storage.create_loan })
   await afterTx('Request recorded. Now press "2. Send to stewards".')

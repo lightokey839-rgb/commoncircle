@@ -87,6 +87,22 @@ export function isWaiting(loan: LoanView, nowMs: number): boolean {
   return loan.state === 'Open' && nsToMs(loan.funding_deadline) > nowMs
 }
 
+/**
+ * Loans that count against the open-loan limit (interface section 4): every loan
+ * as borrower in this circle except Repaid, Cancelled, and Open past its window.
+ */
+export function openLoansCounted(loans: LoanView[], nowMs: number): LoanView[] {
+  return loans.filter((l) => l.state !== 'Repaid' && l.state !== 'Cancelled' && !(l.state === 'Open' && !isWaiting(l, nowMs)))
+}
+
+/** A plain refusal before signing, or null when another loan is allowed (avoids E16_OPEN_LOAN_LIMIT). */
+export function openLimitMessage(loans: LoanView[], limit: Pick<BorrowLimit, 'openAllowed' | 'tier'>, nowMs: number): string | null {
+  const open = openLoansCounted(loans, nowMs)
+  if (open.length < limit.openAllowed) return null
+  const list = open.map((l) => `#${l.loan_id}`).join(' and ')
+  return `As a ${limit.tier} you can have ${limit.openAllowed} open loan${limit.openAllowed > 1 ? 's' : ''} at a time, and ${list} ${open.length > 1 ? 'are' : 'is'} still open. Cancel a waiting request on the Loans page (or repay a loan) first.`
+}
+
 /** Requests that name this account as lender and can still be funded. */
 export function requestsForLender(loans: LoanView[], accountId: string, nowMs: number): LoanView[] {
   return loans.filter((l) => l.lender_id === accountId && isWaiting(l, nowMs))

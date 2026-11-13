@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { parseFtTransferCallOutcome, type CircleParams, type LoanView, type PassportView } from '../web/circle-client'
-import { borrowLimit, canCancel, countdown, formatDuration, loanLengthText, requestsForLender, trustedProgress, validateLoanInput } from '../web/loan-rules'
+import { borrowLimit, canCancel, countdown, formatDuration, loanLengthText, openLimitMessage, requestsForLender, trustedProgress, validateLoanInput } from '../web/loan-rules'
 import { explorerTxUrl, moneySummary, runMoney, type MoneyDeps } from '../web/money'
 import { formatUsdc } from '../web/treasury'
 
@@ -152,6 +152,14 @@ describe('loan rules come from the circle params (P0-3)', () => {
     expect(countdown(ns(NOW + 125_000), NOW)).toBe('2:05')
     expect(countdown(ns(NOW + 3_723_000), NOW)).toBe('1:02:03')
     expect(countdown(ns(NOW - 1), NOW)).toBeNull()
+  })
+
+  it('refuses before signing when the open-loan limit is reached (E16), counting lapsed requests as closed', () => {
+    const limit = { openAllowed: 2, tier: 'Trusted' as const }
+    expect(openLimitMessage([loan({ loan_id: '13' }), loan({ loan_id: '14' })], limit, NOW)).toMatch(/#13 and #14 are still open/)
+    expect(openLimitMessage([loan({ loan_id: '13' }), loan({ loan_id: '14', funding_deadline: ns(NOW - 1) })], limit, NOW)).toBeNull()
+    expect(openLimitMessage([loan({ state: 'Funded' })], { openAllowed: 1, tier: 'Member' }, NOW)).toMatch(/1 open loan at a time/)
+    expect(openLimitMessage([loan({ state: 'Repaid' }), loan({ state: 'Cancelled' })], { openAllowed: 1, tier: 'Member' }, NOW)).toBeNull()
   })
 
   it('lists only live requests that name the lender', () => {

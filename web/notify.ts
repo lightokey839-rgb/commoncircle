@@ -18,6 +18,7 @@ const POPUP = /popup|pop-up|window\.open|Couldn't open/i
 const CANCELLED = /user (closed|rejected|cancell?ed|denied)|rejected by user|closed the (window|modal)|cancell?ed by (the )?user|User aborted/i
 const NO_BALANCE = /NotEnoughBalance|LackBalanceForState|not enough balance|insufficient (funds|balance)/i
 const OFFLINE = /Failed to fetch|NetworkError|ECONNREFUSED|Load failed|ERR_CONNECTION/i
+const CHAIN_REFUSED = /publishing_transaction_failed|final_execution_outcome|Transaction .* failed|ExecutionError/i
 const RPC_DOWN = /NEAR RPC view failed|Server error|Too Many Requests|\b429\b|\b50[234]\b|timed? ?out|TIMEOUT/i
 
 /**
@@ -37,6 +38,7 @@ export function friendlyError(error: unknown, context: 'wallet' | 'chat' | 'chai
       ? { text: 'Chat is offline: the chat server did not answer. Everything else still works.', next: 'retry' }
       : { text: 'Could not reach NEAR testnet. Check your connection, then try again.', next: 'retry' }
   }
+  if (CHAIN_REFUSED.test(raw)) return { text: 'The blockchain refused that transaction, so nothing moved. Press refresh (top right) to see the latest state, then try again.', next: null }
   if (RPC_DOWN.test(raw)) return { text: 'NEAR testnet is busy and did not answer. Try again in a moment.', next: 'retry' }
   return { text: firstSentence(raw), next: null }
 }
