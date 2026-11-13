@@ -618,3 +618,6 @@ button.room:hover { background: var(--surface); }
 :root[data-theme="dark"] .hero .flag-warn, .hero .flag-warn { color: #ffd99a; }
 :root[data-theme="dark"] .tile.warn, :root[data-theme="dark"] .net-banner { border-color: #5a4320; }
 :root[data-theme="dark"] .dialog { background: var(--surface); color: var(--text); }
+
+/* non-members never see a circle's members, loans or activity */
+body.gated .member-only { display: none !important; }

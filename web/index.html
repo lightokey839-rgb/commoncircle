@@ -133,7 +133,7 @@
 
             <div id="quick-actions" class="quick" aria-label="Quick actions"></div>
 
-            <section aria-label="Circle numbers from testnet">
+            <section class="member-only" aria-label="Circle numbers from testnet">
               <div class="section-head"><h2>Financial overview</h2><p class="muted small" id="stats-note">From the contract's views on NEAR testnet.</p></div>
               <div id="stats-grid" class="stats"></div>
             </section>
@@ -153,7 +153,7 @@
                   <p class="hint">The secret stays in this browser. It is never sent to a server.</p>
                 </details>
               </div>
-              <div class="stack">
+              <div class="stack member-only">
                 <div id="custody" class="card custody"></div>
                 <div id="trust-summary" class="card"></div>
                 <div id="dao-summary" class="card"></div>
@@ -166,12 +166,12 @@
               <ul id="for-you-list" class="rows"></ul>
             </div>
 
-            <div id="open-requests" class="card" hidden>
+            <div id="open-requests" class="card member-only" hidden>
               <div class="section-head row"><h2>Open requests in this circle</h2><button id="open-chat-requests" class="btn btn-ghost btn-sm" type="button">Open the chat</button></div>
               <ul id="open-requests-list" class="rows"></ul>
             </div>
 
-            <div class="card">
+            <div class="card member-only">
               <div class="section-head row"><h2>Recent activity</h2><button id="see-activity" class="btn btn-ghost btn-sm" type="button">All activity</button></div>
               <p class="muted small">Built from timestamps in the contract's loan and passport views. Not a full blockchain indexer.</p>
               <ol id="activity" class="feed"></ol>
@@ -186,6 +186,16 @@
                 <li><strong>Membership, not identity.</strong> Members join by invite link. Nobody's identity or family relationship is verified.</li>
                 <li><strong>Chat is private to members, not encrypted.</strong> Messages are off-chain on the chat server and access-controlled.</li>
               </ul>
+            </div>
+          </section>
+
+          <!-- MEMBERS-ONLY GATE -->
+          <section class="view" id="view-locked" data-title="Members only" hidden>
+            <div class="card form-state">
+              <p class="eyebrow">Members only</p>
+              <h1 id="locked-title">This part is for circle members</h1>
+              <p class="muted" id="locked-text"></p>
+              <div class="btn-row" id="locked-actions"></div>
             </div>
           </section>
 

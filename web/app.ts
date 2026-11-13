@@ -41,7 +41,19 @@ const config = {
 const readClient = new CircleClient(config.rpcUrl, config.contractId)
 const client = () => new CircleClient(config.rpcUrl, config.contractId, window.commonCircleWallet)
 const TOKEN_KEY = 'commoncircle.session'
-const VIEWS = ['home', 'chat', 'members', 'invites', 'loans', 'direct', 'myloans', 'passport', 'treasury', 'activity', 'evidence', 'network', 'tools', 'settings'] as const
+const VIEWS = ['locked', 'home', 'chat', 'members', 'invites', 'loans', 'direct', 'myloans', 'passport', 'treasury', 'activity', 'evidence', 'network', 'tools', 'settings'] as const
+/** Pages that show a circle's members, loans, chat or money: members only (or the public demo on request). */
+const GATED = new Set<string>(['chat', 'members', 'loans', 'direct', 'myloans', 'passport', 'treasury', 'activity'])
+/** Set only when someone presses "View the public demo circle" (for judges); never for other circles. */
+let demoOpen = false
+const DEMO_CIRCLE = '3'
+
+/** May this browser show the open circle's activity? Members of it, or the public demo when asked for. */
+function canView(): boolean {
+  if (me?.passport?.status === 'Active') return true
+  return demoOpen && circleId === DEMO_CIRCLE
+}
+
 /** Phone tab bar: which tab lights up for each page ("more" covers the rest). */
 const TAB_OF: Partial<Record<string, string>> = { home: 'home', chat: 'chat', loans: 'loans', direct: 'loans', myloans: 'loans', passport: 'passport' }
 type View = (typeof VIEWS)[number]
@@ -234,9 +246,29 @@ async function afterTx(message: string): Promise<void> {
 
 /* ---------- views ---------- */
 
+/** Show the current page, or the members-only notice in its place. */
+function showView(): void {
+  const locked = GATED.has(view) && !canView()
+  for (const v of VIEWS) $(`#view-${v}`).hidden = v !== (locked ? 'locked' : view)
+  document.body.classList.toggle('gated', !canView())
+  if (!locked) return
+  const name = $(`#view-${view}`).dataset.title ?? 'This page'
+  const pending = inviteFields()
+  $('#locked-title').textContent = `${name}: for circle members`
+  $('#locked-text').textContent = !accountId
+    ? 'Connect your wallet. If you belong to a circle, it opens here. Circles are private to their members in this app.'
+    : pending.inviteSecret ? 'You have an invite. Join the circle on Overview, then this page opens.'
+      : `${memberLabel(accountId)} is not a member of this circle. Ask a member for an invite link, or start your own circle.`
+  $('#locked-actions').replaceChildren(
+    ...(accountId ? [] : connectButtons()),
+    button(pending.inviteSecret ? 'Go to Join' : 'Paste an invite link', async () => goView('home')),
+    button('Start my own circle', async () => { goView('tools'); const d = document.querySelector<HTMLDetailsElement>('#view-tools details'); if (d) d.open = true }, 'ghost'),
+    ...(circleId === DEMO_CIRCLE ? [button('View the public demo circle', async () => { demoOpen = true; renderAll() }, 'ghost')] : []))
+}
+
 function goView(next: View): void {
   view = next
-  for (const v of VIEWS) $(`#view-${v}`).hidden = v !== next
+  showView()
   for (const item of document.querySelectorAll<HTMLButtonElement>('.nav-item')) {
     item.classList.toggle('active', item.dataset.view === next)
     if (item.dataset.view === next) item.setAttribute('aria-current', 'page')
@@ -1093,6 +1125,24 @@ function invitePanel(where: 'home' | 'members'): HTMLElement[] {
   return nodes
 }
 
+/** Non-members: no circle details on Overview, only what they need to join. */
+function renderGateHero(): void {
+  if (!demo?.circle) return
+  const pending = inviteFields()
+  const invitedHere = !!pending.inviteSecret && pending.circleId === circleId
+  const open = canView()
+  $('#circle-name').textContent = open || invitedHere ? demo.circle.name : (accountId ? 'Join or start a circle' : 'Welcome to CommonCircle')
+  $('#crumb-circle').textContent = open || invitedHere ? demo.circle.name : 'No circle open'
+  if (!open) { $('#demo-flag').hidden = true; $('#dao-status').hidden = true } else $('#dao-status').hidden = false
+  $('#visitor-note').hidden = open && !(demoOpen && !me?.passport)
+  $('#visitor-note').textContent = invitedHere ? `You were invited to ${demo.circle.name}. Join below to see its members, chat and loans.`
+    : demoOpen && circleId === DEMO_CIRCLE ? 'You are viewing the public demo circle. This is public testnet data, not yours.'
+      : 'Circles are private to their members in this app. Paste an invite link to join one, or start your own in Advanced tools.'
+  if (!open && !invitedHere && circleId === DEMO_CIRCLE) {
+    $('#visitor-note').append(' ', el('button', { className: 'btn btn-ghost btn-sm', type: 'button', textContent: 'View the public demo circle', onclick: () => { demoOpen = true; renderAll() } }))
+  }
+}
+
 /** Invitations page. Only shows the form when the contract would let this account invite. */
 let invitePanelKey = ''
 function renderInvitePanels(): void {
@@ -1551,6 +1601,8 @@ function renderAll(): void {
   renderLoansTable()
   renderSidebar()
   renderRooms()
+  showView()
+  renderGateHero()
   if (view === 'direct') mountForm($('#loan-form-slot'), 'direct')
   if (view === 'network') renderNetwork()
   if (view === 'settings') renderSettings()
@@ -1823,8 +1875,30 @@ function renderJourney(): void {
     $('#join-text').textContent = invite.inviteSecret
       ? (accountId ? 'Invite found. Press "Join the circle" in your steps below.' : 'Invite found. Connect your wallet (top right), then join.')
       : `${accountId ? `${memberLabel(accountId)} is not a member of ${circleName} yet. ` : ''}Paste the invite link you were sent to join. Opening the link in this browser works too.`
-    if (invite.inviteSecret) $('#join-slot').replaceChildren()
-    else if (!$('#join-slot').firstChild) $('#join-slot').replaceChildren(pasteInviteBox())
+    if (invite.inviteSecret) {
+      const key = `${invite.invitePublicKey}|${accountId}|${circleName}`
+      if ($('#join-slot').dataset.key !== key) {
+        $('#join-slot').dataset.key = key
+        const status = el('p', { className: 'hint', textContent: 'Checking the invite on testnet…' })
+        const actions = accountId ? [button(`Join ${circleName}`, joinInvite)] : connectButtons()
+        const other = button('Use a different link', async () => {
+          forgetInvite()
+          for (const id of ['#circle-id', '#invite-public-key', '#invite-secret']) $<HTMLInputElement>(id).value = ''
+          $('#join-slot').dataset.key = ''
+          $('#join-slot').replaceChildren(pasteInviteBox())
+          renderJourney()
+        }, 'ghost')
+        $('#join-slot').replaceChildren(el('div', { className: 'btn-row' }, ...actions, other), status)
+        void readClient.getInvite(invite.invitePublicKey).then((iv) => {
+          const wrongWallet = !!iv?.invitee_id && !!accountId && iv.invitee_id !== accountId
+          status.textContent = !iv ? 'This invite was already used or does not exist. Ask for a new link.'
+            : iv.expired ? 'This invite has expired. Ask for a new link.'
+              : wrongWallet ? `This invite is only for ${iv.invitee_id}. Connect that wallet to join.`
+                : `Valid invite from ${memberLabel(iv.inviter_id)}. Joining costs about 0.01 NEAR (it pays for storing your passport), so the wallet needs some testnet NEAR.`
+          status.classList.toggle('bad', !iv || iv.expired || wrongWallet)
+        }).catch(() => { status.textContent = 'Could not check the invite right now. You can still try to join.' })
+      }
+    } else if (!$('#join-slot').firstChild || $('#join-slot').dataset.key) { $('#join-slot').dataset.key = ''; $('#join-slot').replaceChildren(pasteInviteBox()) }
   }
   $('#invite-details').hidden = isMember
   $('#home-hero').classList.toggle('compact', isMember)
@@ -1960,6 +2034,7 @@ async function loadPositions(): Promise<void> {
 async function renderTreasury(): Promise<void> {
   const panel = $('#treasury-actions')
   const none = $('#treasury-none')
+  $('#nav-treasury-badge').hidden = true
   if (!demo?.circle?.treasury_id || !demo.dao?.verified) { panel.hidden = true; none.hidden = false; return }
   panel.hidden = false
   none.hidden = true
@@ -1991,7 +2066,8 @@ async function renderTreasury(): Promise<void> {
         await afterTx('Sent to the stewards. The money arrives when both have approved.')
       }))))
   }
-  const voting = proposals.filter((p) => p.status === 'InProgress').length
+  // Badge = votes waiting for THIS steward, not every open proposal.
+  const voting = isSteward && canView() ? proposals.filter((p) => p.status === 'InProgress' && !(accountId in (p.votes ?? {}))).length : 0
   $('#nav-treasury-badge').hidden = !voting
   $('#nav-treasury-badge').textContent = String(voting)
   $('#treasury-proposals').replaceChildren(...(proposals.length ? proposals.map((p: SputnikProposal) => {
