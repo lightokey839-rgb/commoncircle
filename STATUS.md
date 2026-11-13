@@ -9,7 +9,7 @@ Ship Sat 14 Nov 17:59. This replaces amendment A11's Gate 2/3 times.
 ## Public (13 Nov 2026 ~11:20 UTC)
 
 - The builder made the repository public. GitHub Pages is on (source: Actions); deploy run `43416163294` built `9173f08` and GitHub reports the `github-pages` deployment as success at https://lightokey839-rgb.github.io/commoncircle/. The first run failed at `npm ci` on Node 22; the workflow now uses `.nvmrc` (Node 24) like the main CI.
-- Not checked by the lead: the live page in a browser (this PC cannot connect to GitHub Pages' IPs; github.com works). Builder: open the link and check Overview, My Passport and Evidence & Tracks load.
+- Live page checked from outside: workflow `check-pages.yml` (run `43418186159`) fetched the page (HTTP 200, title CommonCircle) and both assets (HTTP 200) from a GitHub runner. The builder's Wi-Fi and mobile network both block `*.github.io` (ERR_CONNECTION_TIMED_OUT); it opens through a VPN.
 - Chat and chat loan requests are not hosted (sign-in server is local only); the hosted page says so.
 
 ## Finishing pass (13 Nov 2026 ~01:20 UTC, branch `lane/web-polish`, not pushed)
