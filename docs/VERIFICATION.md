@@ -460,3 +460,5 @@ Rows `f0-web-peer-request`, `f0-web-peer-fund`, `f0-web-peer-repay`, `f0-web-pee
 | Evidence & Tracks renders `web/evidence-status.json`, written only by `npm run claims`; a track passes only if all its claims pass | PASS | `tests/overview.test.ts` (incl. every claim id in `evidence/evidence.json` present); browser pane: 7/7, 12/12, 13/13 at the time (36 rows after the peer rows) |
 | Repaying a lender who left USDC: optional registration (0.00125 NEAR, shown before signing), then the repayment | PASS (unit) / UNVERIFIED (live) | `tests/money.test.ts`; live needs a lender that unregisters, not done |
 | 375 px: no element wider than the viewport on any of the nine pages | PASS | browser pane, mobile preset |
+
+CI run `43409857179` on `lane/web-polish` at `4e5bf5d` (2026-11-13 ~10:45 UTC): all four jobs succeeded, including online claims with 36 rows. The previous run `43406772708` failed only at online claims: FastNEAR's regular RPC no longer serves the 11 Nov transaction `9eRRis9r…` (NOT_OBSERVED / timeout); `contracts/scripts/near-tx.mjs` now falls back to `https://archival-rpc.testnet.fastnear.com` for transactions and blocks outside the regular window.

@@ -10,7 +10,8 @@ Ship Sat 14 Nov 17:59. This replaces amendment A11's Gate 2/3 times.
 
 - Two-wallet loan done **from the web app on both sides** (request card in chat, offer, pick lender, lender funds from its own browser, repay). Repaid 26 s late, so it counts as late. Evidence 36/36.
 - New pages: Overview dashboard (live stats, zero-custody balance, DAO balance, activity), My Passport, Evidence & Tracks (from `npm run claims` output), Direct loans; honest labels for the frontend DAO check, demo settings and shared steward operator; repay route for a lender who left USDC.
-- Not done / not verified: contract Rust suites (CI only, needs a push); `npm ci` (not re-run, 10–25 min here); the lender-registration route live; hosted chat; key deletion (needs approval, `docs/SHIP_CHECKLIST.md`).
+- **CI run `43409857179` (lane/web-polish @ 4e5bf5d): all four jobs green**: Rust build, unit and near-workspaces sandbox; reproducible circle wasm (Docker, cargo-near); npm tests, online claims (36 rows re-read from testnet, older transactions via FastNEAR's archival node) and USDC verification; full-history gitleaks.
+- Not done / not verified: `npm ci` (not re-run, 10–25 min here); the lender-registration route live; hosted chat; key deletion (needs approval, `docs/SHIP_CHECKLIST.md`).
 
 ## Web polish (branch `lane/web-polish`, started 2026-11-12 ~21:20 UTC)
 
