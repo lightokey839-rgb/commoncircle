@@ -5,7 +5,7 @@ const members = new Set(['amy.testnet', 'ben.testnet', 'cat.testnet'])
 const checkAccess = vi.fn(async (circleId: string, accountId: string) => ({ allowed: circleId === '3' && members.has(accountId) }))
 const chain = new Map<string, ChainLoan>()
 const getLoan = vi.fn(async (id: string) => chain.get(id) ?? null)
-const service = () => new RequestService({ checkAccess, getLoan, now: () => 1000 })
+const service = () => new RequestService({ checkAccess, getLoan, now: () => 1000, retryMs: 0 })
 const ask = { amount: '1000000', days: 7, note: 'School fees for my daughter' }
 
 describe('loan request cards in the circle chat', () => {

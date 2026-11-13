@@ -61,10 +61,14 @@ export class RequestService {
   private rooms = new Map<string, LoanRequest[]>()
   private nextId = 1
   private access = new Map<string, { allowed: boolean; until: number }>()
-  private readonly deps: { checkAccess: AccessCheck; getLoan: LoanLookup; now?: () => number; storePath?: string }
+  private readonly deps: { checkAccess: AccessCheck; getLoan: LoanLookup; now?: () => number; storePath?: string; retryMs?: number }
+  private readonly retries: number
+  private readonly retryMs: number
 
-  constructor(deps: { checkAccess: AccessCheck; getLoan: LoanLookup; now?: () => number; storePath?: string }) {
+  constructor(deps: { checkAccess: AccessCheck; getLoan: LoanLookup; now?: () => number; storePath?: string; retryMs?: number }) {
     this.deps = deps
+    this.retryMs = deps.retryMs ?? 1500
+    this.retries = this.retryMs ? 6 : 1
     if (deps.storePath) this.load(deps.storePath)
   }
 
@@ -183,9 +187,13 @@ export class RequestService {
   private async chainLoan(loanIdInput: unknown): Promise<ChainLoan> {
     const loanId = typeof loanIdInput === 'string' && /^\d{1,19}$/.test(loanIdInput) ? loanIdInput : null
     if (!loanId) throw new ChatError(400, 'REQ_LOAN', 'Unknown loan number.')
-    const loan = await this.deps.getLoan(loanId)
-    if (!loan) throw new ChatError(404, 'REQ_LOAN', 'That loan is not on-chain (yet). Try again in a few seconds.')
-    return loan
+    // A just-sent loan reaches "final" a couple of seconds after the wallet returns: retry briefly.
+    for (let attempt = 0; attempt < this.retries; attempt++) {
+      const loan = await this.deps.getLoan(loanId)
+      if (loan) return loan
+      await new Promise((resolve) => setTimeout(resolve, this.retryMs))
+    }
+    throw new ChatError(404, 'REQ_LOAN', 'That loan is not on-chain (yet). Try again in a few seconds.')
   }
 
   private assertUnlinked(circleId: string, loanId: string, exceptId: number): void {

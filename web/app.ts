@@ -696,11 +696,18 @@ async function chooseLender(card: LoanRequestCard, lenderId: string): Promise<vo
   requireWallet()
   const chat = chatClient()
   if (!chat) throw new Error('Sign in first (Home, step 3).')
-  await assertCanBorrow()
-  const storage = await readClient.storageCosts()
-  const raw = await client().createLoan({ circleId: card.circle_id, lenderId, amount: card.amount, durationDays: card.days, deposit: storage.create_loan })
-  const loanId = await newLoanId(raw, lenderId, card.amount)
-  if (!loanId) throw new Error('The loan was sent, but its number could not be read yet. Press refresh in a few seconds.')
+  // If an earlier try already created this loan on-chain (but the link failed), link that one instead of making another.
+  const linked = new Set((chatRequests.get(card.circle_id) ?? []).map((c) => c.loan_id).filter(Boolean))
+  const existing = (await readClient.loansByBorrower(accountId)).find((l) => l.circle_id === card.circle_id && l.lender_id === lenderId
+    && l.principal === card.amount && l.duration_days === card.days && isWaiting(l, Date.now()) && !linked.has(l.loan_id))
+  let loanId = existing?.loan_id ?? null
+  if (!loanId) {
+    await assertCanBorrow()
+    const storage = await readClient.storageCosts()
+    const raw = await client().createLoan({ circleId: card.circle_id, lenderId, amount: card.amount, durationDays: card.days, deposit: storage.create_loan })
+    loanId = await newLoanId(raw, lenderId, card.amount)
+  }
+  if (!loanId) throw new Error('The loan was sent, but its number could not be read yet. Press the button again in a few seconds; it will not create a second loan.')
   await chat.requestAction(card.circle_id, card.id, 'link', loanId)
   await loadRequests(chat, card.circle_id)
   await afterTx(`Loan #${loanId} created. ${memberLabel(lenderId)} can now fund it.`)
