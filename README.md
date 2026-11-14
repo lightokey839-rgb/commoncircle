@@ -355,6 +355,10 @@ is in [`NEW_FILES.md`](NEW_FILES.md).
 3. Build the vault and a live relayer, so a new member can join without buying NEAR.
 4. Pilot one real circle with the standard rules and people who are not the builder.
 
+## License
+
+[MIT](LICENSE). Third-party libraries keep their own licences.
+
 ## Risk and privacy
 
 Loans are unsecured; repayment cannot be forced. Chat is access-controlled, not

@@ -158,7 +158,10 @@ and sustainability".
 ## 3. Feature verification
 
 Checked on the **live** site (the build before today's fixes, from commit
-`0213b9a`) in the browser pane, and by read-only testnet views. Viewports:
+`0213b9a`) in the browser pane, and by read-only testnet views. After the fixes
+were deployed, the changed screens were checked again on the live site, and CI
+run `43570469530` passed all four jobs on `10d1f09`, including the online
+re-read of all 36 evidence rows. Viewports:
 1366×900, 390×844 and 320×640 (the pane rendered the last one as 328×656).
 "Needs a wallet" means the path was read in the code and is covered by unit
 tests, but nobody clicked it today.
@@ -250,6 +253,7 @@ it (README, this report, the video script). The contract was not touched.
 | 10 | Low | White text on green buttons was under the contrast guideline | Accent colour too light (light theme) and much too light (dark theme) | Slightly darker green in light; dark text on the green in dark | Contrast computed: about 5:1 and 6:1 |
 | 11 | Low | The public repo description said "private until Gate 4" and had no app link | Never updated | Description and homepage set on GitHub | — |
 | 12 | Info | README said chat "runs on the local sign-in server" and listed hosting as future work | Written before the Render deployment | README rewritten (section 6) | — |
+| 13 | Info | No LICENSE file (the hackathon guide asks for one), and the README linked a second entry whose repo was private | Never added; the thesis repo had not been published | MIT licence added and the thesis repo made public, both on the builder's instruction | — |
 
 ### Future work (would need a contract change, so not done)
 
@@ -282,7 +286,7 @@ hackathon publishes no rubric.
 
 **1. AI screener.**
 Best: one keyless command passes; every claim has a transaction, view or test; README reads as "do X, see Y".
-Worst: plain `npm ci` broke on Windows until today; the repo carries the old LoanBook app (`src/`, Foundry, Supabase) beside the new one; no LICENSE file.
+Worst: plain `npm ci` broke on Windows until today; the repo carries the old LoanBook app (`src/`, Foundry, Supabase) beside the new one; the LICENSE file was added only on the last day.
 Hard question: "Which files are the hackathon work, and can I build only those?"
 
 **2. NEAR protocol engineer.**
@@ -446,8 +450,8 @@ That happened on 13 Nov and is described in section 1.
 
 | # | What | Time | Why it earns points | Who |
 |---|---|---|---|---|
-| 1 | Add a LICENSE file | 5 min | The guide says "add a LICENSE file"; an AI screener checks for it | Builder decides the licence; the agent can add it |
-| 2 | Make the thesis repo public | 2 min | The README links it for rule Q-015; today the link is a 404 for judges | Builder |
+| 1 | ~~Add a LICENSE file~~ **Done 14 Nov:** MIT, chosen by the builder | — | The guide says "add a LICENSE file"; an AI screener checks for it | Done |
+| 2 | ~~Make the thesis repo public~~ **Done 14 Nov**, on the builder's instruction | — | The README links it for rule Q-015 | Done |
 | 3 | Record and post the V3 video | 1–2 h | The X post with a video is required, and it is most of what a human judge will see | Builder |
 | 4 | Submit on nearhackathon.com | 15 min | Without it nothing is judged. One attempt only | Builder |
 | 5 | One person who is not the builder joins and borrows 1 USDC | 1 h | Answers the skeptic's question with a transaction | Builder + a friend |
@@ -461,8 +465,8 @@ That happened on 13 Nov and is described in section 1.
 
 In this order. Each one needs your accounts, so the agent did not do it.
 
-1. **Decide on a licence** and say which (your thesis repo uses MIT). The agent adds the file.
-2. **Make `Near-thesis-` public** (GitHub → the repo → Settings → Danger Zone → Change visibility), or tell the agent to do it. It must be public by 23:59 UTC.
+1. ~~Decide on a licence.~~ Done: MIT, added on 14 Nov.
+2. ~~Make `Near-thesis-` public.~~ Done on 14 Nov. Both repos must stay public through judging.
 3. **Run the wallet steps** in section 3 with two browsers. It is the same run as the video.
 4. **Record the video** with `docs/VIDEO_SCRIPT_V3.md`, and have it edited and voiced.
 5. **Post on X** from your account: say it was built at NEAR HACKATHON, tag `@NEARProtocol`, include `#NEARHackathon`, attach the video, link the app and the repo. Copy the post's URL.
