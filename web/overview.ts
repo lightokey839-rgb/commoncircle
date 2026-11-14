@@ -49,15 +49,16 @@ export function demoDifferences(params: CircleParams): string[] {
 export type TreasuryEligibility = { eligible: boolean; reason: string }
 
 /** Interface section 4: DAO attached, at least 2 Active stewards, borrower effective Trusted and not a steward. */
-export function treasuryEligibility(passport: PassportView | null, lendingEnabled: boolean, daoVerified: boolean): TreasuryEligibility {
+export function treasuryEligibility(passport: PassportView | null, lendingEnabled: boolean, daoVerified: boolean, mine = true): TreasuryEligibility {
+  // `mine` = the passport belongs to the person reading. Another member's passport is described in the third person.
   if (!daoVerified) return { eligible: false, reason: 'The treasury account did not pass the app\'s DAO trust checks, so treasury requests are switched off.' }
   if (!lendingEnabled) return { eligible: false, reason: 'Treasury lending needs a DAO and at least 2 active stewards in this circle.' }
   if (!passport) return { eligible: false, reason: 'Join the circle first.' }
-  if (passport.status !== 'Active') return { eligible: false, reason: `Your passport is ${passport.status}.` }
+  if (passport.status !== 'Active') return { eligible: false, reason: `${mine ? 'Your' : 'This'} passport is ${passport.status}.` }
   if (passport.steward) return { eligible: false, reason: 'Stewards approve treasury loans, so they cannot borrow from the treasury.' }
-  if (passport.perks_paused) return { eligible: false, reason: 'An overdue loan pauses Trusted perks. Repay it (or ask the stewards to clear the flag).' }
+  if (passport.perks_paused) return { eligible: false, reason: mine ? 'An overdue loan pauses Trusted perks. Repay it (or ask the stewards to clear the flag).' : 'An overdue loan pauses this member\'s Trusted perks until it is repaid or the stewards clear the flag.' }
   if (passport.effective_tier !== 'Trusted') return { eligible: false, reason: 'Only Trusted members can borrow from the treasury.' }
-  return { eligible: true, reason: 'You are Trusted and not a steward: you can ask the treasury.' }
+  return { eligible: true, reason: mine ? 'You are Trusted and not a steward: you can ask the treasury.' : 'Trusted and not a steward: this member can ask the treasury.' }
 }
 
 /** What the passport unlocks right now, in plain words, from the circle params. */
@@ -94,6 +95,21 @@ export type ClaimStatus = { id: string; track: string; feature: string; kind: 't
 export type EvidenceStatus = { generated_at: string; source: string; claims: ClaimStatus[] }
 
 export type TrackSummary = { track: string; feature: string; pass: number; fail: number; total: number; status: 'PASS' | 'DROPPED' | 'UNVERIFIED'; claims: ClaimStatus[] }
+
+/** Pass count over all claims, straight from the claims harness output (never computed here). */
+export function evidenceTotals(status: EvidenceStatus | null): { pass: number; total: number } {
+  const claims = status?.claims ?? []
+  return { pass: claims.filter((c) => c.status === 'PASS').length, total: claims.length }
+}
+
+/**
+ * The judges' link "?demo=1" opens the public demo circle without a click. An invite link wins:
+ * someone who was invited to a circle is never switched to the demo instead.
+ */
+export function wantsPublicDemo(search: string, hasInvite: boolean): boolean {
+  if (hasInvite) return false
+  return new URLSearchParams(search).get('demo') === '1'
+}
 
 /** Group the claims harness output by track. A track passes only when every one of its claims passed. */
 export function trackSummaries(status: EvidenceStatus | null, order: string[]): TrackSummary[] {

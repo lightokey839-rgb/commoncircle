@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { CircleParams, LoanView, PassportView } from '../web/circle-client'
-import { circleStats, demoDifferences, privileges, recentActivity, trackSummaries, treasuryEligibility, type EvidenceStatus } from '../web/overview'
+import { circleStats, demoDifferences, evidenceTotals, privileges, recentActivity, trackSummaries, treasuryEligibility, wantsPublicDemo, type EvidenceStatus } from '../web/overview'
 import { formatUsdc } from '../web/treasury'
 
 const ns = (ms: number) => (BigInt(ms) * 1_000_000n).toString()
@@ -59,6 +59,16 @@ describe('treasury eligibility (interface section 4)', () => {
     expect(treasuryEligibility(passport({ effective_tier: 'Trusted' }), true, true).eligible).toBe(true)
   })
 
+  it('describes the passport of another member in the third person, never as "you"', () => {
+    const trusted = passport({ effective_tier: 'Trusted' })
+    expect(treasuryEligibility(trusted, true, true).reason).toBe('You are Trusted and not a steward: you can ask the treasury.')
+    const other = treasuryEligibility(trusted, true, true, false)
+    expect(other).toEqual({ eligible: true, reason: 'Trusted and not a steward: this member can ask the treasury.' })
+    for (const p of [passport({ status: 'Suspended' }), passport({ tier: 'Trusted', perks_paused: true }), trusted]) {
+      expect(treasuryEligibility(p, true, true, false).reason).not.toMatch(/\b[Yy]ou(r)?\b/)
+    }
+  })
+
   it('shows the Member → Trusted change in privileges', () => {
     expect(privileges(passport({}), demo, '50000000', formatUsdc)[0]).toBe('Borrow 1 to 10 USDC per loan, up to 1 open loan at a time.')
     expect(privileges(passport({ effective_tier: 'Trusted' }), demo, '50000000', formatUsdc)[0]).toBe('Borrow 1 to 50 USDC per loan, up to 2 open loans at a time.')
@@ -82,9 +92,25 @@ describe('evidence status comes from the claims harness output', () => {
     expect(trackSummaries(null, ['Social Money'])[0].status).toBe('UNVERIFIED')
   })
 
+  it('counts passes over all claims without inventing any', () => {
+    expect(evidenceTotals(status)).toEqual({ pass: 2, total: 3 })
+    expect(evidenceTotals(null)).toEqual({ pass: 0, total: 0 })
+  })
+
   it('the committed web/evidence-status.json lists every claim in evidence/evidence.json', () => {
     const web = JSON.parse(readFileSync('web/evidence-status.json', 'utf8')) as EvidenceStatus
     const src = JSON.parse(readFileSync('evidence/evidence.json', 'utf8')) as { claims: Array<{ id: string }> }
     expect(web.claims.map((c) => c.id).sort()).toEqual(src.claims.map((c) => c.id).sort())
+  })
+})
+
+describe('the link for judges, ?demo=1', () => {
+  it('opens the public demo only when asked, and never instead of an invite', () => {
+    expect(wantsPublicDemo('?demo=1', false)).toBe(true)
+    expect(wantsPublicDemo('?circle_id=3&demo=1', false)).toBe(true)
+    expect(wantsPublicDemo('', false)).toBe(false)
+    expect(wantsPublicDemo('?demo=0', false)).toBe(false)
+    expect(wantsPublicDemo('?circle_id=3', false)).toBe(false)
+    expect(wantsPublicDemo('?demo=1', true)).toBe(false)
   })
 })

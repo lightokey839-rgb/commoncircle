@@ -1,5 +1,5 @@
 import { txHashOf, type FtTransferCallOutcome, type LoanView, type U128 } from './circle-client'
-import { loanLengthText } from './loan-rules'
+import { countdown, loanLengthText } from './loan-rules'
 import { friendlyError } from './notify'
 import { formatUsdc, repaymentNotice } from './treasury'
 
@@ -20,8 +20,8 @@ export type MoneyDeps = {
   registerAccount?(accountId: string): Promise<unknown>
 }
 
-/** Options the dialog collects before signing. */
-export type MoneyOptions = { registerLender?: boolean }
+/** Options the dialog collects before signing. `nowMs` lets a repayment summary say how long is left. */
+export type MoneyOptions = { registerLender?: boolean; nowMs?: number }
 
 /** The USDC storage deposit for one account (NEP-145, registration_only), in NEAR, shown before signing. */
 export const USDC_REGISTRATION_NEAR = '0.00125'
@@ -46,11 +46,15 @@ export function moneySummary(kind: MoneyKind, loan: LoanView, label: (account: s
     }
   }
   if (kind === 'repay') {
+    // The contract decides on time or late when the repayment lands, not when this box opens: show the time left.
+    const left = !loan.overdue && options.nowMs !== undefined ? countdown(loan.due_at, options.nowMs) : null
     return {
       title: `Repay loan #${loan.loan_id}`,
       lines: [
         `You pay ${amount} back to ${loan.lender_is_treasury ? 'the circle treasury (DAO)' : label(loan.lender_id)}.`,
-        loan.overdue ? 'This loan is past its due time, so it will count as late.' : 'Paying before the due time counts as on time.',
+        loan.overdue ? 'This loan is past its due time, so it will count as late.'
+          : left ? `Paying before the due time counts as on time. About ${left} was left when this box opened; the repayment must land on testnet before then.`
+            : 'Paying before the due time counts as on time.',
         ...(options.registerLender ? [`${label(loan.lender_id)} is no longer set up to receive USDC, so a repayment would bounce back to you. First you pay ${USDC_REGISTRATION_NEAR} NEAR to set up their USDC account (a storage deposit), then the repayment. That is two wallet approvals.`] : []),
       ],
       confirm: options.registerLender ? `Set up their USDC (${USDC_REGISTRATION_NEAR} NEAR), then pay ${amount}` : `Pay ${amount}`,

@@ -3,7 +3,7 @@
   "account_id": "dogs-dao.commoncircle-light.testnet",
   "method": "get_policy",
   "args": {},
-  "block_height": 277497962,
+  "block_height": 277589322,
   "result": {
     "roles": [
       {
@@ -43,5 +43,5 @@
     "bounty_forgiveness_period": "86400000000000"
   },
   "rpc": "https://test.rpc.fastnear.com",
-  "read_at": "2026-11-13T10:29:52.814Z"
+  "read_at": "2026-11-14T01:25:03.610Z"
 }

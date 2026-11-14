@@ -63,8 +63,10 @@ const rows = [
     { ...ok, has_event: { nft_mint: true, invite_redeemed: true }, storage_verdict: "deposit covers storage growth" }),
   tx("f1-web-repay-tier", NFT, F1, "FVVgaWmNE8fYwLbUNJSDTr55bWDbTVgcN93fPH5pU7vw", WEB, { ...ok, has_event: { tier_changed: true } }),
   view("f1-web-passport", NFT, F1, C, "passport_for", { circle_id: "3", account_id: WEB },
-    // late_count is not asserted: loan 19 (two-wallet test, 13 Nov) was repaid 26 s late, so it is 1 since then.
-    { result: { tier: "Trusted", effective_tier: "Trusted", status: "Active", on_time_count: 1 } }),
+    // Only the lasting facts are asserted. This wallet is still in use (demo recordings), so its counters move:
+    // on_time_count was 1 when the row was written and became 2 with loan 21 (13 Nov), which turned the online
+    // check red. The tier never goes down, and the repayment that earned it is row f1-web-repay-tier (tier_changed).
+    { result: { tier: "Trusted", status: "Active" } }),
 
   // Two-wallet web test (2026-11-13): both sides in the web app. The borrower posted a request card in the
   // circle chat, the second wallet offered and funded from its own browser; repaid 26 s after the due time (late).

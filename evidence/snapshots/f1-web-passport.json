@@ -6,7 +6,7 @@
     "circle_id": "3",
     "account_id": "254edye5v.testnet"
   },
-  "block_height": 277497822,
+  "block_height": 277589165,
   "result": {
     "token_id": "3:254edye5v.testnet",
     "circle_id": "3",
@@ -18,9 +18,9 @@
     "expires_at": null,
     "joined_at": "1794516665460049575",
     "invited_by": "commoncircle-light-borrower3.testnet",
-    "on_time_count": 1,
+    "on_time_count": 2,
     "late_count": 1,
-    "qualifying_count": 1,
+    "qualifying_count": 2,
     "distinct_lenders": 1,
     "open_loans": 0,
     "overdue_loans": 0,
@@ -29,5 +29,5 @@
     "recovery": null
   },
   "rpc": "https://test.rpc.fastnear.com",
-  "read_at": "2026-11-13T10:28:28.188Z"
+  "read_at": "2026-11-14T01:23:28.223Z"
 }

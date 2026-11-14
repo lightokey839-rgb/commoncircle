@@ -101,6 +101,19 @@ export function proposalLoanId(proposal: SputnikProposal): { loanId: U64; action
   return null
 }
 
+/**
+ * Why an open vote can no longer take effect, in plain words; null while it still can, or when the
+ * loan is not known. The proposal itself stays "InProgress" on the DAO until it expires there.
+ */
+export function staleProposalNote(status: string, action: 'fund' | 'clear_flag' | null, loan: LoanView | null, nowMs: number): string | null {
+  if (status !== 'InProgress' || !action || !loan) return null
+  if (action === 'clear_flag') return loan.flag_cleared ? `the late mark on loan #${loan.loan_id} was already forgiven` : null
+  if (loan.state === 'Cancelled') return `loan #${loan.loan_id} was cancelled, so this vote can no longer pay it`
+  if (loan.state !== 'Open') return `loan #${loan.loan_id} is already ${loan.state.toLowerCase()}`
+  if (Number(BigInt(loan.funding_deadline) / 1_000_000n) <= nowMs) return `loan #${loan.loan_id} passed its funding deadline, so this vote can no longer pay it`
+  return null
+}
+
 /** Open treasury loans of this borrower that no live (InProgress or Approved) fund proposal covers yet. */
 export function loansNeedingProposal(loans: LoanView[], daoId: string, borrowerId: string, proposals: SputnikProposal[]): LoanView[] {
   const covered = new Set(

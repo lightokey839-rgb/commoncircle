@@ -1,7 +1,7 @@
 import { CircleClient, parseFtTransferCallOutcome, passportTokenTitle, type CircleParams, type LoanView, type PassportView } from './circle-client'
 import { friendlyError, isRepeat, TOAST_MS, type NextAction, type ToastKind } from './notify'
 import { badgeFor, memberLabel, type Tier } from './labels'
-import { circleStats, demoDifferences, privileges, recentActivity, STANDARD_RULES, trackSummaries, treasuryEligibility, type EvidenceStatus } from './overview'
+import { circleStats, demoDifferences, evidenceTotals, privileges, recentActivity, STANDARD_RULES, trackSummaries, treasuryEligibility, wantsPublicDemo, type EvidenceStatus } from './overview'
 import evidenceFile from './evidence-status.json'
 import { borrowLimit, canCancel, countdown, formatDuration, isWaiting, loanLengthText, openLimitMessage, requestsForLender, trustedProgress, validateLoanInput } from './loan-rules'
 import { explorerTxUrl, moneySummary, runMoney, type MoneyDeps, type MoneyKind, type MoneyOptions } from './money'
@@ -18,7 +18,7 @@ import { describeNet, initialNet, isStale, netFailed, netSucceeded, retryDelay, 
 import { avatarFor, ChatApiError, ChatClient, chatServerHealth, dayLabel, mergeMessages, timeLabel, type ChatMessage, type LoanRequestCard } from './chat'
 import {
   clearFlagProposal, DEMO_TREASURY_LOAN_DAYS, formatUsdc, loansNeedingProposal, proposalLoanId, repaymentNotice,
-  SputnikDaoClient, stewardsOf, treasuryFundProposal, type SputnikProposal,
+  SputnikDaoClient, staleProposalNote, stewardsOf, treasuryFundProposal, type SputnikProposal,
 } from './treasury'
 
 declare global {
@@ -593,7 +593,7 @@ async function money(kind: MoneyKind, cachedLoan: LoanView): Promise<void> {
   if (kind === 'cancel' && loan.state !== 'Open') { void refreshAll(); throw new Error(`Loan #${loan.loan_id} is ${loan.state} and cannot be cancelled.`) }
   const dialog = $<HTMLDialogElement>('#money-dialog')
   // Repaying a lender who left USDC would bounce: offer to pay their USDC registration first (F-09 route).
-  const options: MoneyOptions = {}
+  const options: MoneyOptions = { nowMs: Date.now() }
   if (kind === 'repay' && !loan.lender_is_treasury) options.registerLender = !(await moneyDeps().isRegistered(loan.lender_id).catch(() => true))
   const summary = moneySummary(kind, loan, memberLabel, demo?.circle?.params.day_length_sec ?? '86400', options)
   const state = $('#money-state')
@@ -1148,9 +1148,38 @@ function renderGateHero(): void {
   $('#visitor-note').textContent = invitedHere ? `You were invited to ${demo.circle.name}. Join below to see its members, chat and loans.`
     : demoOpen && circleId === DEMO_CIRCLE ? 'You are viewing the public demo circle. This is public testnet data, not yours.'
       : 'Circles are private to their members in this app. Paste an invite link to join one, or start your own in Advanced tools.'
-  if (!open && !invitedHere && circleId === DEMO_CIRCLE) {
-    $('#visitor-note').append(' ', el('button', { className: 'btn btn-ghost btn-sm', type: 'button', textContent: 'View the public demo circle', onclick: () => { demoOpen = true; renderAll() } }))
-  }
+  // The public demo is offered once, in the proof strip right below (renderProof), not here as well.
+}
+
+/**
+ * First view for someone with no circle open (a judge, a newcomer): what can be checked right now
+ * without a wallet. Only public facts: the loan contract's live USDC balance and the claims output.
+ * No circle's members, loans or chat are shown here.
+ */
+function renderProof(): void {
+  const box = $('#proof-strip')
+  // Someone who opened an invite link came to join a circle: keep their screen about that.
+  box.hidden = canView() || !!inviteFields().inviteSecret
+  if (box.hidden) return
+  const value = balances.contract
+  const totals = evidenceTotals(evidenceFile as unknown as EvidenceStatus)
+  const fact = (big: string, label: string, note: string, action: HTMLElement, cls = '') => el('div', { className: `proof-item ${cls}` },
+    el('p', { className: 'proof-value', textContent: big }), el('p', { className: 'proof-label', textContent: label }), el('p', { className: 'muted small', textContent: note }), action)
+  const go = (label: string, to: View) => el('button', { className: 'btn btn-ghost btn-sm', type: 'button', textContent: label, onclick: () => goView(to) })
+  box.replaceChildren(
+    el('div', { className: 'section-head' }, el('h2', { textContent: 'See it working in one minute, no wallet needed' }),
+      el('p', { className: 'muted small', textContent: 'Everything here is read from NEAR testnet or from the repository\'s evidence checks. Testnet only: no real money.' })),
+    el('div', { className: 'proof-grid' },
+      // null = not read: say so, never show a made-up zero.
+      fact(!demo && !loadError ? '…' : value === null ? 'Unavailable' : `${formatUsdc(value)} USDC`, 'held by the loan contract right now',
+        value === null ? 'The balance could not be read just now. This is not a zero.' : 'Zero custody: a loan goes from lender to borrower in one transaction, and a failed one refunds the lender.',
+        go('How it is checked', 'network'), value === '0' ? 'ok' : ''),
+      fact(`${totals.pass} of ${totals.total}`, 'evidence claims pass',
+        'Each claim links to a testnet transaction, a contract view or an automated test, grouped by hackathon track.',
+        go('Evidence & tracks', 'evidence'), totals.total > 0 && totals.pass === totals.total ? 'ok' : ''),
+      fact('Demo circle', 'real testnet members, loans and passports',
+        'The Dogs (DEMO): passports that turned Trusted by repaying, and a Sputnik DAO treasury. Public data, opened only when you ask.',
+        el('button', { className: 'btn btn-accent btn-sm', type: 'button', textContent: 'Open the public demo circle', onclick: () => { demoOpen = true; if (circleId !== DEMO_CIRCLE) { $<HTMLInputElement>('#demo-circle-id').value = DEMO_CIRCLE; void refreshAll().catch(() => undefined) } renderAll() } }))))
 }
 
 /** Invitations page. Only shows the form when the contract would let this account invite. */
@@ -1354,7 +1383,7 @@ function renderPassport(): void {
   const params = demo.circle.params
   const prog = trustedProgress(p, params)
   const limit = borrowLimit(params, p, demo.config.hard_loan_cap)
-  const elig = treasuryEligibility(p, demo.circle.treasury_lending_enabled, !!demo.dao?.verified)
+  const elig = treasuryEligibility(p, demo.circle.treasury_lending_enabled, !!demo.dao?.verified, isMine)
   const founderAdmin = demo.circle.founder_id === p.owner_id && demo.circle.admin_id === p.owner_id
   const canInvite = p.status === 'Active' && (founderAdmin || p.effective_tier === 'Trusted')
   const art = el('figure', { className: 'pp-card' })
@@ -1364,7 +1393,7 @@ function renderPassport(): void {
     el('a', { href: `${config.explorerUrl}/address/${p.owner_id}`, target: '_blank', rel: 'noopener', textContent: 'owner on NearBlocks' })))
   const who = el('div', { className: 'pp-who' }, avatar(p.owner_id), el('div', { className: 'grow' },
     el('p', { className: 'small muted', textContent: isMine ? 'Your account' : 'Viewing another member (read-only)' }),
-    el('p', { className: 'acct-full', textContent: p.owner_id })), badge(p.display_tier), p.steward ? badge('Steward') : '')
+    el('p', { className: 'acct-full', textContent: p.owner_id })), badge(p.display_tier), p.steward && p.display_tier !== 'Steward' ? badge('Steward') : '')
   const statsList = el('dl', { className: 'pp-stats' },
     ...[['Circle', demo.circle.name], ['Passport token', p.token_id], ['Tier', p.tier], ['Effective tier', p.effective_tier], ['Status', p.status],
       ['On-time repayments', String(p.on_time_count)], ['Late repayments', String(p.late_count)], ['Counted toward Trusted', `${p.qualifying_count} of ${params.trusted_threshold}`],
@@ -1613,6 +1642,7 @@ function renderAll(): void {
   renderRooms()
   showView()
   renderGateHero()
+  renderProof()
   if (view === 'direct') mountForm($('#loan-form-slot'), 'direct')
   if (view === 'network') renderNetwork()
   if (view === 'settings') renderSettings()
@@ -1637,7 +1667,7 @@ function renderSidebar(): void {
   $('#side-circles-note').textContent = !accountId ? 'Connect a wallet to see the circles you belong to.'
     : !me ? 'Reading your circles from testnet…'
       : !mine.length ? `${memberLabel(accountId)} is not in any circle yet. Paste an invite link on Overview.`
-        : viewingOther && circleName ? `Now viewing ${circleName}, which you are not a member of.` : ''
+        : viewingOther && circleName && canView() ? `Now viewing ${circleName}, which you are not a member of.` : ''
   const tier = me?.passport ? `${me.passport.display_tier} · ${demo?.circle?.name ?? `circle ${circleId}`}` : accountId ? 'Not a member of this circle yet' : ''
   $('#profile-tier').textContent = tier
   $('#crumb-circle').replaceChildren(demo?.circle?.name ?? skeleton())
@@ -1809,14 +1839,17 @@ function pasteInviteBox(): HTMLElement {
     if (invite.circleId !== (demo?.circleId ?? circleId)) await refreshAll()
     renderJourney()
     goView('home')
-    show('Invite found. Press "Join the circle" in your steps.', 'ok')
+    // The link is only read here; whether the invite still exists is checked on testnet in the box below.
+    show('Invite link read. It is being checked on testnet in the box on Overview.', 'info')
   })
   return el('div', { className: 'paste-box' }, input, use)
 }
 
 function renderJourney(): void {
-  const circleName = demo?.circle?.name ?? `circle ${circleId}`
   const invite = inviteFields()
+  // A visitor with no invite has no circle open (circles are private), so the steps must not name one.
+  const circleShown = canView() || (!!invite.inviteSecret && invite.circleId === circleId)
+  const circleName = circleShown ? (demo?.circle?.name ?? `circle ${circleId}`) : 'a circle'
   const passport = me?.passport ?? null
   const isMember = !!passport && passport.status === 'Active'
   const loans = (me?.loans ?? []).slice().sort((a, b) => Number(b.loan_id) - Number(a.loan_id))
@@ -1835,7 +1868,7 @@ function renderJourney(): void {
   steps.push(step(2, stateOf(1), `Join ${circleName}`,
     isMember ? `You are a ${passport.display_tier} of ${circleName}.`
       : passport ? `Your card is ${passport.status}. Ask the stewards for help.`
-        : invite.inviteSecret ? 'You have an invite. Joining costs about 0.009 NEAR, which pays for storing your card.'
+        : invite.inviteSecret ? 'You opened an invite link. Joining costs about 0.01 NEAR (0.009 to store your passport, plus a small network fee).'
           : 'You need an invite link from the founder or a Trusted member. Paste it in "Have an invite link?" above.',
     invite.inviteSecret && !passport ? [button('Join the circle', joinInvite)] : []))
   steps.push(step(3, stateOf(2), 'Sign in',
@@ -1883,7 +1916,7 @@ function renderJourney(): void {
   joinBox.hidden = isMember || !!passport
   if (!joinBox.hidden) {
     $('#join-text').textContent = invite.inviteSecret
-      ? (accountId ? 'Invite found. Press "Join the circle" in your steps below.' : 'Invite found. Connect your wallet (top right), then join.')
+      ? (accountId ? 'You opened an invite link. If the check below says it is valid, press Join.' : 'You opened an invite link. Connect your wallet, then join.')
       : `${accountId ? `${memberLabel(accountId)} is not a member of ${circleName} yet. ` : ''}Paste the invite link you were sent to join. Opening the link in this browser works too.`
     if (invite.inviteSecret) {
       const key = `${invite.invitePublicKey}|${accountId}|${circleName}`
@@ -1904,7 +1937,7 @@ function renderJourney(): void {
           status.textContent = !iv ? 'This invite was already used or does not exist. Ask for a new link.'
             : iv.expired ? 'This invite has expired. Ask for a new link.'
               : wrongWallet ? `This invite is only for ${iv.invitee_id}. Connect that wallet to join.`
-                : `Valid invite from ${memberLabel(iv.inviter_id)}. Joining costs about 0.01 NEAR (it pays for storing your passport), so the wallet needs some testnet NEAR.`
+                : `Valid invite from ${memberLabel(iv.inviter_id)}. Joining costs about 0.01 NEAR (0.009 to store your passport, plus a small network fee), so the wallet needs some testnet NEAR.`
           status.classList.toggle('bad', !iv || iv.expired || wrongWallet)
         }).catch(() => { status.textContent = 'Could not check the invite right now. You can still try to join.' })
       }
@@ -1914,7 +1947,7 @@ function renderJourney(): void {
   $('#home-hero').classList.toggle('compact', isMember)
   // A wallet that is not a member is only looking at this circle's public, on-chain history.
   const visitor = !isMember && !!demo?.circle
-  $('#hero-eyebrow').textContent = isMember ? 'Your circle' : 'Viewing a circle'
+  $('#hero-eyebrow').textContent = isMember ? 'Your circle' : demoOpen && circleId === DEMO_CIRCLE ? 'Public demo circle' : circleShown ? 'You are invited' : 'Private lending circles · NEAR testnet'
   $('#visitor-note').hidden = !visitor
   $('#visitor-note').textContent = !accountId ? 'You are viewing as a visitor. This is the circle\'s public history on testnet, not yours.'
     : `${memberLabel(accountId)} is not a member here. You are viewing this circle's public history on testnet; none of it is yours.`
@@ -1928,7 +1961,8 @@ function renderMembers(): void {
   const table = $('#members-table')
   const rows = passports.map((p) => el('div', { className: 'mrow' },
     el('span', { className: 'who' }, avatar(p.owner_id, 'sm'), accountChip(p.owner_id)),
-    el('span', {}, badge(p.display_tier), p.steward ? ' ' : '', p.steward ? badge('Steward') : ''),
+    // A steward's display tier is already "Steward": one badge, not two.
+    el('span', {}, badge(p.display_tier), ...(p.steward && p.display_tier !== 'Steward' ? [' ', badge('Steward')] : [])),
     el('span', { className: 'c-hide', textContent: p.status }),
     el('span', { className: 'c-hide', textContent: `${p.on_time_count} on time` }),
     el('span', { className: 'c-hide', textContent: `${p.late_count} late` })))
@@ -2086,9 +2120,12 @@ async function renderTreasury(): Promise<void> {
     const canVote = isSteward && p.status === 'InProgress' && !(accountId in (p.votes ?? {}))
     const what = target ? (target.action === 'fund' ? `Pay loan #${target.loanId}` : `Forgive the late mark on loan #${target.loanId}`) : p.description
     const label = p.status === 'InProgress' ? 'Voting' : p.status === 'Approved' ? 'Approved' : 'Other'
+    // An open vote whose loan is already cancelled, lapsed or forgiven can no longer do anything: say so.
+    const targetLoan = target ? (demo?.loans ?? []).find((l) => l.loan_id === target.loanId) ?? null : null
+    const stale = staleProposalNote(p.status, target?.action ?? null, targetLoan, Date.now())
     const li = el('li', {}, avatar(p.proposer, 'sm'), el('span', {},
       el('strong', { textContent: `#${p.id} ${what}` }), el('br'),
-      el('span', { className: 'muted small', textContent: `Asked by ${memberLabel(p.proposer)} · ${approvals} of ${stewards.length} approvals` })),
+      el('span', { className: 'muted small', textContent: `Asked by ${memberLabel(p.proposer)} · ${approvals} of ${stewards.length} approvals${stale ? ` · ${stale}` : ''}` })),
       el('span', { className: `state state-${label}`, textContent: label === 'Other' ? p.status : label }))
     if (canVote) li.append(button('Approve', async () => { await dao.approve(p); await afterTx(`You approved proposal #${p.id}.`) }))
     return li
@@ -2290,6 +2327,8 @@ function hydrateInviteFields(): void {
 function boot(): void {
   try { const t = localStorage.getItem('commoncircle.theme'); if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t } catch { /* ignore */ }
   hydrateInviteFields()
+  // "?demo=1" is the judges' link: it opens the public demo circle (and only that one) without a click.
+  if (wantsPublicDemo(window.location.search, !!inviteFields().inviteSecret)) { demoOpen = true; circleId = DEMO_CIRCLE; chatRoom = DEMO_CIRCLE; $<HTMLInputElement>('#demo-circle-id').value = DEMO_CIRCLE }
   wire()
   let start: View = 'home'
   try { const saved = localStorage.getItem('commoncircle.view'); if (saved && (VIEWS as readonly string[]).includes(saved)) start = saved as View } catch { /* ignore */ }

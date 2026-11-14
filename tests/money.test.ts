@@ -136,6 +136,15 @@ describe('summaries say who pays whom, how much, due when', () => {
   it('repay to the treasury', () => {
     expect(moneySummary('repay', loan({ lender_is_treasury: true }), label, '60').lines[0]).toBe('You pay 1 USDC back to the circle treasury (DAO).')
   })
+
+  it('a repayment summary says how long is left before the due time', () => {
+    const funded = loan({ state: 'Funded', due_at: ns(NOW + 95_000) })
+    expect(moneySummary('repay', funded, label, '60', { nowMs: NOW }).lines[1]).toBe('Paying before the due time counts as on time. About 1:35 was left when this box opened; the repayment must land on testnet before then.')
+    // No clock given, or the due time already passed: no countdown is made up.
+    expect(moneySummary('repay', funded, label, '60').lines[1]).toBe('Paying before the due time counts as on time.')
+    expect(moneySummary('repay', loan({ state: 'Funded', due_at: ns(NOW - 1000) }), label, '60', { nowMs: NOW }).lines[1]).toBe('Paying before the due time counts as on time.')
+    expect(moneySummary('repay', loan({ state: 'Funded', due_at: ns(NOW - 1000), overdue: true }), label, '60', { nowMs: NOW }).lines[1]).toBe('This loan is past its due time, so it will count as late.')
+  })
   it('explorer link', () => {
     expect(explorerTxUrl('https://testnet.nearblocks.io/', HASH)).toBe(`https://testnet.nearblocks.io/txns/${HASH}`)
   })

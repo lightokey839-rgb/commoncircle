@@ -5,7 +5,7 @@
   "args": {
     "id": 3
   },
-  "block_height": 277497990,
+  "block_height": 277589621,
   "result": {
     "id": 3,
     "proposer": "commoncircle-light-borrower3.testnet",
@@ -44,5 +44,5 @@
     ]
   },
   "rpc": "https://test.rpc.fastnear.com",
-  "read_at": "2026-11-13T10:30:09.548Z"
+  "read_at": "2026-11-14T01:28:04.557Z"
 }

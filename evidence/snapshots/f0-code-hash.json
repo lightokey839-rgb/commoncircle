@@ -3,14 +3,14 @@
   "account_id": "commoncircle-light.testnet",
   "method": "view_account",
   "args": {},
-  "block_height": 277497372,
+  "block_height": 277588595,
   "result": {
     "code_hash": "J4X6efoAqFoKVYxaSNtpDYUTyKrKDzrqa2vPZxvMLxGr",
     "global_contract_hash": null,
-    "storage_usage": 412598,
+    "storage_usage": 414926,
     "key_count": 1,
     "full_access_key_count": 1
   },
   "rpc": "https://test.rpc.fastnear.com",
-  "read_at": "2026-11-13T10:24:11.859Z"
+  "read_at": "2026-11-14T01:17:42.810Z"
 }

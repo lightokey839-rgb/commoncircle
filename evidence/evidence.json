@@ -1,7 +1,7 @@
 {
   "schema_version": "A9",
   "project": "CommonCircle",
-  "generated_at": "2026-11-13T10:30:16.621Z",
+  "generated_at": "2026-11-14T01:31:08.687Z",
   "claims": [
     {
       "id": "f0-code-hash",
@@ -316,9 +316,7 @@
       "expected": {
         "result": {
           "tier": "Trusted",
-          "effective_tier": "Trusted",
-          "status": "Active",
-          "on_time_count": 1
+          "status": "Active"
         }
       }
     },

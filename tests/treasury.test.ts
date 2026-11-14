@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { evaluateDaoPolicy, evaluateDaoTrust, requiredApprovals, SPUTNIK_GLOBAL_HASH, type PolicyJson } from '../web/dao'
 import {
-  clearFlagProposal, formatUsdc, loansNeedingProposal, proposalLoanId, repaymentNotice, stewardsOf, treasuryFundProposal,
+  clearFlagProposal, formatUsdc, loansNeedingProposal, proposalLoanId, repaymentNotice, staleProposalNote, stewardsOf, treasuryFundProposal,
   usdcToBaseUnits, SputnikDaoClient, type SputnikPolicy, type SputnikProposal,
 } from '../web/treasury'
 import { assertCircleName, assertTagline, isPlainText } from '../web/text-rules'
@@ -178,3 +178,23 @@ function loan(id: string, state: LoanView['state']): LoanView {
     repaid_on_time: null, qualifying: null, flag_cleared: false,
   }
 }
+
+describe('an open vote that can no longer do anything says so', () => {
+  const NOW = 1_800_000_000_000
+  const deadline = (ms: number) => (BigInt(ms) * 1_000_000n).toString()
+  it('a fund vote for a cancelled, lapsed or already funded loan', () => {
+    expect(staleProposalNote('InProgress', 'fund', loan('13', 'Cancelled'), NOW)).toBe('loan #13 was cancelled, so this vote can no longer pay it')
+    expect(staleProposalNote('InProgress', 'fund', { ...loan('7', 'Open'), funding_deadline: deadline(NOW - 1) }, NOW)).toBe('loan #7 passed its funding deadline, so this vote can no longer pay it')
+    expect(staleProposalNote('InProgress', 'fund', loan('6', 'Repaid'), NOW)).toBe('loan #6 is already repaid')
+  })
+  it('a forgive vote whose late mark is already cleared', () => {
+    expect(staleProposalNote('InProgress', 'clear_flag', { ...loan('4', 'Repaid'), flag_cleared: true }, NOW)).toBe('the late mark on loan #4 was already forgiven')
+    expect(staleProposalNote('InProgress', 'clear_flag', loan('19', 'Repaid'), NOW)).toBeNull()
+  })
+  it('says nothing for a live vote, a finished vote or an unknown loan', () => {
+    expect(staleProposalNote('InProgress', 'fund', { ...loan('8', 'Open'), funding_deadline: deadline(NOW + 60_000) }, NOW)).toBeNull()
+    expect(staleProposalNote('Approved', 'fund', loan('13', 'Cancelled'), NOW)).toBeNull()
+    expect(staleProposalNote('InProgress', 'fund', null, NOW)).toBeNull()
+    expect(staleProposalNote('InProgress', null, loan('13', 'Cancelled'), NOW)).toBeNull()
+  })
+})
