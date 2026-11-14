@@ -499,7 +499,17 @@ async function joinInvite(): Promise<void> {
   if (!invite) throw new Error('This invite was already used or does not exist.')
   if (invite.expired) throw new Error('This invite has expired. Ask for a new one.')
   if (invite.invitee_id && invite.invitee_id !== accountId) throw new Error(`This invite is for ${invite.invitee_id}. Connect that account instead.`)
+  if (await readClient.passportFor(cid, accountId)) {
+    throw new Error(`${memberLabel(accountId)} is already a member of this circle, so this invite is not for this wallet. Send the link to the person you are inviting; they open it and join with their own wallet.`)
+  }
   const storage = await readClient.storageCosts()
+  // The joining wallet pays the passport storage plus gas. A new wallet with 0 NEAR cannot sign at all.
+  const need = BigInt(storage.redeem_invite) + 10n ** 22n
+  await loadWalletBalance(accountId).catch(() => undefined)
+  const nearNow = walletBal?.account === accountId ? walletBal.near : null
+  if (nearNow !== null && BigInt(nearNow) < need) {
+    throw new Error(`This wallet has ${formatNear(nearNow)} NEAR. Joining needs about ${formatNear(need.toString())} NEAR (passport storage and fees). Send this wallet some testnet NEAR first, then press Join again.`)
+  }
   const signer = window.commonCircleInviteSigner ?? signInviteWithSecret
   await client().joinByInvite({ circleId: cid, callerId: accountId, invitePublicKey, inviteSecret, signInvite: signer, deposit: storage.redeem_invite })
   forgetInvite()

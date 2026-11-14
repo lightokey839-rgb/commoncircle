@@ -202,6 +202,11 @@ export class PostgresStore implements CircleStore {
     return rows[0].hits <= limit
   }
 
+  /** Delete every chat message and loan request card (off-chain data only). Used by CHAT_RESET on start. */
+  async resetChat(): Promise<void> {
+    await this.pool.query('truncate chat_messages, chat_rooms, loan_requests restart identity')
+  }
+
   async health(): Promise<{ ok: boolean; detail: string }> {
     try {
       await this.pool.query('select 1')

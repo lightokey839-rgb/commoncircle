@@ -51,6 +51,18 @@ async function openStore(): Promise<CircleStore> {
 }
 
 const store = await openStore()
+
+// One-time wipe of chat messages and request cards (never on-chain loans): set
+// CHAT_RESET=delete-all-chat-data, let the service restart once, then remove the variable.
+if (process.env.CHAT_RESET === 'delete-all-chat-data') {
+  const resettable = store as CircleStore & { resetChat?: () => Promise<void> }
+  if (resettable.resetChat) {
+    await resettable.resetChat()
+    console.warn('[chat-server] CHAT_RESET: all chat messages and loan request cards were deleted. Remove CHAT_RESET now.')
+  } else {
+    console.warn('[chat-server] CHAT_RESET is set but this store cannot be reset; delete server/.data instead.')
+  }
+}
 const gate = new MembershipGate(rpcAccessCheck(config.rpcUrl, config.contractId))
 const handle = createApp({
   store,
