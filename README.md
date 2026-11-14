@@ -13,6 +13,13 @@ borrower inside one transaction, and the contract's USDC balance is zero at rest
 > not end-to-end encrypted. Loan terms, account ids and passport history are
 > public on-chain. **Testnet only: no mainnet funds.**
 
+**Live app:** https://lightokey839-rgb.github.io/commoncircle/ · **Chat server:** https://commoncircle-chat.onrender.com/health
+(free hosting sleeps when idle; the first chat request can take about a minute).
+
+**Our other NEAR HACKATHON entry (rule Q-015):** [NEAR Intents Thesis Engine](https://github.com/lightokey839-rgb/Near-thesis-)
+(Investment Thesis track), a reproducible, data-pinned thesis on NEAR Intents demand,
+fee capture and value accrual, with its own dashboard.
+
 ## The problem
 
 In a rotating savings group (ajo, esusu, chama) you get money when it is your
